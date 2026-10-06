@@ -26,6 +26,8 @@ interface TextFieldProps {
   placeholder?: string;
   autoComplete?: string;
   maxLength?: number;
+  /** Only for the first field of a single-purpose page (login, register). */
+  autoFocus?: boolean;
   /** Marks the label with a red asterisk and sets aria-required. */
   required?: boolean;
   /** An error from the API for this field, shown instead of validation errors. */
@@ -44,6 +46,7 @@ export function TextField({
   placeholder,
   autoComplete,
   maxLength,
+  autoFocus,
   required = false,
   serverError,
   hideErrors = false,
@@ -75,6 +78,7 @@ export function TextField({
     placeholder,
     autoComplete,
     maxLength,
+    autoFocus,
     value,
     onBlur: field.handleBlur,
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {

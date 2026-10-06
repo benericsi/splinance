@@ -46,6 +46,7 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
             field={field}
             required
             label="Display name"
+            autoFocus
             placeholder="e.g. Anna"
             autoComplete="nickname"
           />

@@ -41,6 +41,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
             field={field}
             required
             label="Email"
+            autoFocus
             type="email"
             placeholder="you@example.com"
             autoComplete="email"
