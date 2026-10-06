@@ -1,5 +1,5 @@
 import { BRAND_COLORS } from '@splinance/shared';
-import { patternStyleFor } from '@/components/brand/pattern-style';
+import { motifStyleFor } from '@/components/brand/motif-style';
 import { renderMotif } from '@/components/brand/motifs';
 import { cn } from '@/lib/utils';
 
@@ -14,7 +14,7 @@ interface HouseholdAvatarProps {
  * renames and distinct between households. Only legible (logo) pairings are used.
  */
 export function HouseholdAvatar({ household, size = 32, className }: HouseholdAvatarProps) {
-  const { motif, pairing } = patternStyleFor(household.id);
+  const { motif, pairing } = motifStyleFor(household.id);
   const bg = BRAND_COLORS[pairing.bg];
 
   return (

@@ -40,14 +40,6 @@ export const LOGO_PAIRINGS: readonly BrandPairing[] = [
 /** The primary pairing: app icon, favicon, default logo. */
 export const PRIMARY_PAIRING: BrandPairing = { bg: 'blue', fg: 'pink' };
 
-/** Low-contrast but pretty pairs: only for pure decoration (patterns), never text or logo. */
-export const DECORATIVE_PAIRINGS: readonly BrandPairing[] = [
-  { bg: 'pink', fg: 'cream' },
-  { bg: 'orange', fg: 'cream' },
-  { bg: 'mustard', fg: 'pink' },
-  { bg: 'sky', fg: 'cream' },
-];
-
 /** FNV-1a: small, fast and stable across platforms, so ids always map to the same pairing. */
 export function hashString(value: string): number {
   let hash = 0x811c9dc5;

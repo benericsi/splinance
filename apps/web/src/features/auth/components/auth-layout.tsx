@@ -1,9 +1,6 @@
 import type { ReactNode } from 'react';
-import { Pattern } from '@/components/brand/pattern';
+import { PosterWall } from '@/components/brand/poster-wall';
 import { Logo } from '@/components/logo';
-
-// Fixed seeds: the poster wall looks the same on every visit.
-const POSTER_SEEDS = ['porto', 'kyoto', 'nyc', 'rome', 'miami', 'berlin'];
 
 interface AuthLayoutProps {
   title: string;
@@ -13,25 +10,18 @@ interface AuthLayoutProps {
   children: ReactNode;
 }
 
-/** Split auth screen: brand poster wall on the left (lg+), form on the right. */
+/** Split auth screen: poster wall on the left (lg+), form on the right. */
 export function AuthLayout({ title, description, aside, children }: AuthLayoutProps) {
   return (
     <div className="bg-muted/40 grid min-h-svh gap-3 p-3 lg:grid-cols-2">
-      <aside className="bg-brand-blue hidden flex-col gap-8 rounded-2xl p-10 lg:flex">
-        {/* Pink on blue is 5:1, cream on blue 7.9:1: both readable. */}
-        <Logo tile={false} className="text-brand-pink self-start" />
-        <div className="grid flex-1 grid-cols-3 gap-3" aria-hidden>
-          {POSTER_SEEDS.map((seed) => (
-            <div key={seed} className="overflow-hidden rounded-xl">
-              <Pattern seed={seed} decorative cell={36} />
-            </div>
-          ))}
-        </div>
+      <aside className="bg-background hidden flex-col justify-between gap-8 rounded-2xl p-8 lg:flex">
+        <Logo className="self-start" />
+        <PosterWall />
         <div className="space-y-3">
-          <p className="font-heading text-brand-pink text-4xl leading-[1.05] font-extrabold tracking-tight text-balance">
+          <p className="font-heading text-4xl leading-[1.05] font-extrabold tracking-tight text-balance">
             Shared expenses, sorted.
           </p>
-          <p className="text-brand-cream max-w-md text-base">
+          <p className="text-muted-foreground max-w-md text-base">
             Track what you spend together and always know who owes whom.
           </p>
         </div>
