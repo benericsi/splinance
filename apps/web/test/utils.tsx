@@ -1,6 +1,6 @@
 import type { User } from '@splinance/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 
 /** Renders with a fresh QueryClient so tests never share cached data. */
@@ -25,4 +25,10 @@ export function authResponse(accessToken = 'access-1', user: User = testUser) {
 
 export function apiError(code: string, message = code) {
   return { error: { code, message } };
+}
+
+/** Finds a form control by label, ignoring the visual required marker ("Password *"). */
+export function getField(label: string): HTMLElement {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return screen.getByLabelText(new RegExp(`^${escaped}\\s*\\*?$`));
 }

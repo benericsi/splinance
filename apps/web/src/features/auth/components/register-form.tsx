@@ -44,6 +44,7 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         {(field) => (
           <TextField
             field={field}
+            required
             label="Display name"
             placeholder="e.g. Anna"
             autoComplete="nickname"
@@ -55,6 +56,7 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
         {(field) => (
           <TextField
             field={field}
+            required
             label="Email"
             type="email"
             placeholder="you@example.com"
@@ -77,6 +79,7 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
             {(field) => (
               <TextField
                 field={field}
+                required
                 label="Password"
                 type="password"
                 placeholder="Create a password"

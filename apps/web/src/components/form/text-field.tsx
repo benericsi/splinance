@@ -26,6 +26,8 @@ interface TextFieldProps {
   placeholder?: string;
   autoComplete?: string;
   maxLength?: number;
+  /** Marks the label with a red asterisk and sets aria-required. */
+  required?: boolean;
   /** An error from the API for this field, shown instead of validation errors. */
   serverError?: string | undefined;
   /** Hide validation errors, e.g. when a live checklist already explains them. */
@@ -42,6 +44,7 @@ export function TextField({
   placeholder,
   autoComplete,
   maxLength,
+  required = false,
   serverError,
   hideErrors = false,
   description,
@@ -78,13 +81,22 @@ export function TextField({
       field.handleChange(e.target.value);
       onValueChange?.();
     },
+    'aria-required': required || undefined,
     'aria-invalid': invalid,
     'aria-describedby': describedBy,
   };
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id}>
+        {label}
+        {/* Visual cue only; screen readers get aria-required on the input. */}
+        {required && (
+          <span aria-hidden className="text-destructive -ml-1">
+            *
+          </span>
+        )}
+      </Label>
       {type === 'password' ? (
         <InputGroup className="h-10">
           <InputGroupInput {...inputProps} type={revealed ? 'text' : 'password'} />

@@ -39,6 +39,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         {(field) => (
           <TextField
             field={field}
+            required
             label="Email"
             type="email"
             placeholder="you@example.com"
@@ -52,6 +53,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         {(field) => (
           <TextField
             field={field}
+            required
             label="Password"
             type="password"
             placeholder="Enter your password"
