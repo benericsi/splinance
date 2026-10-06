@@ -9,15 +9,15 @@ Household expense tracker for personal spending and shared expenses with a partn
 ## Tech stack
 
 - **API:** Node.js, Express 5, TypeScript, PostgreSQL, Drizzle ORM, Zod, pino
-- **Web:** React, Vite, TanStack Router/Query/Form, shadcn/ui, Tailwind CSS
+- **Web:** React 19, Vite, TanStack Router and Query, shadcn/ui (Base UI), Tailwind CSS v4
 - **Shared:** Zod schemas and types used by both apps
-- **Tooling:** pnpm workspaces, Docker Compose, Vitest, Supertest, ESLint, Prettier, GitHub Actions
+- **Tooling:** pnpm workspaces, Docker Compose, Vitest, Supertest, Testing Library, ESLint, Prettier, GitHub Actions
 
 ## Repository layout
 
 ```
 apps/api         Express REST API
-apps/web         React SPA (planned)
+apps/web         React SPA (Vite)
 packages/shared  Zod schemas and types shared by api and web
 ```
 
@@ -35,10 +35,17 @@ pnpm dev
 
 Docker Compose starts Postgres with two databases: `splinance` for development and `splinance_test` for tests. If port 5432 is taken, copy `.env.example` to `.env` in the repo root, change `DB_PORT`, and update `DATABASE_URL` (and `TEST_DATABASE_URL` for tests) to match.
 
-The API runs at http://localhost:3000:
+`pnpm dev` starts both apps:
 
-- `GET /health/live`: the process is running
-- `GET /health/ready`: the API can reach the database (503 if not)
+- Web app: http://localhost:5173 (the home page shows live API and database status)
+- API: http://localhost:3000, all routes under `/api`
+
+In development, Vite proxies `/api/*` to the API, so the browser talks to a single origin and no CORS setup is needed.
+
+Health endpoints:
+
+- `GET /api/health/live`: the process is running
+- `GET /api/health/ready`: the API can reach the database (503 if not)
 
 ## Database migrations
 

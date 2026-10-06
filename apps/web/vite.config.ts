@@ -1,0 +1,32 @@
+import tailwindcss from '@tailwindcss/vite';
+import { tanstackRouter } from '@tanstack/router-plugin/vite';
+import react from '@vitejs/plugin-react';
+import { fileURLToPath, URL } from 'node:url';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  plugins: [
+    // Must run before the React plugin: generates src/routeTree.gen.ts from src/routes.
+    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    react(),
+    tailwindcss(),
+  ],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  server: {
+    port: 5173,
+    // Fail instead of silently moving to another port (the origin matters for cookies).
+    strictPort: true,
+    // Same origin for browser and API in dev: no CORS, cookies just work.
+    proxy: {
+      '/api': 'http://localhost:3000',
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./test/setup.ts'],
+  },
+});
