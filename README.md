@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="apps/web/public/logo.svg" width="96" alt="Splinance logo" />
+</p>
+
 # Splinance
 
 [![CI](https://github.com/benericsi/splinance/actions/workflows/ci.yml/badge.svg)](https://github.com/benericsi/splinance/actions/workflows/ci.yml)

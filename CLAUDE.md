@@ -47,7 +47,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Not found / error states: `NotFoundPage` / `ErrorPage` (full page at the root, inline inside layouts via router defaults); throw `notFound()` for missing resources
 - shadcn/ui on Base UI; components in `src/components/ui` are owned code and may be edited. Icons: lucide only
 - Brand: palette, logo pairings and contrast helpers live in `packages/shared/src/brand.ts` (mirrored as `--color-brand-*` in `apps/web/src/index.css`; keep both in sync). Brand colors are fills; text uses role tokens `text-link`, `text-positive`, `text-negative` (light/dark tuned to >= 4.5:1). UI chrome stays neutral. Every logo pairing must stay >= 3:1 (enforced by a test)
-- Logo: `LogoMark` / `Logo`; `public/favicon.svg` is the source for PNG icons (`pnpm --filter @splinance/web gen:icons`)
+- Logo: pink-to-orange split S on a softly lit blue tile (`LogoMark` / `Logo`, crisp). `public/favicon.svg` (crisp) and `public/logo.svg` (grainy, for large static uses and the iOS icon) must match the component; PNGs via `pnpm --filter @splinance/web gen:icons`. Keep the S at >= 3:1 against the tile glow
 - Avatars only through wrappers: `UserAvatar` (facehash with brand colors, seeded with user id) and `HouseholdAvatar` (brand motif + pairing derived from household id). The auth screen uses the hand-composed `PosterWall` (`components/brand`): curated art, not generated
 - Fonts: Inter (body, 14px base, use `tabular-nums` for amounts) and Bricolage Grotesque (headings, `font-heading`), self-hosted via fontsource (never Google Fonts CDN, GDPR)
 - Web tests mock the API with MSW (`test/msw.ts`, unhandled requests fail the test)

@@ -1,16 +1,9 @@
-import type { BrandPairing } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
 import { LogoMark } from './brand/logo-mark';
 
-interface LogoProps {
-  className?: string;
-  /** Mark colors; the wordmark inherits the current text color. */
-  pairing?: BrandPairing;
-  tile?: boolean;
-}
-
-export function Logo({ className, pairing, tile = true }: LogoProps) {
+/** Mark + "Splinance" wordmark; the wordmark inherits the current text color. */
+export function Logo({ className }: { className?: string }) {
   return (
     <Link
       to="/"
@@ -19,7 +12,7 @@ export function Logo({ className, pairing, tile = true }: LogoProps) {
         className,
       )}
     >
-      <LogoMark pairing={pairing} tile={tile} className={tile ? 'size-8' : 'h-8 w-6'} />
+      <LogoMark className="size-8" />
       Splinance
     </Link>
   );

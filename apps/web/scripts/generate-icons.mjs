@@ -1,33 +1,33 @@
-// Renders PNG icons from public/favicon.svg (the source of truth).
+// Renders PNG icons: crisp favicon.svg for small sizes, grainy logo.svg for the large iOS icon.
 // Run after changing the logo: pnpm --filter @splinance/web gen:icons
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
-const svg = await readFile(`${publicDir}favicon.svg`);
+const logo = await readFile(`${publicDir}logo.svg`, 'utf8');
+const sources = {
+  favicon: await readFile(`${publicDir}favicon.svg`),
+  // iOS rounds the corners itself and shows any inner rounding as a visible edge,
+  // so the home-screen icon uses a full-bleed square tile.
+  logoFullBleed: Buffer.from(
+    logo
+      .replaceAll(
+        'x="4" y="4" width="56" height="56" rx="16"',
+        'x="0" y="0" width="64" height="64"',
+      )
+      .replaceAll('x="4" y="4" width="56" height="56"', 'x="0" y="0" width="64" height="64"'),
+  ),
+};
 
 const icons = [
   // Legacy browsers that ignore SVG favicons.
-  { file: 'favicon-32.png', size: 32, padding: 0 },
-  // iOS home screen: full-bleed square (iOS rounds the corners itself), so render the
-  // tile slightly enlarged to hide the transparent margin of the SVG.
-  { file: 'apple-touch-icon.png', size: 180, padding: -12, background: '#0000D4' },
+  { file: 'favicon-32.png', size: 32, source: 'favicon' },
+  { file: 'apple-touch-icon.png', size: 180, source: 'logoFullBleed' },
 ];
 
-for (const { file, size, padding, background } of icons) {
-  const inner = size - padding * 2;
-  let image = sharp(svg, { density: 384 }).resize(inner, inner);
-  if (padding < 0) {
-    const crop = -padding;
-    image = sharp(await image.png().toBuffer()).extract({
-      left: crop,
-      top: crop,
-      width: size,
-      height: size,
-    });
-  }
-  if (background) image = image.flatten({ background });
+for (const { file, size, source } of icons) {
+  const image = sharp(sources[source], { density: 384 }).resize(size, size);
   await image.png({ compressionLevel: 9 }).toFile(`${publicDir}${file}`);
   console.log(`Wrote public/${file} (${String(size)}px)`);
 }
