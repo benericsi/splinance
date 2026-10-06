@@ -1,15 +1,10 @@
-import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
-import { AuthCard } from '@/features/auth/components/auth-card';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { AuthLayout } from '@/features/auth/components/auth-layout';
 import { LoginForm } from '@/features/auth/components/login-form';
 import { redirectSearchSchema, safeRedirect } from '@/lib/safe-redirect';
 
-export const Route = createFileRoute('/login')({
+export const Route = createFileRoute('/_auth/login')({
   validateSearch: redirectSearchSchema,
-  beforeLoad: ({ context, search }) => {
-    if (context.auth.getState().status === 'authenticated') {
-      throw redirect({ href: safeRedirect(search.redirect) });
-    }
-  },
   component: LoginPage,
 });
 
@@ -18,19 +13,23 @@ function LoginPage() {
   const navigate = useNavigate();
 
   return (
-    <AuthCard
+    <AuthLayout
       title="Log in"
       description="Welcome back to Splinance."
-      footer={
+      aside={
         <>
           No account yet?{' '}
-          <Link to="/register" search={{ redirect: target }} className="text-foreground underline">
+          <Link
+            to="/register"
+            search={{ redirect: target }}
+            className="text-foreground font-medium"
+          >
             Create one
           </Link>
         </>
       }
     >
       <LoginForm onSuccess={() => void navigate({ href: safeRedirect(target), replace: true })} />
-    </AuthCard>
+    </AuthLayout>
   );
 }

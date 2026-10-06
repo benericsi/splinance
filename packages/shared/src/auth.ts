@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, PASSWORD_RULES } from './password/rules';
 
 // Normalized before validation so "Anna@Example.com " and "anna@example.com" are the same account.
 export const emailSchema = z
@@ -10,8 +11,8 @@ export const emailSchema = z
 // Length over complexity rules (NIST SP 800-63B). Upper bound keeps hashing cost predictable.
 export const passwordSchema = z
   .string()
-  .min(10, 'Password must be at least 10 characters')
-  .max(128, 'Password must be at most 128 characters');
+  .min(PASSWORD_MIN_LENGTH, `Password must be at least ${String(PASSWORD_MIN_LENGTH)} characters`)
+  .max(PASSWORD_MAX_LENGTH, `Password must be at most ${String(PASSWORD_MAX_LENGTH)} characters`);
 
 export const displayNameSchema = z
   .string()
@@ -19,11 +20,21 @@ export const displayNameSchema = z
   .min(1, 'Display name is required')
   .max(50, 'Display name must be at most 50 characters');
 
-export const registerInputSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
-  displayName: displayNameSchema,
-});
+export const registerInputSchema = z
+  .object({
+    email: emailSchema,
+    password: passwordSchema,
+    displayName: displayNameSchema,
+  })
+  .superRefine(({ password, email, displayName }, ctx) => {
+    // Length is covered by passwordSchema; the remaining required rules need the other fields.
+    for (const rule of PASSWORD_RULES) {
+      if (!rule.required || rule.id === 'minLength') continue;
+      if (!rule.test(password, { email, displayName })) {
+        ctx.addIssue({ code: 'custom', path: ['password'], message: rule.message });
+      }
+    }
+  });
 
 export type RegisterInput = z.infer<typeof registerInputSchema>;
 

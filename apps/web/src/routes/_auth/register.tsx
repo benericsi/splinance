@@ -1,15 +1,10 @@
-import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
-import { AuthCard } from '@/features/auth/components/auth-card';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { AuthLayout } from '@/features/auth/components/auth-layout';
 import { RegisterForm } from '@/features/auth/components/register-form';
 import { redirectSearchSchema, safeRedirect } from '@/lib/safe-redirect';
 
-export const Route = createFileRoute('/register')({
+export const Route = createFileRoute('/_auth/register')({
   validateSearch: redirectSearchSchema,
-  beforeLoad: ({ context, search }) => {
-    if (context.auth.getState().status === 'authenticated') {
-      throw redirect({ href: safeRedirect(search.redirect) });
-    }
-  },
   component: RegisterPage,
 });
 
@@ -18,13 +13,13 @@ function RegisterPage() {
   const navigate = useNavigate();
 
   return (
-    <AuthCard
+    <AuthLayout
       title="Create your account"
       description="Track personal and shared expenses in one place."
-      footer={
+      aside={
         <>
           Already have an account?{' '}
-          <Link to="/login" search={{ redirect: target }} className="text-foreground underline">
+          <Link to="/login" search={{ redirect: target }} className="text-foreground font-medium">
             Log in
           </Link>
         </>
@@ -33,6 +28,6 @@ function RegisterPage() {
       <RegisterForm
         onSuccess={() => void navigate({ href: safeRedirect(target), replace: true })}
       />
-    </AuthCard>
+    </AuthLayout>
   );
 }

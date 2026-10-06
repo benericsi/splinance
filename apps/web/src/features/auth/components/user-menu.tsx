@@ -1,5 +1,6 @@
 import type { User } from '@splinance/shared';
 import { LogOut } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { UserAvatar } from '@/components/user-avatar';
 import {
   DropdownMenu,
@@ -30,6 +31,11 @@ export function UserMenu({ user }: { user: User }) {
             <div className="text-muted-foreground truncate text-xs font-normal">{user.email}</div>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <div className="flex items-center justify-between gap-4 px-2 py-1">
+          <span className="text-sm">Theme</span>
+          <ThemeToggle />
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={logout.isPending}

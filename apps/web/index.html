@@ -5,6 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Splinance</title>
+    <!-- Applies the saved theme before first paint (no light flash in dark mode).
+         Mirrors src/lib/theme.ts; a production CSP needs this script's hash. -->
+    <script>
+      (function () {
+        var dark = false;
+        try {
+          var p = localStorage.getItem('splinance-theme');
+          dark =
+            p === 'dark' || (p !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        } catch (e) {
+          dark = matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

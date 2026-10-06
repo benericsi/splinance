@@ -3,3 +3,4 @@ dist
 coverage
 apps/api/drizzle
 **/routeTree.gen.ts
+packages/shared/src/password/common-passwords.ts

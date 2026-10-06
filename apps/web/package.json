@@ -13,6 +13,7 @@
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@fontsource-variable/geist": "^5.3.0",
+    "@outpacelabs/avatars": "^0.6.0",
     "@splinance/shared": "workspace:*",
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-query": "^5.104.1",

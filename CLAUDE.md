@@ -38,7 +38,10 @@ Splinance is a household expense web app for tracking personal spending and shar
   - No DTO/model/mapper layer: shared Zod schemas are the contract and are validated at runtime
 - `http` is a module-level client (`createHttpClient` factory): attaches the access token from the in-memory `authStore`, refreshes once on 401 (single in-flight refresh, Web Locks across tabs) and retries once. Never store tokens in localStorage
 - Failed mutations show a sonner toast globally (`MutationCache.onError`); toasts use `sonner` directly, not the shadcn wrapper
-- Forms: TanStack Form with the shared Zod schema via `revalidateLogic()` + `onDynamic`; field-specific API errors next to the field, others in `FormError`
+- Forms: TanStack Form with the shared Zod schema via `revalidateLogic()` + `onDynamic`; field-specific API errors next to the field, others in `FormError`. `TextField` takes a placeholder; password fields get a show/hide toggle, no other input icons
+- Password policy lives once in `packages/shared/src/password/rules.ts`: required rules (length >= 10, no email/name, not common) block registration and are enforced by the API; composition rules (lower/upper/number) are non-blocking hints (NIST SP 800-63B). The common password list is generated (`pnpm --filter @splinance/shared gen:common-passwords`), do not edit it by hand
+- Theme: `src/lib/theme.ts` store (light/dark/system, localStorage, `.dark` on <html>) plus an inline script in `index.html` that applies it before first paint; keep both in sync. Every UI change must look right in light and dark
+- Layouts: `_auth` (split screen with gradient panel, redirects logged-in users) and `_authenticated` (app header with account menu, redirects to /login)
 - shadcn/ui on Base UI; components in `src/components/ui` are owned code and may be edited. Icons: lucide only
 - Avatars only through wrappers: `UserAvatar` (facehash, seeded with user id, gradient variant) and `HouseholdAvatar` (`@outpacelabs/avatars`, seeded with household id)
 - Web tests mock the API with MSW (`test/msw.ts`, unhandled requests fail the test)
