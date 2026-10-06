@@ -24,7 +24,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - `packages/shared` is consumed as TypeScript source (no build step); the api bundles it with tsdown
 - TypeScript pinned to 6.0 until typescript-eslint supports TS 7; `@types/node` matches the Node runtime major
 - Module resolution is `Bundler` everywhere, so no `.js` extensions in relative imports
-- Commands: `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format`
+- Commands: `pnpm check` (same steps as CI), `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format`
 - Work on a branch per change (`chore/...`, `feat/...`, `ci/...`, `docs/...`) and merge via pull request; do not commit to `main` directly
 
 ## Key design decisions
