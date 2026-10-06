@@ -1,10 +1,11 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { createRootRouteWithContext, Link, Outlet } from '@tanstack/react-router';
+import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { lazy, Suspense } from 'react';
 import { Toaster } from 'sonner';
-import { UserMenu } from '@/features/auth/components/user-menu';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { ensureSessionRestored } from '@/features/auth/session';
-import { type AuthStore, useAuth } from '@/lib/auth-store';
+import type { AuthStore } from '@/lib/auth-store';
+import { useTheme } from '@/lib/theme';
 
 export interface RouterContext {
   queryClient: QueryClient;
@@ -20,26 +21,19 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   component: RootLayout,
 });
 
+/** App shell shared by every page; layouts live in _auth and _authenticated. */
 function RootLayout() {
-  const { user } = useAuth();
+  const { resolved } = useTheme();
 
   return (
-    <div className="bg-background text-foreground min-h-svh">
-      <header className="border-b">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Link to="/" className="font-heading text-lg font-semibold">
-            Splinance
-          </Link>
-          {user && <UserMenu user={user} />}
-        </div>
-      </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">
+    <TooltipProvider>
+      <div className="bg-background text-foreground min-h-svh">
         <Outlet />
-      </main>
-      <Toaster position="top-center" richColors closeButton />
+      </div>
+      <Toaster position="top-center" richColors closeButton theme={resolved} />
       <Suspense>
         <Devtools />
       </Suspense>
-    </div>
+    </TooltipProvider>
   );
 }

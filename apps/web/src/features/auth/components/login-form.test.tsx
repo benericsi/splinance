@@ -4,13 +4,19 @@ import { http as mock, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { authStore } from '@/lib/auth-store';
 import { server } from '../../../../test/msw';
-import { apiError, authResponse, renderWithQuery, testUser } from '../../../../test/utils';
+import {
+  apiError,
+  authResponse,
+  getField,
+  renderWithQuery,
+  testUser,
+} from '../../../../test/utils';
 import { LoginForm } from './login-form';
 
 async function fillAndSubmit(email: string, password: string) {
   const user = userEvent.setup();
-  if (email) await user.type(screen.getByLabelText('Email'), email);
-  if (password) await user.type(screen.getByLabelText('Password'), password);
+  if (email) await user.type(getField('Email'), email);
+  if (password) await user.type(getField('Password'), password);
   await user.click(screen.getByRole('button', { name: 'Log in' }));
   return user;
 }
@@ -22,8 +28,8 @@ describe('LoginForm', () => {
 
     await fillAndSubmit('not-an-email', '');
 
-    expect(await screen.findByLabelText('Email')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText('Password')).toHaveAttribute('aria-invalid', 'true');
+    expect(getField('Email')).toHaveAttribute('aria-invalid', 'true');
+    expect(getField('Password')).toHaveAttribute('aria-invalid', 'true');
     expect(onSuccess).not.toHaveBeenCalled();
   });
 
@@ -60,7 +66,7 @@ describe('LoginForm', () => {
     const user = await fillAndSubmit('anna@example.com', 'wrong password');
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password');
-    await user.type(screen.getByLabelText('Password'), 'x');
+    await user.type(getField('Password'), 'x');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

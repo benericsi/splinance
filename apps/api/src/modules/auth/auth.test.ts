@@ -96,6 +96,17 @@ describe('POST /api/auth/register', () => {
     expect(errorCode(res)).toBe('EMAIL_TAKEN');
   });
 
+  it('enforces the shared password rules on the server', async () => {
+    for (const password of ['qwertyuiop', 'anna-has-a-secret']) {
+      const res = await request(app)
+        .post('/api/auth/register')
+        .send({ ...credentials, password })
+        .expect(400);
+      expect(errorCode(res)).toBe('VALIDATION_ERROR');
+    }
+    expect(await db.select().from(users)).toHaveLength(0);
+  });
+
   it('validates the body', async () => {
     const res = await request(app)
       .post('/api/auth/register')

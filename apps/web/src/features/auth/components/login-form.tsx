@@ -39,8 +39,10 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         {(field) => (
           <TextField
             field={field}
+            required
             label="Email"
             type="email"
+            placeholder="you@example.com"
             autoComplete="email"
             onValueChange={login.reset}
           />
@@ -51,8 +53,10 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
         {(field) => (
           <TextField
             field={field}
+            required
             label="Password"
             type="password"
+            placeholder="Enter your password"
             autoComplete="current-password"
             onValueChange={login.reset}
           />
@@ -61,7 +65,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <Button type="submit" size="lg" className="h-10 w-full" disabled={isSubmitting}>
             {isSubmitting ? 'Logging in…' : 'Log in'}
           </Button>
         )}
