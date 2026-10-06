@@ -30,8 +30,18 @@ Splinance is a household expense web app for tracking personal spending and shar
 - API routes are mounted under `/api`; errors use the shared `apiErrorResponseSchema` shape
 - API code is organized by domain in `apps/api/src/modules/<name>/` (`<name>.routes.ts` parses input with shared Zod schemas, `<name>.service.ts` holds business logic and Drizzle queries; services accept `Db` so they run inside or outside a transaction). Multi-row writes use `db.transaction`
 - Protected routes use `requireAuth` and read the user with `getAuth(req)`; authorization checks live in services
-- Web: file-based TanStack Router routes in `apps/web/src/routes` (`routeTree.gen.ts` is generated, committed, not linted); feature code in `src/features/<name>`; data fetching via `queryOptions` + `apiFetch(path, sharedSchema)`; Vite proxies `/api` to the API in dev
-- shadcn/ui on Base UI; components in `src/components/ui` are owned code and may be edited
+- Web: file-based TanStack Router routes in `apps/web/src/routes` (`routeTree.gen.ts` is generated, committed, not linted); protected pages live under the `_authenticated` layout route; Vite proxies `/api` to the API in dev
+- Web data layer (service layer + custom hooks), per feature in `src/features/<name>/`:
+  - `api.ts`: service functions, the only place that imports `http` from `src/lib/http.ts`; object params; return parsed data or void
+  - `queries.ts`: `queryOptions` factories with hierarchical keys (`xQueries.all()`, `.list(params)`, `.detail(id)`), usable in route loaders and components
+  - `hooks.ts`: one custom hook per mutation use case; owns cache invalidation; set `meta: { suppressErrorToast: true }` only when the component renders the error itself
+  - No DTO/model/mapper layer: shared Zod schemas are the contract and are validated at runtime
+- `http` is a module-level client (`createHttpClient` factory): attaches the access token from the in-memory `authStore`, refreshes once on 401 (single in-flight refresh, Web Locks across tabs) and retries once. Never store tokens in localStorage
+- Failed mutations show a sonner toast globally (`MutationCache.onError`); toasts use `sonner` directly, not the shadcn wrapper
+- Forms: TanStack Form with the shared Zod schema via `revalidateLogic()` + `onDynamic`; field-specific API errors next to the field, others in `FormError`
+- shadcn/ui on Base UI; components in `src/components/ui` are owned code and may be edited. Icons: lucide only
+- Avatars only through wrappers: `UserAvatar` (facehash, seeded with user id, gradient variant) and `HouseholdAvatar` (`@outpacelabs/avatars`, seeded with household id)
+- Web tests mock the API with MSW (`test/msw.ts`, unhandled requests fail the test)
 - Tests run against a real Postgres (`splinance_test`); migrations are applied in Vitest global setup. API test files run sequentially (`fileParallelism: false`); tests that write data call `resetDatabase()` from `apps/api/test/db.ts` in `beforeEach`
 - Password hashing uses `@node-rs/argon2` (the `argon2` package segfaults on this Windows setup)
 - Work on a branch per change (`chore/...`, `feat/...`, `ci/...`, `docs/...`) and merge via pull request; do not commit to `main` directly

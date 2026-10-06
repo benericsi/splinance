@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { healthLiveQuery, healthReadyQuery } from './queries';
+import { healthQueries } from './queries';
 
 type Tone = 'success' | 'destructive' | 'secondary';
 
@@ -33,8 +33,8 @@ function StatusCard({
 }
 
 export function StatusPanel() {
-  const live = useQuery(healthLiveQuery);
-  const ready = useQuery(healthReadyQuery);
+  const live = useQuery(healthQueries.live());
+  const ready = useQuery(healthQueries.ready());
 
   const apiStatus: ServiceStatus = live.isPending
     ? { label: 'Checking', tone: 'secondary' }
