@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { healthQueries } from '@/features/health/queries';
 import { StatusPanel } from '@/features/health/status-panel';
 import { useAuth } from '@/lib/auth-store';
+import { PageTitle } from '@/components/page-title';
 
 export const Route = createFileRoute('/_authenticated/')({
   // Start fetching while the route loads; the component reads from the same cache.
@@ -19,6 +20,7 @@ function HomePage() {
 
   return (
     <div className="space-y-6">
+      <PageTitle title="Home" />
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">
           Welcome, {user?.displayName}

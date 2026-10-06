@@ -7,7 +7,12 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   plugins: [
     // Must run before the React plugin: generates src/routeTree.gen.ts from src/routes.
-    tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true,
+      // Tests may live next to routes without becoming routes.
+      routeFileIgnorePattern: '\\.test\\.',
+    }),
     react(),
     tailwindcss(),
   ],

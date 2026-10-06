@@ -21,9 +21,66 @@
         document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
       })();
     </script>
+    <!-- Splash styles live inline: the app CSS is not loaded yet when the splash shows. -->
+    <style>
+      html {
+        background: oklch(1 0 0);
+      }
+      html.dark {
+        background: oklch(0.145 0 0);
+      }
+      .splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        font:
+          14px/1.4 system-ui,
+          sans-serif;
+        color: oklch(0.556 0 0);
+      }
+      .splash a {
+        color: inherit;
+      }
+      /* If the app never boots (script error, stale deploy), offer a way out. CSS only. */
+      .splash-slow {
+        visibility: hidden;
+        animation: splash-reveal 0s 8s forwards;
+      }
+      @keyframes splash-reveal {
+        to {
+          visibility: visible;
+        }
+      }
+      .splash img {
+        width: 40px;
+        height: 40px;
+        animation: splash-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes splash-pulse {
+        50% {
+          opacity: 0.45;
+          transform: scale(0.94);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .splash img {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Shown until main.tsx has restored the session and loaded the first route. -->
+      <div class="splash" role="status" aria-label="Loading Splinance">
+        <img src="/favicon.svg" alt="" />
+        <p class="splash-slow">Taking longer than expected. <a href="">Reload the page</a></p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

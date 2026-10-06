@@ -69,3 +69,32 @@ describe('route guard and session restore', () => {
     expect(router.state.location.pathname).toBe('/');
   });
 });
+
+describe('page titles and not found', () => {
+  it('sets a page title per route', async () => {
+    server.use(
+      mock.post('/api/auth/refresh', () =>
+        HttpResponse.json(apiError('INVALID_REFRESH_TOKEN'), { status: 401 }),
+      ),
+    );
+
+    renderAt('/login');
+
+    await screen.findByRole('heading', { name: 'Log in' });
+    expect(document.title).toBe('Log in · Splinance');
+  });
+
+  it('shows a full 404 page for unknown URLs', async () => {
+    server.use(
+      mock.post('/api/auth/refresh', () =>
+        HttpResponse.json(apiError('INVALID_REFRESH_TOKEN'), { status: 401 }),
+      ),
+    );
+
+    renderAt('/does/not/exist');
+
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Back to home' })).toHaveAttribute('href', '/');
+    expect(document.title).toBe('Page not found · Splinance');
+  });
+});

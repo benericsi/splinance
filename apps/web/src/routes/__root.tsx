@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { lazy, Suspense } from 'react';
 import { Toaster } from 'sonner';
+import { ErrorPage, NotFoundPage } from '@/components/route-states';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ensureSessionRestored } from '@/features/auth/session';
 import type { AuthStore } from '@/lib/auth-store';
@@ -19,6 +20,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   // Every navigation waits for the one-time session restore, so guards see the real state.
   beforeLoad: () => ensureSessionRestored(),
   component: RootLayout,
+  notFoundComponent: () => <NotFoundPage fullPage />,
+  errorComponent: (props) => <ErrorPage {...props} fullPage />,
 });
 
 /** App shell shared by every page; layouts live in _auth and _authenticated. */

@@ -1,6 +1,6 @@
+import { cn } from '@/lib/utils';
 import type { User } from '@splinance/shared';
 import { Facehash } from 'facehash';
-import { cn } from '@/lib/utils';
 
 // Muted, mid-tone colors: calm for a finance app, still distinct at 24px.
 const AVATAR_COLORS = ['#0f766e', '#0e7490', '#4f46e5', '#7c3aed', '#be185d', '#b45309', '#15803d'];
@@ -28,6 +28,7 @@ export function UserAvatar({ user, size = 32, className }: UserAvatarProps) {
       aria-label={user.displayName}
       title={user.displayName}
       className={cn('shrink-0 overflow-hidden rounded-full', className)}
+      enableBlink
     />
   );
 }
