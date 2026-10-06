@@ -1,11 +1,16 @@
 import express from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
+import { pingDatabase } from './db/client';
 import { logger } from './lib/logger';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
-import { healthRouter } from './routes/health';
+import { createHealthRouter, type HealthDeps } from './routes/health';
 
-export function createApp() {
+export type AppDeps = HealthDeps;
+
+const defaultDeps: AppDeps = { pingDatabase };
+
+export function createApp(deps: AppDeps = defaultDeps) {
   const app = express();
 
   app.disable('x-powered-by');
@@ -26,7 +31,7 @@ export function createApp() {
   );
   app.use(express.json({ limit: '100kb' }));
 
-  app.use('/health', healthRouter);
+  app.use('/health', createHealthRouter(deps));
 
   app.use(notFoundHandler);
   app.use(errorHandler);
