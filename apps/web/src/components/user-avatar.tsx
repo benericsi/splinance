@@ -1,9 +1,18 @@
 import { cn } from '@/lib/utils';
 import type { User } from '@splinance/shared';
+import { BRAND_COLORS } from '@splinance/shared';
 import { Facehash } from 'facehash';
 
-// Muted, mid-tone colors: calm for a finance app, still distinct at 24px.
-const AVATAR_COLORS = ['#0f766e', '#0e7490', '#4f46e5', '#7c3aed', '#be185d', '#b45309', '#15803d'];
+// Brand palette minus cream (too close to light backgrounds to read as an avatar).
+const AVATAR_COLORS = [
+  BRAND_COLORS.blue,
+  BRAND_COLORS.green,
+  BRAND_COLORS.red,
+  BRAND_COLORS.orange,
+  BRAND_COLORS.pink,
+  BRAND_COLORS.sky,
+  BRAND_COLORS.mustard,
+];
 
 interface UserAvatarProps {
   user: Pick<User, 'id' | 'displayName'>;

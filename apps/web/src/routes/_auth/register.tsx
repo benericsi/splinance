@@ -22,7 +22,11 @@ function RegisterPage() {
         aside={
           <>
             Already have an account?{' '}
-            <Link to="/login" search={{ redirect: target }} className="text-foreground font-medium">
+            <Link
+              to="/login"
+              search={{ redirect: target }}
+              className="text-link font-medium underline-offset-4 hover:underline"
+            >
               Log in
             </Link>
           </>

@@ -25,7 +25,7 @@ function LoginPage() {
             <Link
               to="/register"
               search={{ redirect: target }}
-              className="text-foreground font-medium"
+              className="text-link font-medium underline-offset-4 hover:underline"
             >
               Create one
             </Link>
