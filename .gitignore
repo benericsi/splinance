@@ -147,3 +147,20 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Claude Code local settings
+.claude/settings.local.json
