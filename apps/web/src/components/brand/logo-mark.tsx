@@ -1,12 +1,12 @@
 import { BRAND_COLORS as B } from '@splinance/shared';
 import { useId } from 'react';
 
-// The split S: two strokes with a gap in the middle. Shared with public/favicon.svg and
-// public/logo.svg; keep all three in sync.
+// The split S (chunky monoline): two strokes with a ~3 unit gap in the middle.
+// Shared with public/favicon.svg and public/logo.svg; keep all three in sync.
 const SPLIT_S_TOP =
-  'M42 21C42 16 37.5 13.5 32 13.5C26 13.5 22 16.5 22 21.5C22 25.5 25 27.6 29 28.6';
+  'M42.5 20.5C42.5 15.5 37.5 12.5 32 12.5C25.5 12.5 21 15.8 21 21.2C21 25 23.8 27.1 27.6 28.1';
 const SPLIT_S_BOTTOM =
-  'M35 35.4C39.5 36.6 42 38.8 42 42.5C42 47.5 38 50.5 32 50.5C26.5 50.5 22 48 22 43';
+  'M36.4 35.9C40.3 37.2 43 39.4 43 43C43 48.2 38.5 51.5 32 51.5C26 51.5 21.2 48.8 21 43';
 
 // Lightest point of the tile glow. Brighter blues drop the orange end of the S below
 // 3:1 (#3B3BFF would be 2.28:1); #1515E8 keeps it at 3.2:1.
@@ -42,7 +42,7 @@ export function LogoMark({ className }: { className?: string }) {
         </linearGradient>
       </defs>
       <rect x="4" y="4" width="56" height="56" rx="16" fill={`url(#${id}-tile)`} />
-      <g fill="none" stroke={`url(#${id}-s)`} strokeWidth="6" strokeLinecap="round">
+      <g fill="none" stroke={`url(#${id}-s)`} strokeWidth="8.5" strokeLinecap="round">
         <path d={SPLIT_S_TOP} />
         <path d={SPLIT_S_BOTTOM} />
       </g>
