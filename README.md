@@ -10,6 +10,11 @@ Household expense tracker for personal spending and shared expenses with a partn
 
 > Work in progress.
 
+## Documentation
+
+- [Architecture](docs/architecture.md): how the code works, auth flow, data layer, testing, and the tricky parts
+- [Data model](docs/data-model.md): tables and database conventions
+
 ## Tech stack
 
 - **API:** Node.js, Express 5, TypeScript, PostgreSQL, Drizzle ORM, Zod, pino

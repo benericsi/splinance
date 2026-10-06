@@ -21,6 +21,8 @@ Splinance is a household expense web app for tracking personal spending and shar
 
 ## Repo conventions
 
+- Read `docs/architecture.md` (how everything works, including "The hard parts") and `docs/data-model.md` before larger changes; update them in the same PR when behavior changes
+
 - `packages/shared` is consumed as TypeScript source (no build step); the api bundles it with tsdown
 - TypeScript pinned to 6.0 until typescript-eslint supports TS 7; `@types/node` matches the Node runtime major
 - Module resolution is `Bundler` everywhere, so no `.js` extensions in relative imports
