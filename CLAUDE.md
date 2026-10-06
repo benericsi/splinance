@@ -21,6 +21,8 @@ Splinance is a household expense web app for tracking personal spending and shar
 
 ## Repo conventions
 
+- Read `docs/architecture.md` (how everything works, including "The hard parts") and `docs/data-model.md` before larger changes; update them in the same PR when behavior changes
+
 - `packages/shared` is consumed as TypeScript source (no build step); the api bundles it with tsdown
 - TypeScript pinned to 6.0 until typescript-eslint supports TS 7; `@types/node` matches the Node runtime major
 - Module resolution is `Bundler` everywhere, so no `.js` extensions in relative imports
@@ -46,7 +48,10 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Boot: `index.html` holds a static splash (with a CSS-only "taking longer" fallback after 8 s); `main.tsx` awaits `router.load()` before rendering, so there is no blank frame or login flash
 - Not found / error states: `NotFoundPage` / `ErrorPage` (full page at the root, inline inside layouts via router defaults); throw `notFound()` for missing resources
 - shadcn/ui on Base UI; components in `src/components/ui` are owned code and may be edited. Icons: lucide only
-- Avatars only through wrappers: `UserAvatar` (facehash, seeded with user id, gradient variant) and `HouseholdAvatar` (`@outpacelabs/avatars`, seeded with household id)
+- Brand: palette, logo pairings and contrast helpers live in `packages/shared/src/brand.ts` (mirrored as `--color-brand-*` in `apps/web/src/index.css`; keep both in sync). Brand colors are fills; text uses role tokens `text-link`, `text-positive`, `text-negative` (light/dark tuned to >= 4.5:1). UI chrome stays neutral. Every logo pairing must stay >= 3:1 (enforced by a test)
+- Logo: pink-to-orange split S on a softly lit blue tile (`LogoMark` / `Logo`, crisp). `public/favicon.svg` (crisp) and `public/logo.svg` (grainy, for large static uses and the iOS icon) must match the component; PNGs via `pnpm --filter @splinance/web gen:icons`. Keep the S at >= 3:1 against the tile glow
+- Avatars only through wrappers: `UserAvatar` (facehash with brand colors, seeded with user id) and `HouseholdAvatar` (brand motif + pairing derived from household id). The auth screen uses the hand-composed `PosterWall` (`components/brand`): curated art, not generated
+- Fonts: Inter (body, 14px base, use `tabular-nums` for amounts) and Bricolage Grotesque (headings, `font-heading`), self-hosted via fontsource (never Google Fonts CDN, GDPR)
 - Web tests mock the API with MSW (`test/msw.ts`, unhandled requests fail the test)
 - Tests run against a real Postgres (`splinance_test`); migrations are applied in Vitest global setup. API test files run sequentially (`fileParallelism: false`); tests that write data call `resetDatabase()` from `apps/api/test/db.ts` in `beforeEach`
 - Password hashing uses `@node-rs/argon2` (the `argon2` package segfaults on this Windows setup)

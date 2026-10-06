@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="apps/web/public/logo.svg" width="96" alt="Splinance logo" />
+</p>
+
 # Splinance
 
 [![CI](https://github.com/benericsi/splinance/actions/workflows/ci.yml/badge.svg)](https://github.com/benericsi/splinance/actions/workflows/ci.yml)
@@ -5,6 +9,11 @@
 Household expense tracker for personal spending and shared expenses with a partner, roommates or family.
 
 > Work in progress.
+
+## Documentation
+
+- [Architecture](docs/architecture.md): how the code works, auth flow, data layer, testing, and the tricky parts
+- [Data model](docs/data-model.md): tables and database conventions
 
 ## Tech stack
 

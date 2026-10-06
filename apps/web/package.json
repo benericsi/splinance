@@ -8,12 +8,13 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
-    "@fontsource-variable/geist": "^5.3.0",
-    "@outpacelabs/avatars": "^0.6.0",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource-variable/inter": "^5.3.0",
     "@splinance/shared": "workspace:*",
     "@tanstack/react-form": "^1.33.5",
     "@tanstack/react-query": "^5.104.1",
@@ -43,6 +44,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "jsdom": "^30.1.2",
     "msw": "^3.0.2",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.3",
     "vitest": "^5.0.3"
