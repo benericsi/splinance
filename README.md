@@ -1,5 +1,7 @@
 # Splinance
 
+[![CI](https://github.com/benericsi/splinance/actions/workflows/ci.yml/badge.svg)](https://github.com/benericsi/splinance/actions/workflows/ci.yml)
+
 Household expense tracker for personal spending and shared expenses with a partner, roommates or family.
 
 > Work in progress.
@@ -33,11 +35,12 @@ The API runs at http://localhost:3000. Check it with `GET /health`.
 
 ## Scripts
 
-| Command          | What it does                  |
-| ---------------- | ----------------------------- |
-| `pnpm dev`       | Start all apps in watch mode  |
-| `pnpm build`     | Build all apps                |
-| `pnpm test`      | Run all tests                 |
-| `pnpm typecheck` | Type-check every package      |
-| `pnpm lint`      | Lint with ESLint (type-aware) |
-| `pnpm format`    | Format with Prettier          |
+| Command          | What it does                                                       |
+| ---------------- | ------------------------------------------------------------------ |
+| `pnpm dev`       | Start all apps in watch mode                                       |
+| `pnpm build`     | Build all apps                                                     |
+| `pnpm test`      | Run all tests                                                      |
+| `pnpm typecheck` | Type-check every package                                           |
+| `pnpm lint`      | Lint with ESLint (type-aware)                                      |
+| `pnpm format`    | Format with Prettier                                               |
+| `pnpm check`     | Run everything CI runs: format check, lint, typecheck, test, build |
