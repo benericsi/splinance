@@ -47,7 +47,11 @@ Health endpoints:
 - `GET /api/health/live`: the process is running
 - `GET /api/health/ready`: the API can reach the database (503 if not)
 
-## Database migrations
+## Database
+
+The data model and its conventions are described in [docs/data-model.md](docs/data-model.md).
+
+### Migrations
 
 Schema lives in `apps/api/src/db/schema.ts`. Migrations are SQL files in `apps/api/drizzle`, generated from the schema and committed.
 

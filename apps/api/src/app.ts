@@ -1,9 +1,12 @@
+import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import { pingDatabase } from './db/client';
 import { logger } from './lib/logger';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
+import { requireAuth } from './middleware/require-auth';
+import { createAuthRouter, getMe } from './modules/auth/auth.routes';
 import { createHealthRouter, type HealthDeps } from './routes/health';
 
 export type AppDeps = HealthDeps;
@@ -30,10 +33,13 @@ export function createApp(deps: AppDeps = defaultDeps) {
     }),
   );
   app.use(express.json({ limit: '100kb' }));
+  app.use(cookieParser());
 
   // All API routes live under /api, so they never collide with frontend paths.
   const api = express.Router();
   api.use('/health', createHealthRouter(deps));
+  api.use('/auth', createAuthRouter());
+  api.get('/me', requireAuth, getMe);
   app.use('/api', api);
 
   app.use(notFoundHandler);
