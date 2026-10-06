@@ -26,6 +26,9 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Module resolution is `Bundler` everywhere, so no `.js` extensions in relative imports
 - Commands: `pnpm check` (same steps as CI), `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format`
 - Database: schema in `apps/api/src/db/schema.ts`, migrations generated with `db:generate` into `apps/api/drizzle` and committed; never use `drizzle-kit push`. Do not edit or regenerate a migration once merged
+- API routes are mounted under `/api`; errors use the shared `apiErrorResponseSchema` shape
+- Web: file-based TanStack Router routes in `apps/web/src/routes` (`routeTree.gen.ts` is generated, committed, not linted); feature code in `src/features/<name>`; data fetching via `queryOptions` + `apiFetch(path, sharedSchema)`; Vite proxies `/api` to the API in dev
+- shadcn/ui on Base UI; components in `src/components/ui` are owned code and may be edited
 - Tests run against a real Postgres (`splinance_test`); migrations are applied in Vitest global setup
 - Work on a branch per change (`chore/...`, `feat/...`, `ci/...`, `docs/...`) and merge via pull request; do not commit to `main` directly
 
