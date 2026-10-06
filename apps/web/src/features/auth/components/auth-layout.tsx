@@ -16,7 +16,7 @@ export function AuthLayout({ title, description, aside, children }: AuthLayoutPr
     <div className="bg-muted/40 grid min-h-svh gap-3 p-3 lg:grid-cols-2">
       <aside className="bg-background hidden flex-col justify-between gap-8 rounded-2xl p-8 lg:flex">
         <Logo className="self-start" />
-        <PosterWall />
+        <PosterWall className="flex-1" />
         <div className="space-y-3">
           <p className="font-heading text-4xl leading-[1.05] font-extrabold tracking-tight text-balance">
             Shared expenses, sorted.
