@@ -23,7 +23,10 @@ describe('registerInputSchema', () => {
       displayName: '   ',
     });
     expect(result.success).toBe(false);
-    expect(result.error?.issues.map((i) => i.path[0])).toEqual(['password', 'displayName']);
+    expect(result.error?.issues.map((i) => [i.path[0], i.message])).toEqual([
+      ['password', 'Password must be at least 10 characters'],
+      ['displayName', 'Display name is required'],
+    ]);
   });
 });
 

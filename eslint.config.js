@@ -28,6 +28,21 @@ export default tseslint.config(
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // TanStack Router control flow: `throw redirect()` / `throw notFound()` by design.
+      '@typescript-eslint/only-throw-error': [
+        'error',
+        {
+          allow: [
+            {
+              from: 'package',
+              package: '@tanstack/router-core',
+              name: ['Redirect', 'NotFoundError'],
+            },
+          ],
+        },
+      ],
+    },
   },
   {
     // shadcn/ui components export variant helpers next to the component, and route files

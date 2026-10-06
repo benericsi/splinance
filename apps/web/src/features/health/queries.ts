@@ -1,20 +1,23 @@
-import { liveResponseSchema, readyResponseSchema } from '@splinance/shared';
 import { queryOptions } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api-client';
+import { healthApi } from './api';
 
 const POLL_INTERVAL_MS = 10_000;
 
 // Status checks should report failures immediately, not after retries.
-export const healthLiveQuery = queryOptions({
-  queryKey: ['health', 'live'],
-  queryFn: () => apiFetch('/health/live', liveResponseSchema),
-  refetchInterval: POLL_INTERVAL_MS,
-  retry: false,
-});
-
-export const healthReadyQuery = queryOptions({
-  queryKey: ['health', 'ready'],
-  queryFn: () => apiFetch('/health/ready', readyResponseSchema),
-  refetchInterval: POLL_INTERVAL_MS,
-  retry: false,
-});
+export const healthQueries = {
+  all: () => ['health'] as const,
+  live: () =>
+    queryOptions({
+      queryKey: [...healthQueries.all(), 'live'],
+      queryFn: ({ signal }) => healthApi.live(signal),
+      refetchInterval: POLL_INTERVAL_MS,
+      retry: false,
+    }),
+  ready: () =>
+    queryOptions({
+      queryKey: [...healthQueries.all(), 'ready'],
+      queryFn: ({ signal }) => healthApi.ready(signal),
+      refetchInterval: POLL_INTERVAL_MS,
+      retry: false,
+    }),
+};

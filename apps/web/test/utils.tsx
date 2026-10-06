@@ -1,28 +1,28 @@
+import type { User } from '@splinance/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { vi } from 'vitest';
 
 /** Renders with a fresh QueryClient so tests never share cached data. */
 export function renderWithQuery(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return {
+    queryClient,
+    ...render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>),
+  };
 }
 
-export function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
+export const testUser: User = {
+  id: '01a112be-f8eb-73bb-b534-400e393821c3',
+  email: 'anna@example.com',
+  displayName: 'Anna',
+  createdAt: '2026-10-06T19:44:27.880Z',
+};
+
+export function authResponse(accessToken = 'access-1', user: User = testUser) {
+  return { accessToken, user };
 }
 
-/** Replaces global fetch with a handler keyed by request path. */
-export function stubFetch(routes: Record<string, () => Response | Promise<Response>>) {
-  const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-    const handler = routes[url];
-    return handler ? Promise.resolve(handler()) : Promise.reject(new TypeError('Failed to fetch'));
-  });
-  vi.stubGlobal('fetch', fetchMock);
-  return fetchMock;
+export function apiError(code: string, message = code) {
+  return { error: { code, message } };
 }
