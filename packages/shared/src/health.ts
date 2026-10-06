@@ -1,8 +1,21 @@
 import { z } from 'zod';
 
-export const healthResponseSchema = z.object({
+/** Liveness: the process is up. Never depends on external services. */
+export const liveResponseSchema = z.object({
   status: z.literal('ok'),
   uptimeSeconds: z.number().nonnegative(),
 });
 
-export type HealthResponse = z.infer<typeof healthResponseSchema>;
+export type LiveResponse = z.infer<typeof liveResponseSchema>;
+
+const checkStatusSchema = z.enum(['ok', 'error']);
+
+/** Readiness: the process can serve traffic (dependencies reachable). */
+export const readyResponseSchema = z.object({
+  status: checkStatusSchema,
+  checks: z.object({
+    database: checkStatusSchema,
+  }),
+});
+
+export type ReadyResponse = z.infer<typeof readyResponseSchema>;

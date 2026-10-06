@@ -15,7 +15,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 ## Stack
 
 - Frontend: React, TypeScript, Vite, TanStack Router, TanStack Query, TanStack Form, shadcn/ui, Tailwind CSS, charts (shadcn charts / Recharts), Zod
-- Backend: Node.js, Express 5, TypeScript, PostgreSQL (ORM or query builder still to decide, leaning Drizzle), Zod validation, Argon2, pino
+- Backend: Node.js, Express 5, TypeScript, PostgreSQL 18, Drizzle ORM (node-postgres driver), Zod validation, Argon2, pino
 - Later: BullMQ + Redis for jobs
 - Tooling: pnpm monorepo (apps/web, apps/api, packages/shared), Vitest, Supertest, Playwright, Docker Compose, GitHub Actions
 
@@ -25,6 +25,8 @@ Splinance is a household expense web app for tracking personal spending and shar
 - TypeScript pinned to 6.0 until typescript-eslint supports TS 7; `@types/node` matches the Node runtime major
 - Module resolution is `Bundler` everywhere, so no `.js` extensions in relative imports
 - Commands: `pnpm check` (same steps as CI), `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format`
+- Database: schema in `apps/api/src/db/schema.ts`, migrations generated with `db:generate` into `apps/api/drizzle` and committed; never use `drizzle-kit push`. Do not edit or regenerate a migration once merged
+- Tests run against a real Postgres (`splinance_test`); migrations are applied in Vitest global setup
 - Work on a branch per change (`chore/...`, `feat/...`, `ci/...`, `docs/...`) and merge via pull request; do not commit to `main` directly
 
 ## Key design decisions

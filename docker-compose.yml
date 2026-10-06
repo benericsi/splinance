@@ -1,0 +1,24 @@
+# Local development services. Credentials here are for local use only.
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: splinance
+      POSTGRES_PASSWORD: splinance
+      POSTGRES_DB: splinance
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    volumes:
+      # Postgres 18+ keeps data in a versioned subdirectory, so mount the parent.
+      - pgdata:/var/lib/postgresql
+      # Runs only when the volume is empty (first start).
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U splinance -d splinance']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
