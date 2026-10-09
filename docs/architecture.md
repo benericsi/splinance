@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phase 0 (foundation) and Phase 1 auth (API and web) are done; the households API is done, its web UI is not. Transactions and everything after are not built yet.
+Status: Phase 0 (foundation) and Phase 1 auth (API and web) are done; the households API is done, and the web has the household shell (switcher, sections, new household). Settings actions, invites and onboarding are next. Transactions and everything after are not built yet.
 
 ## Contents
 
@@ -49,6 +49,8 @@ Key files by concern:
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                          |
 | HTTP client, auth store       | `apps/web/src/lib/http.ts`, `apps/web/src/lib/auth-store.ts`                                                     |
 | Auth (web)                    | `apps/web/src/features/auth/*`                                                                                   |
+| Households (web), app shell   | `apps/web/src/features/households/*`, `apps/web/src/routes/_authenticated/h/*`                                   |
+| URL-driven modals             | `apps/web/src/components/route-dialog.tsx`, `apps/web/src/lib/route-modal.ts`                                    |
 | Theme                         | `apps/web/src/lib/theme.ts` + inline script in `apps/web/index.html`                                             |
 | Brand                         | `packages/shared/src/brand.ts`, `apps/web/src/components/brand/*`, `apps/web/src/index.css`                      |
 
@@ -285,15 +287,36 @@ _auth.tsx                  pathless layout: if authenticated -> redirect to ?red
   _auth/login.tsx          /login
   _auth/register.tsx       /register
 _authenticated.tsx         pathless layout: if not authenticated -> redirect /login?redirect=<current>;
-                           renders the app header (logo, account menu)
-  _authenticated/index.tsx /  (home)
+                           validates ?modal= and renders app-wide modals (ModalHost)
+  _authenticated/index.tsx /  dispatcher: redirect to the last used household, else the first;
+                              "create your first household" when there is none
+  _authenticated/h/$householdId.tsx           household layout: loads the household (404 -> notFound()),
+                                              remembers it as last used, renders HouseholdShell
+    _authenticated/h/$householdId/index.tsx    /h/:id           overview
+    _authenticated/h/$householdId/settings.tsx /h/:id/settings  details and members
 ```
+
+- Household shell (`HouseholdShell`): on desktop a sidebar with the logo, the household switcher and the section links; the account menu sits top right, level with the page heading (`PageHeader` leaves room for it). On phones a top bar holds the switcher and account menu, and the sections become a bottom tab bar. New sections are added to `NAV_ITEMS`.
+- The last used household is kept in localStorage per user id (`splinance-last-household:<userId>`), a convenience only: `/` checks it against the list from the API.
 
 - Router context carries `queryClient` and `auth` (the store), so guards and loaders work outside React.
 - The `?redirect=` value is validated by `redirectSearchSchema` and `safeRedirect()`: only same-app paths are allowed; `https://...`, `//evil.com` and `/\evil.com` fall back to `/` (open redirect protection).
 - Logout or a failed mid-session refresh flips `authStore` to anonymous. `main.tsx` subscribes to that transition and calls `router.invalidate()`, so guards re-run and protected pages redirect.
 - Not found and errors: the root shows full-page versions; the router defaults (`defaultNotFoundComponent`, `defaultErrorComponent`) render inline inside layouts. "Try again" resets the error boundary and re-runs loaders.
 - Page titles: each page renders exactly one `<PageTitle title="..." />`. React 19 hoists `<title>` into `<head>`; multiple titles at once are unsupported, so layouts never render one.
+
+### URL-driven modals
+
+Every modal has a URL, so reload, sharing a link and the back button work (the pattern comes from the Bump project, which used React Router's "background location"). Two flavors:
+
+| Flavor                   | Use for                                         | How                                                                                                                           |
+| ------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Search param (`?modal=`) | app-wide actions, openable from any page        | `_authenticated` validates `modal` with a Zod enum (unknown values are dropped) and renders the matching dialog over the page |
+| Child route              | modals that belong to a page (invite, edit ...) | a child route renders a dialog over its parent route; a pasted link shows the real parent underneath                          |
+
+- `RouteDialog` is the shell for both: a Base UI dialog on larger screens, a Base UI drawer (bottom sheet, swipe to dismiss) below the `sm` breakpoint. It is always open while mounted; closing plays the exit animation, then calls `onClose`.
+- Links that open a modal pass `state={OPEN_MODAL_STATE}`. `useCloseModal(fallback)` goes back in history when that flag is set (closing does not leave a "modal open" entry behind, so back does not reopen it); for a pasted link there is nothing to go back to, so it runs the fallback, a `replace` navigation to the page underneath.
+- After a successful submit the dialog navigates with `replace: true`, which swaps out the modal entry.
 
 ## 10. Web: data layer
 
@@ -335,6 +358,7 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 - Query retries: none for 4xx (`ApiError` with status 400-499), up to 2 otherwise.
 - `MutationCache.onError` shows a sonner toast for every failed mutation. A mutation opts out with `meta: { suppressErrorToast: true }` when the component shows the error itself (the auth forms do).
 - `useLogout` clears `authStore` and the whole query cache in `onSettled`, even if the request fails, so no data of the previous user stays in memory.
+- Households: `householdQueries.list()` and `.detail(id)` under the `['households']` key; mutations invalidate the whole key. The household layout's loader awaits the detail (a 404 becomes `notFound()`) and warms the list for the switcher; components read the detail with `useSuspenseQuery`, which never suspends there because the loader filled the cache.
 
 ## 11. Web: forms
 
@@ -401,7 +425,9 @@ Things that took real debugging or are easy to break. Read these before changing
 13. **One lock order: household, then invite.** Accepting an invite reads the invite's household id without a lock, locks the household, then locks the invite row. Membership changes lock the household and then revoke invites. Locking the invite first in accept would let the two paths deadlock.
 14. **Invite tokens are credentials in a URL.** They are 256-bit random values stored as SHA-256 hashes, but they travel in the path, so `redactUrl()` strips them from request logs. The web invite page must not load third-party resources (Referer leak); Helmet already sends `Referrer-Policy: no-referrer` for API responses.
 15. **Invites die with their creator's ownership.** Leaving, removal and demotion revoke the person's pending invites in the same transaction. Otherwise an owner could mint a link, get removed, and walk back in.
-16. **Preview port collisions.** A tool or platform that sets `PORT` for a process makes the API bind that port (`--env-file` never overrides existing env vars). Vite uses `strictPort`, so it fails instead of silently moving.
+16. **Menus that open modals must not take focus back.** A Base UI menu restores focus to its trigger after its close animation. When the clicked item opens a URL-driven dialog, the dialog is already open by then, so focus would land on the trigger behind the backdrop and typing would go nowhere. `DropdownMenuContent` defaults `finalFocus` to skip the restore while a dialog or drawer is open. jsdom does not reproduce this timing; it was found and verified in a real browser.
+17. **A hidden browser pane freezes Base UI exit animations.** Popups wait for their CSS transitions (and `requestAnimationFrame`) before unmounting. In a background or hidden browser view those never advance, so a closed drawer stays mounted with `data-ending-style` until the page is visible again. Not a bug in the app; verify closing behavior in a visible window or in jsdom tests.
+18. **Preview port collisions.** A tool or platform that sets `PORT` for a process makes the API bind that port (`--env-file` never overrides existing env vars). Vite uses `strictPort`, so it fails instead of silently moving.
 
 ## 15. Known limitations
 

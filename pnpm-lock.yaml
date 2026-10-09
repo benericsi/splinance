@@ -126,6 +126,9 @@ importers:
       '@splinance/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@tanstack/history':
+        specifier: 1.162.4
+        version: 1.162.4
       '@tanstack/react-form':
         specifier: ^1.33.5
         version: 1.33.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0)

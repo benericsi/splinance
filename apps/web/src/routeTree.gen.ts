@@ -14,6 +14,9 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedHHouseholdIdRouteImport } from './routes/_authenticated/h/$householdId'
+import { Route as AuthenticatedHHouseholdIdIndexRouteImport } from './routes/_authenticated/h/$householdId/index'
+import { Route as AuthenticatedHHouseholdIdSettingsRouteImport } from './routes/_authenticated/h/$householdId/settings'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
@@ -38,16 +41,39 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedHHouseholdIdRoute =
+  AuthenticatedHHouseholdIdRouteImport.update({
+    id: '/h/$householdId',
+    path: '/h/$householdId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedHHouseholdIdIndexRoute =
+  AuthenticatedHHouseholdIdIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedHHouseholdIdRoute,
+  } as any)
+const AuthenticatedHHouseholdIdSettingsRoute =
+  AuthenticatedHHouseholdIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AuthenticatedHHouseholdIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
+  '/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
+  '/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRoute
+  '/h/$householdId/': typeof AuthenticatedHHouseholdIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
+  '/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRoute
+  '/h/$householdId': typeof AuthenticatedHHouseholdIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -56,12 +82,26 @@ export interface FileRoutesById {
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/register': typeof AuthRegisterRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
+  '/_authenticated/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRoute
+  '/_authenticated/h/$householdId/': typeof AuthenticatedHHouseholdIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/register'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/register'
+    | '/h/$householdId'
+    | '/h/$householdId/settings'
+    | '/h/$householdId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/register'
+  to:
+    | '/'
+    | '/login'
+    | '/register'
+    | '/h/$householdId/settings'
+    | '/h/$householdId'
   id:
     | '__root__'
     | '/_auth'
@@ -69,6 +109,9 @@ export interface FileRouteTypes {
     | '/_auth/login'
     | '/_auth/register'
     | '/_authenticated/'
+    | '/_authenticated/h/$householdId'
+    | '/_authenticated/h/$householdId/settings'
+    | '/_authenticated/h/$householdId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -113,6 +156,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/h/$householdId': {
+      id: '/_authenticated/h/$householdId'
+      path: '/h/$householdId'
+      fullPath: '/h/$householdId'
+      preLoaderRoute: typeof AuthenticatedHHouseholdIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/h/$householdId/': {
+      id: '/_authenticated/h/$householdId/'
+      path: '/'
+      fullPath: '/h/$householdId/'
+      preLoaderRoute: typeof AuthenticatedHHouseholdIdIndexRouteImport
+      parentRoute: typeof AuthenticatedHHouseholdIdRoute
+    }
+    '/_authenticated/h/$householdId/settings': {
+      id: '/_authenticated/h/$householdId/settings'
+      path: '/settings'
+      fullPath: '/h/$householdId/settings'
+      preLoaderRoute: typeof AuthenticatedHHouseholdIdSettingsRouteImport
+      parentRoute: typeof AuthenticatedHHouseholdIdRoute
+    }
   }
 }
 
@@ -128,12 +192,31 @@ const AuthRouteChildren: AuthRouteChildren = {
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
+interface AuthenticatedHHouseholdIdRouteChildren {
+  AuthenticatedHHouseholdIdSettingsRoute: typeof AuthenticatedHHouseholdIdSettingsRoute
+  AuthenticatedHHouseholdIdIndexRoute: typeof AuthenticatedHHouseholdIdIndexRoute
+}
+
+const AuthenticatedHHouseholdIdRouteChildren: AuthenticatedHHouseholdIdRouteChildren =
+  {
+    AuthenticatedHHouseholdIdSettingsRoute:
+      AuthenticatedHHouseholdIdSettingsRoute,
+    AuthenticatedHHouseholdIdIndexRoute: AuthenticatedHHouseholdIdIndexRoute,
+  }
+
+const AuthenticatedHHouseholdIdRouteWithChildren =
+  AuthenticatedHHouseholdIdRoute._addFileChildren(
+    AuthenticatedHHouseholdIdRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedHHouseholdIdRoute: typeof AuthenticatedHHouseholdIdRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedHHouseholdIdRoute: AuthenticatedHHouseholdIdRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
