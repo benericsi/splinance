@@ -77,13 +77,12 @@ describe('opening the app', () => {
     expect(router.state.location.pathname).toBe(`/h/${testHousehold.id}`);
   });
 
-  it('asks to create a household when the user has none', async () => {
+  it('starts onboarding when the user has no household', async () => {
     signedIn([]);
-    renderRoute('/');
+    const router = renderRoute('/');
 
-    expect(
-      await screen.findByRole('heading', { name: 'Create your first household' }),
-    ).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Welcome, Anna' })).toBeVisible();
+    expect(router.state.location.pathname).toBe('/welcome');
   });
 
   it('shows not found for households the user cannot see', async () => {

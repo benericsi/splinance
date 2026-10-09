@@ -1,16 +1,14 @@
 import type { CreateInviteResponse, Household, Invite } from '@splinance/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Check, Copy, Link2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Link2 } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { QrCode } from '@/components/qr-code';
 import { RouteDialog } from '@/components/route-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { expiresIn } from '../format';
 import { useCreateInvite, useRevokeInvite } from '../hooks';
-import { inviteLink } from '../pending-invite';
 import { inviteQueries } from '../queries';
+import { InviteLinkCard } from './invite-link-card';
 
 export function InviteDialog({
   household,
@@ -33,7 +31,7 @@ export function InviteDialog({
     >
       <div className="space-y-6">
         {created ? (
-          <CreatedInvite token={created.token} householdName={household.name} />
+          <InviteLinkCard token={created.token} householdName={household.name} />
         ) : (
           <Button
             className="h-10 w-full"
@@ -76,61 +74,6 @@ export function InviteDialog({
         </section>
       </div>
     </RouteDialog>
-  );
-}
-
-function CreatedInvite({ token, householdName }: { token: string; householdName: string }) {
-  const link = inviteLink(token);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => {
-      setCopied(false);
-    }, 2000);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [copied]);
-
-  return (
-    <div className="space-y-4">
-      <QrCode
-        value={link}
-        label={`QR code for the invite to ${householdName}`}
-        className="mx-auto size-44"
-      />
-      <div className="flex gap-2">
-        <Input
-          readOnly
-          value={link}
-          aria-label="Invite link"
-          className="h-10 font-mono text-xs"
-          onFocus={(e) => {
-            e.currentTarget.select();
-          }}
-        />
-        <Button
-          className="h-10"
-          onClick={() => {
-            navigator.clipboard.writeText(link).then(
-              () => {
-                setCopied(true);
-              },
-              () => {
-                toast.error("Couldn't copy. Select the link and copy it.");
-              },
-            );
-          }}
-        >
-          {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-          {copied ? 'Copied' : 'Copy'}
-        </Button>
-      </div>
-      <p className="text-muted-foreground text-sm">
-        This link is shown only now. Send it, or let them scan the code.
-      </p>
-    </div>
   );
 }
 

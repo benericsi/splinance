@@ -16,6 +16,11 @@ import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedHHouseholdIdRouteImport } from './routes/_authenticated/h/$householdId'
+import { Route as AuthenticatedWelcomeIndexRouteImport } from './routes/_authenticated/welcome.index'
+import { Route as AuthenticatedWelcomeDoneRouteImport } from './routes/_authenticated/welcome.done'
+import { Route as AuthenticatedWelcomeHouseholdRouteImport } from './routes/_authenticated/welcome.household'
+import { Route as AuthenticatedWelcomeInviteRouteImport } from './routes/_authenticated/welcome.invite'
+import { Route as AuthenticatedWelcomeJoinRouteImport } from './routes/_authenticated/welcome.join'
 import { Route as AuthenticatedHHouseholdIdIndexRouteImport } from './routes/_authenticated/h/$householdId/index'
 import { Route as AuthenticatedHHouseholdIdSettingsRouteImport } from './routes/_authenticated/h/$householdId/settings'
 import { Route as AuthenticatedHHouseholdIdSettingsInviteRouteImport } from './routes/_authenticated/h/$householdId/settings.invite'
@@ -54,6 +59,36 @@ const AuthenticatedHHouseholdIdRoute =
     path: '/h/$householdId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedWelcomeIndexRoute =
+  AuthenticatedWelcomeIndexRouteImport.update({
+    id: '/welcome/',
+    path: '/welcome/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWelcomeDoneRoute =
+  AuthenticatedWelcomeDoneRouteImport.update({
+    id: '/welcome/done',
+    path: '/welcome/done',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWelcomeHouseholdRoute =
+  AuthenticatedWelcomeHouseholdRouteImport.update({
+    id: '/welcome/household',
+    path: '/welcome/household',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWelcomeInviteRoute =
+  AuthenticatedWelcomeInviteRouteImport.update({
+    id: '/welcome/invite',
+    path: '/welcome/invite',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWelcomeJoinRoute =
+  AuthenticatedWelcomeJoinRouteImport.update({
+    id: '/welcome/join',
+    path: '/welcome/join',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedHHouseholdIdIndexRoute =
   AuthenticatedHHouseholdIdIndexRouteImport.update({
     id: '/',
@@ -79,6 +114,11 @@ export interface FileRoutesByFullPath {
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
   '/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
+  '/welcome/done': typeof AuthenticatedWelcomeDoneRoute
+  '/welcome/household': typeof AuthenticatedWelcomeHouseholdRoute
+  '/welcome/invite': typeof AuthenticatedWelcomeInviteRoute
+  '/welcome/join': typeof AuthenticatedWelcomeJoinRoute
+  '/welcome/': typeof AuthenticatedWelcomeIndexRoute
   '/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
   '/h/$householdId/': typeof AuthenticatedHHouseholdIdIndexRoute
   '/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
@@ -88,6 +128,11 @@ export interface FileRoutesByTo {
   '/invite': typeof InviteRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
+  '/welcome/done': typeof AuthenticatedWelcomeDoneRoute
+  '/welcome/household': typeof AuthenticatedWelcomeHouseholdRoute
+  '/welcome/invite': typeof AuthenticatedWelcomeInviteRoute
+  '/welcome/join': typeof AuthenticatedWelcomeJoinRoute
+  '/welcome': typeof AuthenticatedWelcomeIndexRoute
   '/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
   '/h/$householdId': typeof AuthenticatedHHouseholdIdIndexRoute
   '/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
@@ -101,6 +146,11 @@ export interface FileRoutesById {
   '/_auth/register': typeof AuthRegisterRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
+  '/_authenticated/welcome/done': typeof AuthenticatedWelcomeDoneRoute
+  '/_authenticated/welcome/household': typeof AuthenticatedWelcomeHouseholdRoute
+  '/_authenticated/welcome/invite': typeof AuthenticatedWelcomeInviteRoute
+  '/_authenticated/welcome/join': typeof AuthenticatedWelcomeJoinRoute
+  '/_authenticated/welcome/': typeof AuthenticatedWelcomeIndexRoute
   '/_authenticated/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
   '/_authenticated/h/$householdId/': typeof AuthenticatedHHouseholdIdIndexRoute
   '/_authenticated/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
@@ -113,6 +163,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/h/$householdId'
+    | '/welcome/done'
+    | '/welcome/household'
+    | '/welcome/invite'
+    | '/welcome/join'
+    | '/welcome/'
     | '/h/$householdId/settings'
     | '/h/$householdId/'
     | '/h/$householdId/settings/invite'
@@ -122,6 +177,11 @@ export interface FileRouteTypes {
     | '/invite'
     | '/login'
     | '/register'
+    | '/welcome/done'
+    | '/welcome/household'
+    | '/welcome/invite'
+    | '/welcome/join'
+    | '/welcome'
     | '/h/$householdId/settings'
     | '/h/$householdId'
     | '/h/$householdId/settings/invite'
@@ -134,6 +194,11 @@ export interface FileRouteTypes {
     | '/_auth/register'
     | '/_authenticated/'
     | '/_authenticated/h/$householdId'
+    | '/_authenticated/welcome/done'
+    | '/_authenticated/welcome/household'
+    | '/_authenticated/welcome/invite'
+    | '/_authenticated/welcome/join'
+    | '/_authenticated/welcome/'
     | '/_authenticated/h/$householdId/settings'
     | '/_authenticated/h/$householdId/'
     | '/_authenticated/h/$householdId/settings/invite'
@@ -194,6 +259,41 @@ declare module '@tanstack/react-router' {
       path: '/h/$householdId'
       fullPath: '/h/$householdId'
       preLoaderRoute: typeof AuthenticatedHHouseholdIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/welcome/': {
+      id: '/_authenticated/welcome/'
+      path: '/welcome'
+      fullPath: '/welcome/'
+      preLoaderRoute: typeof AuthenticatedWelcomeIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/welcome/done': {
+      id: '/_authenticated/welcome/done'
+      path: '/welcome/done'
+      fullPath: '/welcome/done'
+      preLoaderRoute: typeof AuthenticatedWelcomeDoneRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/welcome/household': {
+      id: '/_authenticated/welcome/household'
+      path: '/welcome/household'
+      fullPath: '/welcome/household'
+      preLoaderRoute: typeof AuthenticatedWelcomeHouseholdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/welcome/invite': {
+      id: '/_authenticated/welcome/invite'
+      path: '/welcome/invite'
+      fullPath: '/welcome/invite'
+      preLoaderRoute: typeof AuthenticatedWelcomeInviteRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/welcome/join': {
+      id: '/_authenticated/welcome/join'
+      path: '/welcome/join'
+      fullPath: '/welcome/join'
+      preLoaderRoute: typeof AuthenticatedWelcomeJoinRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/h/$householdId/': {
@@ -267,11 +367,21 @@ const AuthenticatedHHouseholdIdRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedHHouseholdIdRoute: typeof AuthenticatedHHouseholdIdRouteWithChildren
+  AuthenticatedWelcomeDoneRoute: typeof AuthenticatedWelcomeDoneRoute
+  AuthenticatedWelcomeHouseholdRoute: typeof AuthenticatedWelcomeHouseholdRoute
+  AuthenticatedWelcomeInviteRoute: typeof AuthenticatedWelcomeInviteRoute
+  AuthenticatedWelcomeJoinRoute: typeof AuthenticatedWelcomeJoinRoute
+  AuthenticatedWelcomeIndexRoute: typeof AuthenticatedWelcomeIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedHHouseholdIdRoute: AuthenticatedHHouseholdIdRouteWithChildren,
+  AuthenticatedWelcomeDoneRoute: AuthenticatedWelcomeDoneRoute,
+  AuthenticatedWelcomeHouseholdRoute: AuthenticatedWelcomeHouseholdRoute,
+  AuthenticatedWelcomeInviteRoute: AuthenticatedWelcomeInviteRoute,
+  AuthenticatedWelcomeJoinRoute: AuthenticatedWelcomeJoinRoute,
+  AuthenticatedWelcomeIndexRoute: AuthenticatedWelcomeIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phase 0 (foundation) and Phase 1 auth (API and web) are done; the households API is done, and the web has the household shell, settings (rename, members, leave, archive) and invites (modal with QR code, `/invite` landing page). Onboarding is next. Transactions and everything after are not built yet.
+Status: Phase 0 (foundation) and Phase 1 (auth, households, invites, onboarding; API and web) are done. Transactions (Phase 2) and everything after are not built yet.
 
 ## Contents
 
@@ -288,8 +288,10 @@ _auth.tsx                  pathless layout: if authenticated -> redirect to ?red
   _auth/register.tsx       /register
 _authenticated.tsx         pathless layout: if not authenticated -> redirect /login?redirect=<current>;
                            validates ?modal= and renders app-wide modals (ModalHost)
-  _authenticated/index.tsx /  dispatcher: redirect to the last used household, else the first;
-                              "create your first household" when there is none
+  _authenticated/index.tsx /  dispatcher: redirect to the last used household, else the first,
+                              else /welcome
+  _authenticated/welcome.*.tsx  /welcome (create or join), /welcome/household, /welcome/invite,
+                                /welcome/done (?household=<id>), /welcome/join
   _authenticated/h/$householdId.tsx           household layout: loads the household (404 -> notFound()),
                                               remembers it as last used, renders HouseholdShell
     _authenticated/h/$householdId/index.tsx    /h/:id           overview
@@ -301,6 +303,22 @@ invite.tsx                 /invite#<token>  public invite landing page (logged i
 - Household shell (`HouseholdShell`): on desktop a sidebar with the logo, the household switcher and the section links; the account menu sits top right, level with the page heading (`PageHeader` leaves room for it). On phones a top bar holds the switcher and account menu, and the sections become a bottom tab bar. New sections are added to `NAV_ITEMS`.
 - The last used household is kept in localStorage per user id (`splinance-last-household:<userId>`), a convenience only: `/` checks it against the list from the API.
 - Settings: owners rename inline, change roles and remove members from a per-row menu, and archive (typing the household name to confirm). Everyone can leave; the only owner gets an explanation instead of a confirm button (the API enforces `LAST_OWNER` too). Confirmations use `ConfirmDialog` (an alert dialog with local state), not URL-driven modals: a confirmation should not survive a reload or a shared link.
+
+### Onboarding
+
+A user without a household lands on `/welcome` (registration ends on `/`, which dispatches there). The steps are routes in the split-screen layout (`OnboardingLayout`: `BrandPanel` with the poster wall, a step indicator, the account menu):
+
+```
+/welcome            create a household | join with an invite link
+/welcome/household  name -> POST /households -> replace with /welcome/invite?household=<id>
+/welcome/invite     optional: create an invite link (InviteLinkCard: QR, copy) or skip
+/welcome/done       summary (invite pending or not) -> /h/<id>
+/welcome/join       paste the link or token -> sessionStorage -> /invite (the regular invite page)
+```
+
+- The name step is replaced after creating, so back goes to `/welcome` and never offers to create the same household twice.
+- Later steps take the household from `?household=`; a missing id restarts at `/welcome`, an id the user cannot see goes to `/`.
+- Onboarding is for the first household; further ones use the `?modal=new-household` dialog. Both share `CreateHouseholdForm`.
 
 ### Invite flow
 
