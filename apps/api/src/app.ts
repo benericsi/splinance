@@ -4,9 +4,12 @@ import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import { pingDatabase } from './db/client';
 import { logger } from './lib/logger';
+import { redactUrl } from './lib/redact-url';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { requireAuth } from './middleware/require-auth';
 import { createAuthRouter, getMe } from './modules/auth/auth.routes';
+import { createHouseholdsRouter } from './modules/households/households.routes';
+import { createInvitesRouter } from './modules/invites/invites.routes';
 import { createHealthRouter, type HealthDeps } from './routes/health';
 
 export type AppDeps = HealthDeps;
@@ -26,7 +29,7 @@ export function createApp(deps: AppDeps = defaultDeps) {
         req: (req: { id: unknown; method: string; url: string }) => ({
           id: req.id,
           method: req.method,
-          url: req.url,
+          url: redactUrl(req.url),
         }),
         res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
       },
@@ -40,6 +43,8 @@ export function createApp(deps: AppDeps = defaultDeps) {
   api.use('/health', createHealthRouter(deps));
   api.use('/auth', createAuthRouter());
   api.get('/me', requireAuth, getMe);
+  api.use('/households', createHouseholdsRouter());
+  api.use('/invites', createInvitesRouter());
   app.use('/api', api);
 
   app.use(notFoundHandler);
