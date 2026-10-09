@@ -30,7 +30,7 @@ export function useLogout() {
     mutationFn: authApi.logout,
     // Log out locally even if the request fails: the user asked to leave.
     onSettled: () => {
-      authStore.clear();
+      authStore.clear('logout');
       // Never keep the previous user's data in memory.
       queryClient.clear();
     },

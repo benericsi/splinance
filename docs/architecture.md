@@ -338,7 +338,8 @@ invitee: opens /invite#<token>
 
 - Router context carries `queryClient` and `auth` (the store), so guards and loaders work outside React.
 - The `?redirect=` value is validated by `redirectSearchSchema` and `safeRedirect()`: only same-app paths are allowed; `https://...`, `//evil.com` and `/\evil.com` fall back to `/` (open redirect protection).
-- Logout or a failed mid-session refresh flips `authStore` to anonymous. `main.tsx` subscribes to that transition and calls `router.invalidate()`, so guards re-run and protected pages redirect.
+- Logout or a failed mid-session refresh flips `authStore` to anonymous. `rerunGuardsOnSessionEnd` (`lib/session-watch.ts`, wired in `main.tsx` and the test router) calls `router.invalidate()` on that transition, so guards re-run and protected pages redirect.
+- `authStore` remembers why the session ended (`endedBy`). After a failed refresh the guard keeps `?redirect=<page>`, so the same person continues where they were. After an explicit logout it does not: the next person on the browser is often someone else, and the previous user's household would be a 404 for them.
 - Not found and errors: the root shows full-page versions; the router defaults (`defaultNotFoundComponent`, `defaultErrorComponent`) render inline inside layouts. "Try again" resets the error boundary and re-runs loaders.
 - Page titles: each page renders exactly one `<PageTitle title="..." />`. React 19 hoists `<title>` into `<head>`; multiple titles at once are unsupported, so layouts never render one.
 

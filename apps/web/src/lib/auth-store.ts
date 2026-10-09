@@ -3,19 +3,32 @@ import { useSyncExternalStore } from 'react';
 
 export type AuthStatus = 'unknown' | 'authenticated' | 'anonymous';
 
+/**
+ * Why the last session ended. After an explicit logout the next person on this browser may
+ * be someone else, so the login page must not send them back to the previous page.
+ */
+export type SessionEnd = 'logout' | 'expired';
+
 export interface AuthState {
   status: AuthStatus;
   accessToken: string | null;
   user: User | null;
+  endedBy: SessionEnd | null;
 }
 
-const initialState: AuthState = { status: 'unknown', accessToken: null, user: null };
+const initialState: AuthState = {
+  status: 'unknown',
+  accessToken: null,
+  user: null,
+  endedBy: null,
+};
 
 export interface AuthStore {
   getState: () => AuthState;
   subscribe: (listener: () => void) => () => void;
   setSession: (accessToken: string, user: User) => void;
-  clear: () => void;
+  /** Ends the session; `expired` (default) for failed refreshes, `logout` when asked to. */
+  clear: (reason?: SessionEnd) => void;
 }
 
 /**
@@ -40,10 +53,10 @@ function createAuthStore(): AuthStore & { reset: () => void } {
       return () => listeners.delete(listener);
     },
     setSession: (accessToken, user) => {
-      set({ status: 'authenticated', accessToken, user });
+      set({ status: 'authenticated', accessToken, user, endedBy: null });
     },
-    clear: () => {
-      set({ status: 'anonymous', accessToken: null, user: null });
+    clear: (reason = 'expired') => {
+      set({ status: 'anonymous', accessToken: null, user: null, endedBy: reason });
     },
     reset: () => {
       set(initialState);
