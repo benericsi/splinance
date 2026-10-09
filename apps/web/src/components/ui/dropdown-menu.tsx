@@ -23,7 +23,9 @@ function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
  * (behind the modal backdrop, so typing goes nowhere). Leave focus alone in that case.
  */
 const restoreFocusUnlessModalOpen = () =>
-  !document.querySelector('[data-slot="dialog-content"], [data-slot="drawer-popup"]');
+  !document.querySelector(
+    '[data-slot="dialog-content"], [data-slot="drawer-popup"], [data-slot="alert-dialog-content"]',
+  );
 
 function DropdownMenuContent({
   align = 'start',

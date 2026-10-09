@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phase 0 (foundation) and Phase 1 auth (API and web) are done; the households API is done, and the web has the household shell (switcher, sections, new household). Settings actions, invites and onboarding are next. Transactions and everything after are not built yet.
+Status: Phase 0 (foundation) and Phase 1 auth (API and web) are done; the households API is done, and the web has the household shell, settings (rename, members, leave, archive) and invites (modal with QR code, `/invite` landing page). Onboarding is next. Transactions and everything after are not built yet.
 
 ## Contents
 
@@ -293,11 +293,30 @@ _authenticated.tsx         pathless layout: if not authenticated -> redirect /lo
   _authenticated/h/$householdId.tsx           household layout: loads the household (404 -> notFound()),
                                               remembers it as last used, renders HouseholdShell
     _authenticated/h/$householdId/index.tsx    /h/:id           overview
-    _authenticated/h/$householdId/settings.tsx /h/:id/settings  details and members
+    _authenticated/h/$householdId/settings.tsx /h/:id/settings  rename, members, danger zone; <Outlet /> for modals
+      _authenticated/h/$householdId/settings.invite.tsx /h/:id/settings/invite  invite dialog (owners only)
+invite.tsx                 /invite#<token>  public invite landing page (logged in or out)
 ```
 
 - Household shell (`HouseholdShell`): on desktop a sidebar with the logo, the household switcher and the section links; the account menu sits top right, level with the page heading (`PageHeader` leaves room for it). On phones a top bar holds the switcher and account menu, and the sections become a bottom tab bar. New sections are added to `NAV_ITEMS`.
 - The last used household is kept in localStorage per user id (`splinance-last-household:<userId>`), a convenience only: `/` checks it against the list from the API.
+- Settings: owners rename inline, change roles and remove members from a per-row menu, and archive (typing the household name to confirm). Everyone can leave; the only owner gets an explanation instead of a confirm button (the API enforces `LAST_OWNER` too). Confirmations use `ConfirmDialog` (an alert dialog with local state), not URL-driven modals: a confirmation should not survive a reload or a shared link.
+
+### Invite flow
+
+```
+owner: settings -> Invite (/h/:id/settings/invite) -> Create invite link
+       -> POST /households/:id/invites -> link ${origin}/invite#<token> + QR code (uqr, black on white)
+invitee: opens /invite#<token>
+       -> token moved to sessionStorage, hash removed from the URL (replace)
+       -> GET /invites/:token (public preview: household name, inviter, expiry)
+       -> logged out: "Log in to join" / "Create an account" with ?redirect=/invite (no token)
+       -> logged in: Join -> POST /invites/:token/accept -> /h/:id, token cleared
+```
+
+- The token is a credential. The fragment is never sent to a server or in a Referer header, and it only ever travels through login inside this tab's sessionStorage, never in a query string. If storage is blocked, the hash simply stays in the URL.
+- The raw token comes back only from the create call, so reopening the dialog shows the pending list and "Create another link". Revoking an invite that is on screen removes it from the dialog too.
+- Every invite error has its own wording (`invite-errors.ts`): expired, used, revoked, not found (includes archived households); `ALREADY_MEMBER` on accept links to the app instead. "Not you? Log out" lets a different person on a shared browser take the invite.
 
 - Router context carries `queryClient` and `auth` (the store), so guards and loaders work outside React.
 - The `?redirect=` value is validated by `redirectSearchSchema` and `safeRedirect()`: only same-app paths are allowed; `https://...`, `//evil.com` and `/\evil.com` fall back to `/` (open redirect protection).
@@ -358,7 +377,7 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 - Query retries: none for 4xx (`ApiError` with status 400-499), up to 2 otherwise.
 - `MutationCache.onError` shows a sonner toast for every failed mutation. A mutation opts out with `meta: { suppressErrorToast: true }` when the component shows the error itself (the auth forms do).
 - `useLogout` clears `authStore` and the whole query cache in `onSettled`, even if the request fails, so no data of the previous user stays in memory.
-- Households: `householdQueries.list()` and `.detail(id)` under the `['households']` key; mutations invalidate the whole key. The household layout's loader awaits the detail (a 404 becomes `notFound()`) and warms the list for the switcher; components read the detail with `useSuspenseQuery`, which never suspends there because the loader filled the cache.
+- Households: `householdQueries.list()` and `.detail(id)` under the `['households']` key; mutations invalidate the whole key. Leaving and archiving only mark it stale (`refetchType: 'none'`) and navigate to `/`: refetching the detail first would hit the new 404 while the page is still mounted. The household layout's loader awaits the detail (a 404 becomes `notFound()`) and warms the list for the switcher; components read the detail with `useSuspenseQuery`, which never suspends there because the loader filled the cache.
 
 ## 11. Web: forms
 
@@ -427,7 +446,8 @@ Things that took real debugging or are easy to break. Read these before changing
 15. **Invites die with their creator's ownership.** Leaving, removal and demotion revoke the person's pending invites in the same transaction. Otherwise an owner could mint a link, get removed, and walk back in.
 16. **Menus that open modals must not take focus back.** A Base UI menu restores focus to its trigger after its close animation. When the clicked item opens a URL-driven dialog, the dialog is already open by then, so focus would land on the trigger behind the backdrop and typing would go nowhere. `DropdownMenuContent` defaults `finalFocus` to skip the restore while a dialog or drawer is open. jsdom does not reproduce this timing; it was found and verified in a real browser.
 17. **A hidden browser pane freezes Base UI exit animations.** Popups wait for their CSS transitions (and `requestAnimationFrame`) before unmounting. In a background or hidden browser view those never advance, so a closed drawer stays mounted with `data-ending-style` until the page is visible again. Not a bug in the app; verify closing behavior in a visible window or in jsdom tests.
-18. **Preview port collisions.** A tool or platform that sets `PORT` for a process makes the API bind that port (`--env-file` never overrides existing env vars). Vite uses `strictPort`, so it fails instead of silently moving.
+18. **Exiting a household must not refetch it in place.** After leave or archive the household detail is a 404 for the user. An immediate refetch (normal invalidation) would make the still-mounted settings page throw into the error boundary before the navigation to `/` happens. The hooks invalidate with `refetchType: 'none'`; the `/` loader then refetches the list.
+19. **Preview port collisions.** A tool or platform that sets `PORT` for a process makes the API bind that port (`--env-file` never overrides existing env vars). Vite uses `strictPort`, so it fails instead of silently moving.
 
 ## 15. Known limitations
 
