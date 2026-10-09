@@ -1,7 +1,17 @@
+import { GradientAvatar } from '@outpacelabs/avatars';
 import { BRAND_COLORS } from '@splinance/shared';
-import { motifStyleFor } from '@/components/brand/motif-style';
-import { renderMotif } from '@/components/brand/motifs';
 import { cn } from '@/lib/utils';
+
+// Brand palette minus cream (too close to light backgrounds), like user avatars.
+const GRADIENT_COLORS = [
+  BRAND_COLORS.blue,
+  BRAND_COLORS.green,
+  BRAND_COLORS.red,
+  BRAND_COLORS.orange,
+  BRAND_COLORS.pink,
+  BRAND_COLORS.sky,
+  BRAND_COLORS.mustard,
+];
 
 interface HouseholdAvatarProps {
   household: { id: string; name: string };
@@ -12,8 +22,9 @@ interface HouseholdAvatarProps {
 }
 
 /**
- * One brand motif on a brand pairing, both derived from the household id: stable across
- * renames and distinct between households. Only legible (logo) pairings are used.
+ * The only place that knows about @outpacelabs/avatars. A mesh gradient in brand colors,
+ * seeded with the household id: stable across renames and distinct between households.
+ * Rounded square, so households never look like people (round user avatars).
  */
 export function HouseholdAvatar({
   household,
@@ -21,20 +32,18 @@ export function HouseholdAvatar({
   className,
   decorative = false,
 }: HouseholdAvatarProps) {
-  const { motif, pairing } = motifStyleFor(household.id);
-  const bg = BRAND_COLORS[pairing.bg];
-
   return (
-    <svg
-      viewBox="0 0 40 40"
-      width={size}
-      height={size}
+    <span
       {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': household.name })}
-      className={cn('shrink-0 rounded-lg', className)}
+      title={decorative ? undefined : household.name}
+      className={cn('inline-flex shrink-0', className)}
     >
-      {!decorative && <title>{household.name}</title>}
-      <rect width="40" height="40" fill={bg} />
-      {renderMotif(motif, BRAND_COLORS[pairing.fg], bg)}
-    </svg>
+      <GradientAvatar
+        seed={household.id}
+        size={size}
+        radius={Math.round(size * 0.25)}
+        colors={GRADIENT_COLORS}
+      />
+    </span>
   );
 }

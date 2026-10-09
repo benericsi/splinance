@@ -21,6 +21,10 @@ Object.defineProperty(window, 'matchMedia', {
     }) as MediaQueryList,
 });
 
+// jsdom has no canvas; household avatars paint on one. Return no context instead of a
+// "not implemented" error per render (the avatar library skips drawing without one).
+HTMLCanvasElement.prototype.getContext = () => null;
+
 // Any request without a handler fails the test instead of silently hitting the network.
 beforeAll(() => {
   server.listen({ onUnhandledFrame: 'error' });

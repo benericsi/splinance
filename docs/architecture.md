@@ -376,7 +376,7 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 - Brand palette and logo pairings live in `packages/shared/src/brand.ts`; a test asserts every logo pairing is at least 3:1. The CSS mirrors the palette in `index.css`.
 - `LogoMark`: chunky split S with a pink-to-orange gradient on a radially lit blue tile. The glow is capped at `#1515E8` so the orange end keeps 3:1 contrast. `public/favicon.svg` (crisp) and `public/logo.svg` (grainy) must match the component.
 - `PosterWall` (auth panel): 8 hand-composed SVG cards (grainy gradients and geometric symbols). It is a CSS size container: a container query switches 4x2 (landscape) and 2x4 (portrait), and the grid width is `min(100cqw, 150cqh)` (or `37.5cqh`), the largest size that keeps cards at 3:4 without overflowing.
-- Avatars: `UserAvatar` (Facehash with brand colors, seeded by user id, no initial) and `HouseholdAvatar` (one geometric motif on a brand pairing, derived from the household id; not used in a page yet).
+- Avatars: `UserAvatar` (Facehash with brand colors, seeded by user id, no initial) and `HouseholdAvatar` (`@outpacelabs/avatars` mesh gradient on a canvas, brand colors minus cream, seeded by household id, rounded square so households never look like people). Pass `decorative` when the name is shown next to it.
 - Shadcn components in `src/components/ui` are owned code (Base UI primitives underneath). Links styled as buttons use `buttonVariants()` on the `Link`, because Base UI's `Button` must render a real `<button>`.
 
 ## 13. Testing
