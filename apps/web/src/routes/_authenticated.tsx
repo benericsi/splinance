@@ -1,32 +1,33 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
-import { Logo } from '@/components/logo';
-import { UserMenu } from '@/features/auth/components/user-menu';
-import { useAuth } from '@/lib/auth-store';
+import { z } from 'zod';
+import { NewHouseholdDialog } from '@/features/households/components/new-household-dialog';
+
+/**
+ * App-wide modals, opened from any page with `?modal=...` (URL-driven: reload, share and
+ * back work). Page-bound modals are child routes instead. Unknown values are dropped.
+ */
+const modalSearchSchema = z.object({
+  modal: z.enum(['new-household']).optional().catch(undefined),
+});
 
 /** Pathless layout: every route below it requires a logged-in user. */
 export const Route = createFileRoute('/_authenticated')({
+  validateSearch: modalSearchSchema,
   beforeLoad: ({ context, location }) => {
     if (context.auth.getState().status !== 'authenticated') {
       throw redirect({ to: '/login', search: { redirect: location.href } });
     }
   },
-  component: AppLayout,
+  component: AuthenticatedLayout,
 });
 
-function AppLayout() {
-  const { user } = useAuth();
+function AuthenticatedLayout() {
+  const { modal } = Route.useSearch();
 
   return (
     <>
-      <header className="border-b">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Logo />
-          {user && <UserMenu user={user} />}
-        </div>
-      </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">
-        <Outlet />
-      </main>
+      <Outlet />
+      {modal === 'new-household' && <NewHouseholdDialog />}
     </>
   );
 }

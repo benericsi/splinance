@@ -1,34 +1,21 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { http as mock, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { authStore } from '@/lib/auth-store';
-import { routeTree } from '@/routeTree.gen';
 import { server } from '../../test/msw';
-import { apiError, authResponse } from '../../test/utils';
+import { renderRoute as renderAt } from '../../test/router';
+import { apiError, authResponse, householdDetail, testHousehold } from '../../test/utils';
 
-function renderAt(path: string) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const router = createRouter({
-    routeTree,
-    context: { queryClient, auth: authStore },
-    history: createMemoryHistory({ initialEntries: [path] }),
-  });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-  return router;
-}
-
-const health = [
+const signedIn = [
+  mock.post('/api/auth/refresh', () => HttpResponse.json(authResponse())),
+  mock.get('/api/households', () => HttpResponse.json({ households: [testHousehold] })),
+  mock.get('/api/households/:id', () => HttpResponse.json({ household: householdDetail() })),
   mock.get('/api/health/live', () => HttpResponse.json({ status: 'ok', uptimeSeconds: 1 })),
   mock.get('/api/health/ready', () =>
     HttpResponse.json({ status: 'ok', checks: { database: 'ok' } }),
   ),
 ];
+
+const greeting = /^Good (morning|afternoon|evening), Anna$/;
 
 describe('route guard and session restore', () => {
   it('sends anonymous visitors to /login and keeps where they wanted to go', async () => {
@@ -46,27 +33,21 @@ describe('route guard and session restore', () => {
   });
 
   it('restores the session from the refresh cookie on first load', async () => {
-    server.use(
-      mock.post('/api/auth/refresh', () => HttpResponse.json(authResponse())),
-      ...health,
-    );
+    server.use(...signedIn);
 
-    renderAt('/');
+    const router = renderAt('/');
 
-    expect(await screen.findByRole('heading', { name: 'Welcome, Anna' })).toBeVisible();
-    expect(screen.getByRole('img', { name: 'Anna' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: greeting })).toBeVisible();
+    expect(router.state.location.pathname).toBe(`/h/${testHousehold.id}`);
   });
 
   it('redirects logged-in users away from /login', async () => {
-    server.use(
-      mock.post('/api/auth/refresh', () => HttpResponse.json(authResponse())),
-      ...health,
-    );
+    server.use(...signedIn);
 
     const router = renderAt('/login');
 
-    expect(await screen.findByRole('heading', { name: 'Welcome, Anna' })).toBeVisible();
-    expect(router.state.location.pathname).toBe('/');
+    expect(await screen.findByRole('heading', { name: greeting })).toBeVisible();
+    expect(router.state.location.pathname).toBe(`/h/${testHousehold.id}`);
   });
 });
 

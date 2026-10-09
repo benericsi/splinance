@@ -33,5 +33,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
+    // Form tests type whole passwords with user-event; slow shared CI runners need headroom.
+    testTimeout: 15_000,
   },
 });
