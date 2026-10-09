@@ -5,9 +5,10 @@ import { db, type Db } from '../../db/client';
 import { isUniqueViolation } from '../../db/errors';
 import { sessions, users, type UserRow } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
+import { generateToken, hashToken } from '../../lib/random-token';
 import { logger } from '../../lib/logger';
 import { hashPassword, verifyDummyPassword, verifyPassword } from './passwords';
-import { generateRefreshToken, hashToken, signAccessToken } from './tokens';
+import { signAccessToken } from './tokens';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -51,7 +52,7 @@ function refreshExpiry(now: Date): Date {
 
 async function createSession(executor: Db, user: UserRow): Promise<AuthResult> {
   const now = new Date();
-  const refreshToken = generateRefreshToken();
+  const refreshToken = generateToken();
   const expiresAt = refreshExpiry(now);
 
   const [session] = await executor
@@ -119,7 +120,7 @@ export async function refresh(rawToken: string): Promise<AuthResult> {
     if (current) {
       if (current.revokedAt || current.expiresAt <= now) return { kind: 'invalid' };
 
-      const nextToken = generateRefreshToken();
+      const nextToken = generateToken();
       const expiresAt = refreshExpiry(now);
       await tx
         .update(sessions)

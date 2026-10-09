@@ -6,9 +6,9 @@ import { resetDatabase } from '../../../test/db';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
 import { sessions, users } from '../../db/schema';
+import { hashToken } from '../../lib/random-token';
 import { REFRESH_COOKIE } from './auth.routes';
 import { REUSE_GRACE_MS } from './auth.service';
-import { hashToken } from './tokens';
 
 type App = ReturnType<typeof createApp>;
 

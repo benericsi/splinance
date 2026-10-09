@@ -58,13 +58,57 @@ Rows are locked with `SELECT ... FOR UPDATE`, so truly concurrent refreshes prod
 
 Access tokens are stateless JWTs (HS256, 15 minutes). A revoked session's access token stays valid until it expires.
 
+### `households`
+
+| Column                 | Type                           | Notes                                                                   |
+| ---------------------- | ------------------------------ | ----------------------------------------------------------------------- |
+| id                     | uuid PK                        | uuidv7                                                                  |
+| name                   | text                           | 1-60 characters (`households_name_length`)                              |
+| base_currency          | enum `currency` (`HUF`, `EUR`) | Default and, until multi-currency (Phase 7), always `HUF`               |
+| created_by             | uuid FK -> users               | `households_created_by_fk`; informational, roles live in members        |
+| archived_at            | timestamptz, nullable          | Soft delete: an archived household is 404 for everyone, history is kept |
+| created_at, updated_at | timestamptz                    |                                                                         |
+
+A user can belong to any number of households.
+
+### `household_members`
+
+| Column       | Type                                 | Notes                                                                  |
+| ------------ | ------------------------------------ | ---------------------------------------------------------------------- |
+| household_id | uuid FK -> households                | PK part (`household_members_pk`)                                       |
+| user_id      | uuid FK -> users                     | PK part; indexed on its own for "my households"                        |
+| role         | enum `household_role` (owner/member) |                                                                        |
+| joined_at    | timestamptz                          |                                                                        |
+| left_at      | timestamptz, nullable                | Set on leave or removal, never deleted; `left_at >= joined_at` (CHECK) |
+
+- `(household_id, user_id)` is the target of every composite foreign key from household-scoped tables.
+- Rejoining (a new invite) reuses the row: `left_at = null`, `role = member`, fresh `joined_at`.
+- Every household always has at least one active owner: the last owner cannot leave or be demoted (service rule, serialized by a row lock on `households`).
+
+### `household_invites`
+
+| Column       | Type                  | Notes                                                                     |
+| ------------ | --------------------- | ------------------------------------------------------------------------- |
+| id           | uuid PK               | uuidv7                                                                    |
+| household_id | uuid                  | indexed                                                                   |
+| token_hash   | text, unique          | SHA-256 of the 256-bit link token; the raw token is returned once         |
+| created_by   | uuid                  | Composite FK `(household_id, created_by)` -> members                      |
+| expires_at   | timestamptz           | 7 days after creation                                                     |
+| accepted_by  | uuid, nullable        | Composite FK `(household_id, accepted_by)` -> members                     |
+| accepted_at  | timestamptz, nullable | Set together with `accepted_by` (`household_invites_accepted_consistent`) |
+| revoked_at   | timestamptz, nullable | Owner revoked it, or its creator stopped being an owner                   |
+| created_at   | timestamptz           |                                                                           |
+
+- Only owners create invites. An invite is usable when not revoked, not accepted and not expired, and the household is not archived.
+- The composite FKs make both people members of this very household (and so guarantee the household exists): the database rejects an invite created by a member of another household even if service code had a bug. On accept, the member row is written first, then the invite, in one transaction.
+- When an owner leaves, is removed or is demoted, their pending invites are revoked, so a removed owner cannot rejoin through a link they made.
+
 ## Planned (not created yet)
 
-- Phase 1: `households`, `household_members` (role owner/member, `left_at` instead of deleting), `household_invites` (single use, 7 days, owners only, token stored hashed)
 - Phase 2: `categories` (lucide icon name, color, expense/income), `transactions` (shared/private, expense/income, `occurred_on date`, `version` for optimistic locking), `transaction_splits` (shares always sum to the amount), `settlements`, `audit_log`
 - Later: imports (staging rows, duplicates flagged not rejected), category rules (no user regex), budgets (month as `date`), recurring series, notifications
 
 Business rules already agreed:
 
 - Private transactions are paid by their author and never split; anything involving another person is shared.
-- A member cannot leave a household with an unsettled balance; an owner can record a settlement for any pair (audited).
+- A member cannot leave a household with an unsettled balance; an owner can record a settlement for any pair (audited). The balance check for leaving and archiving arrives in Phase 3.
