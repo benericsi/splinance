@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phase 0 (foundation) and the auth half of Phase 1 are done. Households, transactions and everything after are not built yet.
+Status: Phase 0 (foundation) and Phase 1 auth (API and web) are done; the households API is done, its web UI is not. Transactions and everything after are not built yet.
 
 ## Contents
 
@@ -44,6 +44,7 @@ Key files by concern:
 | Env validation                | `apps/api/src/config/env.ts`                                                                                     |
 | DB client, schema, migrations | `apps/api/src/db/*`, `apps/api/drizzle/*.sql`                                                                    |
 | Auth (API)                    | `apps/api/src/modules/auth/*`, `apps/api/src/middleware/require-auth.ts`                                         |
+| Households and invites (API)  | `apps/api/src/modules/households/*`, `apps/api/src/modules/invites/*`                                            |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts` |
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                          |
 | HTTP client, auth store       | `apps/web/src/lib/http.ts`, `apps/web/src/lib/auth-store.ts`                                                     |
@@ -94,13 +95,16 @@ Middleware order:
 
 ```
 helmet()                 security headers (CSP, HSTS, nosniff, ...)
-pinoHttp()               request id, req.log, one log line per request (method, url, status only)
+pinoHttp()               request id, req.log, one log line per request (method, url, status only;
+                         invite tokens in the url are redacted)
 express.json(100kb)      body parsing with a size cap
 cookieParser()           req.cookies (needed for the refresh token)
 /api router
   /health                live + ready
   /auth                  register, login, refresh, logout (rate limited)
   GET /me                requireAuth -> getMe
+  /households            requireAuth for every route; membership checked in the services
+  /invites               token-addressed: public preview, accept (rate limited)
 notFoundHandler          unknown route -> HttpError 404
 errorHandler             every error -> shared JSON error shape
 ```
@@ -132,6 +136,26 @@ All routes live under `/api`. Request and response bodies are defined by Zod sch
 | `GET /api/me`             | `Authorization: Bearer <access token>` |                                    | 200 `{ user }`                                                             | 401 `UNAUTHENTICATED`                                         |
 
 `user` is `{ id, email, displayName, createdAt }` (`userSchema`).
+
+Households and invites. Every route needs a Bearer token except the invite preview. "Member" means an active member (not left) of a non-archived household; everyone else gets 404 `HOUSEHOLD_NOT_FOUND`, also for malformed ids. A member calling an owner-only route gets 403 `FORBIDDEN`.
+
+| Method and path                                | Who                   | Request    | Success                                                   | Errors (besides the above)                                                      |
+| ---------------------------------------------- | --------------------- | ---------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `POST /api/households`                         | any user              | `{ name }` | 201 `{ household }`, caller is owner                      | 400                                                                             |
+| `GET /api/households`                          | any user              |            | 200 `{ households }` (active memberships)                 |                                                                                 |
+| `GET /api/households/:id`                      | member                |            | 200 `{ household }` with `members`                        |                                                                                 |
+| `PATCH /api/households/:id`                    | owner                 | `{ name }` | 200 `{ household }`                                       | 400                                                                             |
+| `DELETE /api/households/:id`                   | owner                 |            | 204, archived (404 for everyone after)                    |                                                                                 |
+| `POST /api/households/:id/leave`               | member                |            | 204                                                       | 409 `LAST_OWNER`                                                                |
+| `PATCH /api/households/:id/members/:userId`    | owner                 | `{ role }` | 200 `{ member }`                                          | 404 `MEMBER_NOT_FOUND`, 409 `LAST_OWNER`                                        |
+| `DELETE /api/households/:id/members/:userId`   | owner                 |            | 204                                                       | 400 `CANNOT_REMOVE_SELF`, 404 `MEMBER_NOT_FOUND`                                |
+| `POST /api/households/:id/invites`             | owner                 |            | 201 `{ invite, token }`                                   |                                                                                 |
+| `GET /api/households/:id/invites`              | owner                 |            | 200 `{ invites }` (pending only)                          |                                                                                 |
+| `DELETE /api/households/:id/invites/:inviteId` | owner                 |            | 204                                                       | 404 `INVITE_NOT_FOUND` (unknown or no longer pending)                           |
+| `GET /api/invites/:token`                      | none, 60 / 15 min     |            | 200 `{ invite: { householdName, invitedBy, expiresAt } }` | 404 `INVITE_NOT_FOUND`, 410 `INVITE_REVOKED` / `INVITE_USED` / `INVITE_EXPIRED` |
+| `POST /api/invites/:token/accept`              | any user, 30 / 15 min |            | 200 `{ household }`, caller is member                     | same as preview, 409 `ALREADY_MEMBER` (invite stays unused)                     |
+
+`household` is `{ id, name, baseCurrency, role, createdAt }` where `role` is the caller's role; members are `{ userId, displayName, role, joinedAt }` (no emails). The raw invite token appears only in the create response; the web app builds the link (and later a QR code) from it.
 
 The refresh cookie: name `refresh_token`, `HttpOnly`, `SameSite=Strict`, `Path=/api/auth` (never sent to other endpoints), `Secure` when `COOKIE_SECURE` is true (default in production), expires with the session (30 days, sliding).
 
@@ -213,6 +237,14 @@ Concurrency: the lookup uses `SELECT ... FOR UPDATE`, so two simultaneous refres
 
 Accepted tradeoff of the single-table design: a token stolen two or more rotations ago matches nothing, so it is rejected but does not trigger a revoke.
 
+### Household authorization
+
+Authorization lives in the services, in one helper: `requireMembership(executor, { userId, householdId, role? })` joins `household_members` with `households`, requires `left_at IS NULL` and `archived_at IS NULL`, and throws 404 when nothing matches, 403 when `role: 'owner'` is required and the caller is a member. Routes only parse ids (a malformed uuid is a 404, never a 400 or a Postgres cast error).
+
+Why 404 and not 403 for non-members: household ids are not secret but should not be confirmable. A former member or a stranger gets exactly the same answer as for an id that never existed.
+
+Membership changes (role change, removal, leave, accepting an invite, creating or revoking invites, archiving) run in a transaction that first calls `lockHousehold()`: `SELECT ... FROM households WHERE id = $1 FOR UPDATE`. That serializes them per household, so the "at least one owner" check and the write cannot interleave (see the hard parts).
+
 ### requireAuth
 
 Reads `Authorization: Bearer`, verifies the JWT (algorithm pinned to HS256, issuer and audience checked) and sets `req.auth = { userId, sessionId }`. Handlers read it with `getAuth(req)`, which throws if a route forgot the middleware. It does not hit the database, so a logged-out session's access token works until it expires (at most 15 minutes).
@@ -226,6 +258,8 @@ Reads `Authorization: Bearer`, verifies the JWT (algorithm pinned to HS256, issu
 | `auth.ts`           | `emailSchema` (trims, lowercases), `registerInputSchema`, `loginInputSchema`, `userSchema`, `authResponseSchema`, `meResponseSchema` | API route parsing, web forms and API client                 |
 | `password/rules.ts` | `PASSWORD_RULES`, `checkPassword()`                                                                                                  | register schema (server enforcement) and the live checklist |
 | `brand.ts`          | palette, logo pairings, `pairingFor(id)`, `contrastRatio()`, `readableTextOn()`                                                      | web brand components, a contrast test                       |
+| `households.ts`     | `HOUSEHOLD_ROLES`, `CURRENCIES` (also the Postgres enums), household/member input and response schemas                               | API routes and Drizzle enums, web (next PR)                 |
+| `invites.ts`        | `INVITE_TTL_DAYS`, `inviteTokenSchema`, create/list/preview response schemas                                                         | API routes, web (next PR)                                   |
 
 Password policy: required rules (10+ characters, does not contain the email local part or display name, not in the common list) block registration and are enforced by the API through `registerInputSchema.superRefine`. Composition rules (lowercase, uppercase, number) are only hints in the UI, following NIST SP 800-63B, which advises against mandatory composition rules. The login schema deliberately has no policy, so existing passwords keep working if rules change.
 
@@ -334,6 +368,8 @@ API specifics:
 - Test files run sequentially (`fileParallelism: false`) because they share one database.
 - Tests that write data call `resetDatabase()` in `beforeEach`. It truncates every table in the `public` schema and refuses to run unless the database name ends in `_test`.
 - A fresh `createApp()` per test keeps rate-limit counters isolated.
+- Household tests create users with `createTestUser()` (`test/users.ts`): a direct insert with a fake hash plus `bearer(user)`, which signs an access token at call time. No Argon2 and no register rate limit, so the permission matrix (every route x owner, member, former member, outsider, anonymous) stays fast, and tokens stay valid after the fake clock jumps 7 days.
+- Database-level guarantees (composite FKs, CHECKs) are tested with raw Drizzle inserts; `pgErrorOf()` unwraps the driver error to assert its code and constraint name.
 - Time-based behavior (token expiry, the grace window, session expiry) uses `vi.useFakeTimers({ toFake: ['Date'] })`, which fakes only `Date`, so the pg driver's timers keep working.
 
 Web specifics:
@@ -361,7 +397,11 @@ Things that took real debugging or are easy to break. Read these before changing
 9. **Contrast-driven palette.** Several colors were adjusted by calculation, not taste: green and red darkened to reach 3:1 in pairings, the logo tile glow capped at `#1515E8`. Change a color only with the contrast test running.
 10. **Base UI quirks.** A focused theme button shows its tooltip, so the first Escape closes the tooltip and the second the menu (standard nested-popup behavior). Rendering a Base UI `Button` as a link breaks its semantics; use `buttonVariants()` on links.
 11. **Vite dev server staleness.** After rapid file rewrites Vite can keep serving a half-written module (`does not provide an export named ...`) and the app stays on the splash. Touching the file or restarting `pnpm dev` fixes it.
-12. **Preview port collisions.** A tool or platform that sets `PORT` for a process makes the API bind that port (`--env-file` never overrides existing env vars). Vite uses `strictPort`, so it fails instead of silently moving.
+12. **The household lock comes before any membership read.** "Is there another owner?" followed by a demotion is a check-then-act race: two owners stepping down at the same time would both see two owners. `lockHousehold()` takes a row lock on `households` first; under READ COMMITTED every later statement in the transaction then sees what the other transaction committed. Reading memberships in the same statement as the lock would not be enough (Postgres re-checks only the locked row). A test fires two parallel step-downs and fails without the lock.
+13. **One lock order: household, then invite.** Accepting an invite reads the invite's household id without a lock, locks the household, then locks the invite row. Membership changes lock the household and then revoke invites. Locking the invite first in accept would let the two paths deadlock.
+14. **Invite tokens are credentials in a URL.** They are 256-bit random values stored as SHA-256 hashes, but they travel in the path, so `redactUrl()` strips them from request logs. The web invite page must not load third-party resources (Referer leak); Helmet already sends `Referrer-Policy: no-referrer` for API responses.
+15. **Invites die with their creator's ownership.** Leaving, removal and demotion revoke the person's pending invites in the same transaction. Otherwise an owner could mint a link, get removed, and walk back in.
+16. **Preview port collisions.** A tool or platform that sets `PORT` for a process makes the API bind that port (`--env-file` never overrides existing env vars). Vite uses `strictPort`, so it fails instead of silently moving.
 
 ## 15. Known limitations
 
@@ -369,5 +409,8 @@ Things that took real debugging or are easy to break. Read these before changing
 - Rate limits are per IP and in memory: they reset on restart and are not shared between instances (Redis is planned for Phase 6). Behind a reverse proxy, `trust proxy` must be configured first (Phase 3 deploy), otherwise every request appears to come from the proxy's IP.
 - Registration reveals whether an email exists (409). Avoiding this needs email verification, which is out of scope for now.
 - No email verification, password reset, account deletion or session list yet.
+- Invite links are not bound to an email: whoever holds a valid link can join. Owners can list and revoke pending links; links expire after 7 days.
+- A removed member can rejoin through any other valid invite link they see; there is no ban list.
+- Leaving and archiving do not check balances yet (Phase 3).
 - The inline theme script in `index.html` needs a CSP hash if a Content Security Policy is added to the frontend.
 - Cross-tab refresh locking is covered by reasoning and the server grace window, not by automated tests (jsdom has no Web Locks).
