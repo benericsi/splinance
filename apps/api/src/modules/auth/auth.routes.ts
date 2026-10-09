@@ -11,9 +11,9 @@ import {
   type Response,
   Router,
 } from 'express';
-import { rateLimit } from 'express-rate-limit';
 import { env } from '../../config/env';
 import { HttpError } from '../../lib/http-error';
+import { rateLimiter } from '../../middleware/rate-limit';
 import { getAuth } from '../../middleware/require-auth';
 import { type AuthResult, getUser, login, logout, refresh, register } from './auth.service';
 
@@ -27,21 +27,6 @@ const cookieOptions: CookieOptions = {
   sameSite: 'strict',
   path: '/api/auth',
 };
-
-const MINUTE_MS = 60_000;
-
-function limiter(limit: number, options: { skipSuccessfulRequests?: boolean } = {}) {
-  return rateLimit({
-    windowMs: 15 * MINUTE_MS,
-    limit,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    ...options,
-    handler: (_req, _res, next) => {
-      next(new HttpError(429, 'Too many attempts, please try again later', 'RATE_LIMITED'));
-    },
-  });
-}
 
 function readRefreshCookie(req: Request): string | undefined {
   const value = (req.cookies as Record<string, unknown> | undefined)?.[REFRESH_COOKIE];
@@ -63,18 +48,18 @@ function sendAuth(res: Response, status: number, result: AuthResult) {
 export function createAuthRouter() {
   const router = Router();
 
-  router.post('/register', limiter(5), async (req, res) => {
+  router.post('/register', rateLimiter(5), async (req, res) => {
     const input = registerInputSchema.parse(req.body);
     sendAuth(res, 201, await register(input));
   });
 
   // Only failed attempts count, so normal users never hit the limit.
-  router.post('/login', limiter(10, { skipSuccessfulRequests: true }), async (req, res) => {
+  router.post('/login', rateLimiter(10, { skipSuccessfulRequests: true }), async (req, res) => {
     const input = loginInputSchema.parse(req.body);
     sendAuth(res, 200, await login(input));
   });
 
-  router.post('/refresh', limiter(100), async (req, res) => {
+  router.post('/refresh', rateLimiter(100), async (req, res) => {
     const token = readRefreshCookie(req);
     if (!token) {
       throw new HttpError(401, 'Session expired, please log in again', 'INVALID_REFRESH_TOKEN');
