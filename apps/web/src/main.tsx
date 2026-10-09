@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { ErrorPage, NotFoundPage } from '@/components/route-states';
 import { authStore } from '@/lib/auth-store';
 import { createQueryClient } from '@/lib/query-client';
+import { rerunGuardsOnSessionEnd } from '@/lib/session-watch';
 import { routeTree } from './routeTree.gen';
 import './index.css';
 
@@ -29,14 +30,7 @@ declare module '@tanstack/react-router' {
   }
 }
 
-// Logout, or a refresh that failed mid-session: re-run route guards so protected
-// pages redirect to /login instead of showing stale content.
-let previousStatus = authStore.getState().status;
-authStore.subscribe(() => {
-  const { status } = authStore.getState();
-  if (previousStatus === 'authenticated' && status === 'anonymous') void router.invalidate();
-  previousStatus = status;
-});
+rerunGuardsOnSessionEnd(authStore, router);
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Root element #root not found');

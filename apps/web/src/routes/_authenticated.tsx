@@ -14,8 +14,14 @@ const modalSearchSchema = z.object({
 export const Route = createFileRoute('/_authenticated')({
   validateSearch: modalSearchSchema,
   beforeLoad: ({ context, location }) => {
-    if (context.auth.getState().status !== 'authenticated') {
-      throw redirect({ to: '/login', search: { redirect: location.href } });
+    const { status, endedBy } = context.auth.getState();
+    if (status !== 'authenticated') {
+      // Come back here after logging in (deep link, expired session), but not after an
+      // explicit logout: the next person may be someone else, who cannot see this page.
+      throw redirect({
+        to: '/login',
+        search: endedBy === 'logout' ? {} : { redirect: location.href },
+      });
     }
   },
   component: AuthenticatedLayout,
