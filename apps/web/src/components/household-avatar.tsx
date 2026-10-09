@@ -1,5 +1,6 @@
-import { GradientAvatar } from '@outpacelabs/avatars';
+import { renderGradient } from '@outpacelabs/avatars';
 import { BRAND_COLORS } from '@splinance/shared';
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 // Brand palette minus cream (too close to light backgrounds), like user avatars.
@@ -12,6 +13,13 @@ const GRADIENT_COLORS = [
   BRAND_COLORS.sky,
   BRAND_COLORS.mustard,
 ];
+
+// Drawn once at a fixed resolution and scaled with CSS. The library varies the level of
+// detail with the display size (fewer colors when small), which made one household look
+// different in the switcher, the menu and the settings card; a fixed `displaySize` keeps
+// it identical everywhere. The blur is baked in, so edges stay crisp at any size.
+const RENDER_SIZE = 128;
+const DETAIL_SIZE = 32;
 
 interface HouseholdAvatarProps {
   household: { id: string; name: string };
@@ -32,18 +40,25 @@ export function HouseholdAvatar({
   className,
   decorative = false,
 }: HouseholdAvatarProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    renderGradient(canvasRef.current, household.id, {
+      colors: GRADIENT_COLORS,
+      displaySize: DETAIL_SIZE,
+    });
+  }, [household.id]);
+
   return (
-    <span
+    <canvas
+      ref={canvasRef}
+      width={RENDER_SIZE}
+      height={RENDER_SIZE}
       {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': household.name })}
       title={decorative ? undefined : household.name}
-      className={cn('inline-flex shrink-0', className)}
-    >
-      <GradientAvatar
-        seed={household.id}
-        size={size}
-        radius={Math.round(size * 0.25)}
-        colors={GRADIENT_COLORS}
-      />
-    </span>
+      style={{ width: size, height: size, borderRadius: Math.round(size * 0.25) }}
+      className={cn('block shrink-0', className)}
+    />
   );
 }

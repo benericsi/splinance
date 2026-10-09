@@ -15,7 +15,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/settings')(
 
 const ROLE_LABELS = { owner: 'Owner', member: 'Member' } as const;
 
-const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
 
 function SettingsPage() {
   const { householdId } = Route.useParams();
