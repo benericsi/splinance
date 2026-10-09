@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 import { resetSessionRestore } from '@/features/auth/session';
 import { resetAuthStore } from '@/lib/auth-store';
@@ -20,6 +20,10 @@ Object.defineProperty(window, 'matchMedia', {
       dispatchEvent: () => false,
     }) as MediaQueryList,
 });
+
+// The first route test in a file loads route chunks cold; on shared CI runners that can
+// exceed the default 1 s of findBy*/waitFor. Real failures still fail, just later.
+configure({ asyncUtilTimeout: 3000 });
 
 // jsdom has no canvas; household avatars paint on one. Return no context instead of a
 // "not implemented" error per render (the avatar library skips drawing without one).
