@@ -72,7 +72,7 @@ export function TransactionDialog({
 
   const form = useForm({
     defaultValues: base
-      ? editTransactionValues(base, household.members)
+      ? editTransactionValues(base, household.members, viewerId)
       : newTransactionValues(household.members, viewerId),
     validationLogic: revalidateLogic(),
     validators: { onDynamic: transactionFormSchema(currency) },
@@ -107,7 +107,7 @@ export function TransactionDialog({
       staleTime: 0,
     });
     setBase(latest);
-    form.reset(editTransactionValues(latest, household.members));
+    form.reset(editTransactionValues(latest, household.members, viewerId));
     update.reset();
   };
 

@@ -58,6 +58,16 @@ const memberRow = (
   amount: '',
 });
 
+/**
+ * The viewer first ("You" leads the payer choice and the split rows), then the others in
+ * the order they joined; people who left (only on old transactions) come last.
+ */
+function viewerFirst(rows: ShareRow[], viewerId: string): ShareRow[] {
+  const rank = (row: ShareRow) => (row.userId === viewerId ? 0 : row.former ? 2 : 1);
+  // Array.prototype.sort is stable, so equal ranks keep their order.
+  return [...rows].sort((a, b) => rank(a) - rank(b));
+}
+
 /** A new transaction: an expense paid by the viewer, split equally between all members. */
 export function newTransactionValues(
   members: Pick<HouseholdMember, 'userId' | 'displayName'>[],
@@ -72,7 +82,10 @@ export function newTransactionValues(
     visibility: 'shared',
     paidBy: viewerId,
     splitMethod: 'equal',
-    shares: members.map((member) => memberRow(member)),
+    shares: viewerFirst(
+      members.map((member) => memberRow(member)),
+      viewerId,
+    ),
   };
 }
 
@@ -80,6 +93,7 @@ export function newTransactionValues(
 export function editTransactionValues(
   transaction: Transaction,
   members: Pick<HouseholdMember, 'userId' | 'displayName'>[],
+  viewerId: string,
 ): TransactionFormValues {
   const rows = members.map((member) => memberRow(member));
   const known = new Set(rows.map((row) => row.userId));
@@ -100,7 +114,7 @@ export function editTransactionValues(
     visibility: transaction.visibility,
     paidBy: transaction.paidBy.userId,
     splitMethod: transaction.split?.method ?? 'equal',
-    shares: rows.map((row) => {
+    shares: viewerFirst(rows, viewerId).map((row) => {
       const share = shareOf.get(row.userId);
       return {
         ...row,
