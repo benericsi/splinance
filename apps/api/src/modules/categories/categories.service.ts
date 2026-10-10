@@ -90,6 +90,24 @@ export async function updateCategory(
   return toCategory(row);
 }
 
+/**
+ * Undoes an archive. The name must still be free among the active categories of its kind
+ * (someone may have reused it): 409 CATEGORY_NAME_TAKEN otherwise. Restoring an active
+ * category changes nothing.
+ */
+export async function restoreCategory(scope: CategoryScope): Promise<Category> {
+  await requireMembership(db, scope);
+  const where = and(
+    eq(categories.id, scope.categoryId),
+    eq(categories.householdId, scope.householdId),
+  );
+  const [row] = await mapNameTaken(
+    db.update(categories).set({ archivedAt: null }).where(where).returning(),
+  );
+  if (!row) throw categoryNotFound();
+  return toCategory(row);
+}
+
 /** Soft delete: hidden from pickers, still shown on the transactions that use it. */
 export async function archiveCategory(scope: CategoryScope): Promise<void> {
   await requireMembership(db, scope);

@@ -130,6 +130,50 @@ describe('categories', () => {
       .expect(404);
   });
 
+  it('restores an archived category unless its name was reused', async () => {
+    const res = await create(app, owner, householdId, pets);
+    const { id } = categoryResponseSchema.parse(res.body).category;
+    const path = `/api/households/${householdId}/categories/${id}`;
+    await request(app)
+      .delete(path)
+      .set('Authorization', await bearer(owner))
+      .expect(204);
+
+    const restored = await request(app)
+      .post(`${path}/restore`)
+      .set('Authorization', await bearer(owner))
+      .expect(200);
+    expect(categoryResponseSchema.parse(restored.body).category).toMatchObject({
+      name: 'Pets',
+      archivedAt: null,
+    });
+    // Restoring an active category changes nothing.
+    await request(app)
+      .post(`${path}/restore`)
+      .set('Authorization', await bearer(owner))
+      .expect(200);
+
+    // Archive again, reuse the name, then restoring conflicts.
+    await request(app)
+      .delete(path)
+      .set('Authorization', await bearer(owner))
+      .expect(204);
+    expect((await create(app, owner, householdId, pets)).status).toBe(201);
+    const conflict = await request(app)
+      .post(`${path}/restore`)
+      .set('Authorization', await bearer(owner));
+    expect(conflict.status).toBe(409);
+    expect(errorCode(conflict)).toBe('CATEGORY_NAME_TAKEN');
+
+    // Not visible from another household.
+    const outsider = await createTestUser('Eve');
+    const otherHousehold = await createHousehold(app, outsider);
+    await request(app)
+      .post(`/api/households/${otherHousehold}/categories/${id}/restore`)
+      .set('Authorization', await bearer(outsider))
+      .expect(404);
+  });
+
   it('validates input', async () => {
     const res = await create(app, owner, householdId, { ...pets, icon: 'skull' });
     expect(res.status).toBe(400);

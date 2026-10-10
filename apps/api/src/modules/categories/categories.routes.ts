@@ -11,6 +11,7 @@ import {
   categoryNotFound,
   createCategory,
   listCategories,
+  restoreCategory,
   updateCategory,
 } from './categories.service';
 
@@ -44,6 +45,11 @@ export function createCategoriesRouter() {
   router.delete('/:categoryId', async (req, res) => {
     await archiveCategory(categoryScope(req));
     res.status(204).end();
+  });
+
+  router.post('/:categoryId/restore', async (req, res) => {
+    const body: CategoryResponse = { category: await restoreCategory(categoryScope(req)) };
+    res.json(body);
   });
 
   return router;

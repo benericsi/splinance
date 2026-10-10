@@ -32,9 +32,10 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
+/** An h2 (not the shadcn default div): cards are the sections of a page, below its h1. */
+function CardTitle({ className, ...props }: React.ComponentProps<'h2'>) {
   return (
-    <div
+    <h2
       data-slot="card-title"
       className={cn(
         'font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm',
