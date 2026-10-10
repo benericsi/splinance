@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { resetSessionRestore } from '@/features/auth/session';
 import { resetAuthStore } from '@/lib/auth-store';
 import { server } from './msw';
@@ -34,6 +34,9 @@ HTMLCanvasElement.prototype.getContext = () => null;
 Element.prototype.setPointerCapture = () => undefined;
 Element.prototype.releasePointerCapture = () => undefined;
 Element.prototype.hasPointerCapture = () => false;
+
+// Rolling numbers are a browser-only custom element; see test/number-flow-mock.tsx.
+vi.mock('@number-flow/react', () => import('./number-flow-mock'));
 
 // Any request without a handler fails the test instead of silently hitting the network.
 beforeAll(() => {

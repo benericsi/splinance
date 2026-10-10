@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { formatDayHeading } from '../dates';
 import { describeTransaction, signedAmount, viewerShare } from '../describe';
 import { formatMoney } from '../money';
+import { MoneyFlow } from './money-flow';
 
 interface DayGroup {
   day: string;
@@ -48,7 +49,11 @@ export function TransactionList({
           <div className="text-muted-foreground flex items-baseline justify-between border-b px-1 pb-2 text-xs font-medium">
             <h2>{formatDayHeading(group.day)}</h2>
             <span className="tabular-nums">
-              {formatMoney(group.total, group.transactions[0]?.currency ?? 'HUF', { signed: true })}
+              <MoneyFlow
+                minor={group.total}
+                currency={group.transactions[0]?.currency ?? 'HUF'}
+                signed
+              />
             </span>
           </div>
           <ul>
