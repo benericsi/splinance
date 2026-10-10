@@ -165,12 +165,13 @@ Households and invites. Every route needs a Bearer token except the invite previ
 
 Categories. Mounted under a household, so the same 404 rules apply first. Every member may manage them.
 
-| Method and path                                     | Who    | Request                                   | Success                                      | Errors (besides the above)                    |
-| --------------------------------------------------- | ------ | ----------------------------------------- | -------------------------------------------- | --------------------------------------------- |
-| `GET /api/households/:id/categories`                | member |                                           | 200 `{ categories }`, archived ones included |                                               |
-| `POST /api/households/:id/categories`               | member | `{ name, kind, icon, color }`             | 201 `{ category }`                           | 400, 409 `CATEGORY_NAME_TAKEN`                |
-| `PATCH /api/households/:id/categories/:categoryId`  | member | any of `{ name, icon, color }` (not kind) | 200 `{ category }`                           | 404 `CATEGORY_NOT_FOUND` (also archived), 409 |
-| `DELETE /api/households/:id/categories/:categoryId` | member |                                           | 204, archived                                | 404 `CATEGORY_NOT_FOUND`                      |
+| Method and path                                           | Who    | Request                                   | Success                                      | Errors (besides the above)                    |
+| --------------------------------------------------------- | ------ | ----------------------------------------- | -------------------------------------------- | --------------------------------------------- |
+| `GET /api/households/:id/categories`                      | member |                                           | 200 `{ categories }`, archived ones included |                                               |
+| `POST /api/households/:id/categories`                     | member | `{ name, kind, icon, color }`             | 201 `{ category }`                           | 400, 409 `CATEGORY_NAME_TAKEN`                |
+| `PATCH /api/households/:id/categories/:categoryId`        | member | any of `{ name, icon, color }` (not kind) | 200 `{ category }`                           | 404 `CATEGORY_NOT_FOUND` (also archived), 409 |
+| `DELETE /api/households/:id/categories/:categoryId`       | member |                                           | 204, archived                                | 404 `CATEGORY_NOT_FOUND`                      |
+| `POST /api/households/:id/categories/:categoryId/restore` | member |                                           | 200 `{ category }` (no-op if active)         | 404, 409 `CATEGORY_NAME_TAKEN` (name reused)  |
 
 `category` is `{ id, name, kind, icon, color, archivedAt }`; the list is sorted by kind (expense first), then name. New households get `DEFAULT_CATEGORIES` in the same transaction that creates them.
 
@@ -347,6 +348,8 @@ _authenticated.tsx         pathless layout: if not authenticated -> redirect /lo
     _authenticated/h/$householdId/index.tsx    /h/:id           overview
     _authenticated/h/$householdId/settings.tsx /h/:id/settings  rename, members, danger zone; <Outlet /> for modals
       _authenticated/h/$householdId/settings.invite.tsx /h/:id/settings/invite  invite dialog (owners only)
+      _authenticated/h/$householdId/settings.categories.new.tsx         /h/:id/settings/categories/new?kind=  new category
+      _authenticated/h/$householdId/settings.categories.$categoryId.tsx /h/:id/settings/categories/:cid      edit category
     _authenticated/h/$householdId/transactions.tsx /h/:id/transactions?month=YYYY-MM  list; <Outlet /> for modals
       _authenticated/h/$householdId/transactions.new.tsx            /h/:id/transactions/new   add dialog
       _authenticated/h/$householdId/transactions.$transactionId.tsx /h/:id/transactions/:tid  edit dialog
@@ -356,6 +359,7 @@ invite.tsx                 /invite#<token>  public invite landing page (logged i
 - Household shell (`HouseholdShell`): on desktop a sidebar with the logo, the household switcher and the section links; the account menu sits top right, level with the page heading (`PageHeader` leaves room for it). On phones a top bar holds the switcher and account menu, and the sections become a bottom tab bar. New sections are added to `NAV_ITEMS`.
 - Household switcher: a plain menu below 5 households (a search box over two entries is noise); from 5 on (`SEARCH_FROM_HOUSEHOLDS`) a combobox with a search box. The search filters households only: "New household" and "Household settings" are items too (one keyboard path for everything) but a custom `filter` always keeps them, and a "No households match" status line covers the case where only they remain. Picking an item navigates.
 - The last used household is kept in localStorage per user id (`splinance-last-household:<userId>`), a convenience only: `/` checks it against the list from the API.
+- Categories (settings card, any member): one kind at a time (Expenses / Income), a row opens the edit dialog, a per-row menu edits or archives (with a confirmation), and archived categories fold away under "Archived (n)" with Restore. The dialog has a live preview tile, the kind (create only; it is fixed afterwards), the name (a taken name shows next to the field), 8 brand color swatches and the 35-icon grid. Swatches and icons are visually hidden native radio inputs, so arrow keys and screen reader announcements work without extra code. A new category gets the color used least among its kind. Archived categories cannot be opened for editing (the API refuses; the route redirects back).
 - Settings: owners rename inline, change roles and remove members from a per-row menu, and archive (typing the household name to confirm). Everyone can leave; the only owner gets an explanation instead of a confirm button (the API enforces `LAST_OWNER` too). Confirmations use `ConfirmDialog` (an alert dialog with local state), not URL-driven modals: a confirmation should not survive a reload or a shared link.
 
 ### Onboarding
@@ -416,6 +420,7 @@ Every modal has a URL, so reload, sharing a link and the back button work (the p
 | Search param (`?modal=`) | app-wide actions, openable from any page        | `_authenticated` validates `modal` with a Zod enum (unknown values are dropped) and renders the matching dialog over the page |
 | Child route              | modals that belong to a page (invite, edit ...) | a child route renders a dialog over its parent route; a pasted link shows the real parent underneath                          |
 
+- `CardTitle` renders an `h2` (shadcn's default is a `div`), so the cards on a page are its sections in the heading outline.
 - `RouteDialog` is the shell for both: a Base UI dialog on larger screens, a Base UI drawer (bottom sheet, swipe to dismiss) below the `sm` breakpoint. It is always open while mounted; closing plays the exit animation, then calls `onClose`.
 - Links that open a modal pass `state={OPEN_MODAL_STATE}`. `useCloseModal(fallback)` goes back in history when that flag is set (closing does not leave a "modal open" entry behind, so back does not reopen it); for a pasted link there is nothing to go back to, so it runs the fallback, a `replace` navigation to the page underneath.
 - After a successful submit the dialog navigates with `replace: true`, which swaps out the modal entry.
@@ -505,7 +510,7 @@ API specifics:
 
 Web specifics:
 
-- MSW runs with `onUnhandledFrame: 'error'` (MSW 3's name for unhandled requests): any request without a handler fails the test.
+- MSW runs with `onUnhandledFrame: 'error'` (MSW 3's name for unhandled requests): any request without a handler fails the test. `test/msw.ts` has one default handler, an empty category list, because the settings page loads it in passing; tests that care override it.
 - `test/setup.ts` stubs `window.matchMedia` (jsdom lacks it) and resets the auth store and session-restore cache after each test.
 - `getField(label)` finds inputs by label while ignoring the required asterisk.
 - jsdom has no `navigator.locks` and no CSS animations, so cross-tab locking is not covered, and Base UI popups close after their exit animation (tests use `waitFor`).
