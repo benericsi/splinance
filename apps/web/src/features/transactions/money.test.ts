@@ -6,6 +6,8 @@ import {
   formatPercentInput,
   parseAmount,
   parsePercent,
+  readAmount,
+  amountProblemMessage,
   caretAfterFormat,
   formatAmountTyping,
   sanitizePercentInput,
@@ -63,6 +65,17 @@ describe('parseAmount', () => {
       expect(parseAmount(text, 'HUF')).toBeUndefined();
     },
   );
+
+  it('says why an amount cannot be used', () => {
+    expect(readAmount('  ', 'HUF')).toEqual({ problem: 'empty' });
+    expect(readAmount('0', 'HUF')).toEqual({ problem: 'zero' });
+    expect(readAmount('12x', 'HUF')).toEqual({ problem: 'invalid' });
+    expect(readAmount('5 000 000 000 000', 'HUF')).toEqual({ problem: 'too-large' });
+    expect(readAmount('1 000 000 000 000', 'HUF')).toEqual({ minor: 1_000_000_000_000 });
+    expect(plain(amountProblemMessage('too-large', 'HUF'))).toBe(
+      'Amount can be at most 1 000 000 000 000 Ft',
+    );
+  });
 
   it('rejects too many euro decimals', () => {
     expect(parseAmount('1,234', 'EUR')).toBe(123_400);

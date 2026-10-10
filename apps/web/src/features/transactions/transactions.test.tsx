@@ -317,6 +317,23 @@ describe('adding a transaction', () => {
     expect(amount.selectionStart).toBe(3); // "1 5|00 000 000"
   });
 
+  it('names the limit when an amount is too large', async () => {
+    const api = fakeApi();
+    const user = userEvent.setup();
+    renderRoute(page);
+
+    await user.click(await screen.findByRole('link', { name: 'Add' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
+    await user.type(within(dialog).getByLabelText('Amount'), '5000000000000');
+    await user.type(getField('Description'), 'Lidl');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(
+      await within(dialog).findByText(/^Amount can be at most 1\s000\s000\s000\s000 Ft$/),
+    ).toBeVisible();
+    expect(writes(api)).toEqual([]);
+  });
+
   it('explains a missing amount and description', async () => {
     fakeApi();
     const user = userEvent.setup();
@@ -326,7 +343,7 @@ describe('adding a transaction', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-    expect(await within(dialog).findByText('Enter an amount, like 12 500')).toBeVisible();
+    expect(await within(dialog).findByText('Enter an amount')).toBeVisible();
     expect(within(dialog).getByText('Description is required')).toBeVisible();
   });
 });

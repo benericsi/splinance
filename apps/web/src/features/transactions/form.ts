@@ -12,7 +12,14 @@ import {
 } from '@splinance/shared';
 import { z } from 'zod';
 import { today } from './dates';
-import { formatAmountInput, formatPercentInput, parseAmount, parsePercent } from './money';
+import {
+  amountProblemMessage,
+  formatAmountInput,
+  formatPercentInput,
+  parseAmount,
+  parsePercent,
+  readAmount,
+} from './money';
 
 /** One person in the split editor. Text fields hold what was typed. */
 export interface ShareRow {
@@ -165,10 +172,8 @@ export function toTransactionInput(
   currency: Currency,
 ): { input: unknown; issues: FormIssue[] } {
   const issues: FormIssue[] = [];
-  const amount = parseAmount(values.amount, currency);
-  if (amount === undefined) {
-    issues.push({ path: 'amount', message: 'Enter an amount, like 12 500' });
-  }
+  const { minor: amount, problem } = readAmount(values.amount, currency);
+  if (problem) issues.push({ path: 'amount', message: amountProblemMessage(problem, currency) });
 
   const base = {
     kind: values.kind,

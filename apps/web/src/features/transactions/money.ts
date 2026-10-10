@@ -52,16 +52,22 @@ export function currencySymbol(currency: Currency): string {
   );
 }
 
+export type AmountProblem = 'empty' | 'invalid' | 'zero' | 'too-large';
+
 /**
  * Reads what people type: "10001", "10 001", "10,001" and "10.001" are all ten thousand
  * and one forints; for euros "12,50", "12.5" and "1.234,56" work too. The last separator
  * counts as the decimal point only when the currency has decimals and at most that many
  * digits follow it; any other separators must group thousands. Returns minor units, or
- * undefined for anything else (letters, too many decimals, zero, too large).
+ * why the text is not a usable amount.
  */
-export function parseAmount(text: string, currency: Currency): number | undefined {
+export function readAmount(
+  text: string,
+  currency: Currency,
+): { minor: number; problem?: never } | { minor?: never; problem: AmountProblem } {
   const digits = CURRENCY_EXPONENTS[currency];
   const value = text.replace(/\s/g, '');
+  if (value === '') return { problem: 'empty' };
 
   let whole = value;
   let fraction = '';
@@ -72,11 +78,32 @@ export function parseAmount(text: string, currency: Currency): number | undefine
       fraction = decimal[2];
     }
   }
-  if (!/^\d+$/.test(whole) && !/^\d{1,3}([.,]\d{3})+$/.test(whole)) return undefined;
+  if (!/^\d+$/.test(whole) && !/^\d{1,3}([.,]\d{3})+$/.test(whole)) return { problem: 'invalid' };
 
   const minor =
     Number(whole.replace(/[.,]/g, '')) * 10 ** digits + Number(fraction.padEnd(digits, '0') || 0);
-  return Number.isSafeInteger(minor) && minor > 0 && minor <= MAX_AMOUNT_MINOR ? minor : undefined;
+  if (!Number.isSafeInteger(minor) || minor > MAX_AMOUNT_MINOR) return { problem: 'too-large' };
+  if (minor === 0) return { problem: 'zero' };
+  return { minor };
+}
+
+/** Minor units, or undefined when `readAmount` reports a problem. */
+export function parseAmount(text: string, currency: Currency): number | undefined {
+  return readAmount(text, currency).minor;
+}
+
+/** What to tell someone whose amount cannot be used. */
+export function amountProblemMessage(problem: AmountProblem, currency: Currency): string {
+  switch (problem) {
+    case 'empty':
+      return 'Enter an amount';
+    case 'zero':
+      return 'Amount must be more than zero';
+    case 'too-large':
+      return `Amount can be at most ${formatMoney(MAX_AMOUNT_MINOR, currency)}`;
+    case 'invalid':
+      return 'Enter an amount, like 12 500';
+  }
 }
 
 /** Whole-unit digits accepted while typing: MAX_AMOUNT_MINOR (10^12) has 13. */
