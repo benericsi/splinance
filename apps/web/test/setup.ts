@@ -22,8 +22,9 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // The first route test in a file loads route chunks cold; on shared CI runners that can
-// exceed the default 1 s of findBy*/waitFor. Real failures still fail, just later.
-configure({ asyncUtilTimeout: 3000 });
+// exceed the default 1 s of findBy*/waitFor (3 s was not enough while the API suite runs in
+// parallel). Real failures still fail, just later.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom has no canvas; household avatars paint on one. Return no context instead of a
 // "not implemented" error per render (the avatar library skips drawing without one).

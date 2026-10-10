@@ -118,6 +118,52 @@ describe('household switcher', () => {
     ).toBeVisible();
   });
 
+  it('gets a search box from five households on', async () => {
+    const many = ['Szülők', 'Iroda', 'Egészségpénztár'].map((name, i) => ({
+      ...trip,
+      id: `01a1216a-b2bb-76cc-aa3b-00e98252d14${String(i + 1)}`,
+      name,
+    }));
+    signedIn([testHousehold, trip, ...many]);
+    const user = userEvent.setup();
+    const router = renderRoute(`/h/${testHousehold.id}`);
+
+    await user.click(
+      await within(await sidebar()).findByRole('combobox', { name: /Otthon, switch household/ }),
+    );
+    const search = await screen.findByRole('combobox', { name: 'Search households' });
+    expect(screen.getAllByRole('option')).toHaveLength(7); // 5 households + 2 actions
+
+    // Accent and case insensitive; the actions stay.
+    await user.type(search, 'EGESZ');
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Egészségpénztár',
+      'New household',
+      'Household settings',
+    ]);
+
+    await user.clear(search);
+    await user.type(search, 'zzz');
+    expect(screen.getByRole('status')).toHaveTextContent('No households match');
+
+    await user.clear(search);
+    await user.type(search, 'iroda');
+    await user.keyboard('{Enter}');
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/h/${many[1]?.id ?? ''}`);
+    });
+  });
+
+  it('keeps the plain menu below five households', async () => {
+    signedIn();
+    renderRoute(`/h/${testHousehold.id}`);
+
+    expect(
+      await within(await sidebar()).findByRole('button', { name: /Otthon, switch household/ }),
+    ).toBeVisible();
+    expect(within(await sidebar()).queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
   it('links the sections of the current household', async () => {
     signedIn();
     const user = userEvent.setup();
