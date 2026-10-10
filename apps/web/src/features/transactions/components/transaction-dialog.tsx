@@ -10,7 +10,7 @@ import { RouteDialog } from '@/components/route-dialog';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { CategoryTile } from '@/features/categories/components/category-tile';
+import { CategoryPicker } from '@/features/categories/components/category-picker';
 import { useAuth } from '@/lib/auth-store';
 import { ApiError } from '@/lib/http';
 import { errorMessage } from '@/lib/query-client';
@@ -222,33 +222,16 @@ export function TransactionDialog({
                   const options = categories.filter(
                     (c) => c.kind === kind && (c.archivedAt === null || c.id === field.state.value),
                   );
-                  const selected = categories.find((c) => c.id === field.state.value);
                   return (
                     <div className="space-y-1.5">
                       <Label htmlFor="field-categoryId">Category</Label>
-                      <div className="relative">
-                        <CategoryTile
-                          category={selected}
-                          size="sm"
-                          className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2"
-                        />
-                        <select
-                          id="field-categoryId"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => {
-                            field.handleChange(e.target.value);
-                          }}
-                          className="border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 h-10 w-full rounded-lg border bg-transparent pr-2 pl-10 text-sm outline-none focus-visible:ring-3"
-                        >
-                          <option value="">No category</option>
-                          {options.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      <CategoryPicker
+                        id="field-categoryId"
+                        categories={options}
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        onBlur={field.handleBlur}
+                      />
                     </div>
                   );
                 }}

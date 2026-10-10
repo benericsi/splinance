@@ -216,7 +216,14 @@ describe('adding a transaction', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
     await user.type(within(dialog).getByLabelText('Amount'), '12 000');
     await user.type(getField('Description'), 'Pizza night');
-    await user.selectOptions(within(dialog).getByLabelText('Category'), 'Eating out');
+    await user.click(within(dialog).getByRole('combobox', { name: 'Category' }));
+    await user.type(await screen.findByRole('combobox', { name: 'Search categories' }), 'eat');
+    await user.keyboard('{Enter}');
+    await waitFor(() => {
+      expect(within(dialog).getByRole('combobox', { name: 'Category' })).toHaveTextContent(
+        'Eating out',
+      );
+    });
     expect(
       within(dialog).getByText('Paid by you · split equally between you and Bela'),
     ).toBeVisible();
@@ -345,6 +352,41 @@ describe('adding a transaction', () => {
 
     expect(await within(dialog).findByText('Enter an amount')).toBeVisible();
     expect(within(dialog).getByText('Description is required')).toBeVisible();
+  });
+});
+
+describe('category picker', () => {
+  it('searches without accents and case, picks with a click, and says when nothing matches', async () => {
+    fakeApi();
+    const user = userEvent.setup();
+    renderRoute(page);
+
+    await user.click(await screen.findByRole('link', { name: 'Add' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
+    const trigger = within(dialog).getByRole('combobox', { name: 'Category' });
+    expect(trigger).toHaveTextContent('No category');
+
+    await user.click(trigger);
+    const search = await screen.findByRole('combobox', { name: 'Search categories' });
+    // Only expense categories (plus "No category") are offered for an expense.
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'No category',
+      'Eating out',
+    ]);
+
+    await user.type(search, 'xyz');
+    expect(await screen.findByText('No categories match')).toBeVisible();
+
+    await user.clear(search);
+    await user.type(search, 'EATING');
+    await user.click(screen.getByRole('option', { name: 'Eating out' }));
+
+    await waitFor(() => {
+      expect(trigger).toHaveTextContent('Eating out');
+    });
+    await waitFor(() => {
+      expect(trigger).toHaveFocus();
+    });
   });
 });
 
