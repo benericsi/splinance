@@ -20,7 +20,7 @@ Household expense tracker for personal spending and shared expenses with a partn
 - **API:** Node.js, Express 5, TypeScript, PostgreSQL, Drizzle ORM, Zod, pino
 - **Web:** React 19, Vite, TanStack Router and Query, shadcn/ui (Base UI), Tailwind CSS v4
 - **Shared:** Zod schemas and types used by both apps
-- **Tooling:** pnpm workspaces, Docker Compose, Vitest, Supertest, Testing Library, ESLint, Prettier, GitHub Actions
+- **Tooling:** pnpm workspaces, Docker Compose, Vitest, Supertest, Testing Library, Playwright, ESLint, Prettier, GitHub Actions
 
 ## Repository layout
 
@@ -70,7 +70,7 @@ pnpm --filter @splinance/api db:migrate    # apply pending migrations
 pnpm --filter @splinance/api db:studio     # browse the database
 ```
 
-Tests apply migrations to `splinance_test` automatically.
+Tests apply migrations to `splinance_test` automatically. The end-to-end suite creates and migrates its own `splinance_e2e` database.
 
 ## Scripts
 
@@ -82,4 +82,7 @@ Tests apply migrations to `splinance_test` automatically.
 | `pnpm typecheck` | Type-check every package                                           |
 | `pnpm lint`      | Lint with ESLint (type-aware)                                      |
 | `pnpm format`    | Format with Prettier                                               |
-| `pnpm check`     | Run everything CI runs: format check, lint, typecheck, test, build |
+| `pnpm check`     | Run the main CI check: format check, lint, typecheck, test, build  |
+| `pnpm e2e`       | Build, then run the Playwright suite against the production builds |
+
+Before the first `pnpm e2e`, install the browser once: `pnpm --filter @splinance/e2e exec playwright install chromium`.

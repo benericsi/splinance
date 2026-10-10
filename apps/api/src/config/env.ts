@@ -19,6 +19,12 @@ const envSchema = z
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
     // Defaults to true in production; local http dev needs false.
     COOKIE_SECURE: z.stringbool().optional(),
+    // End-to-end tests register many users from one IP; never allowed in production.
+    RATE_LIMIT_DISABLED: z.stringbool().default(false),
+  })
+  .refine((e) => !(e.RATE_LIMIT_DISABLED && e.NODE_ENV === 'production'), {
+    message: 'RATE_LIMIT_DISABLED must not be set in production',
+    path: ['RATE_LIMIT_DISABLED'],
   })
   .transform((e) => ({ ...e, COOKIE_SECURE: e.COOKIE_SECURE ?? e.NODE_ENV === 'production' }));
 

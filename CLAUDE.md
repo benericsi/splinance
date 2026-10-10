@@ -26,7 +26,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - `packages/shared` is consumed as TypeScript source (no build step); the api bundles it with tsdown
 - TypeScript pinned to 6.0 until typescript-eslint supports TS 7; `@types/node` matches the Node runtime major
 - Module resolution is `Bundler` everywhere, so no `.js` extensions in relative imports
-- Commands: `pnpm check` (same steps as CI), `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format`
+- Commands: `pnpm check` (same steps as the main CI job), `pnpm e2e` (build + Playwright), `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format`
 - Database: schema in `apps/api/src/db/schema/` (one file per table, shared column helpers in `columns.ts`), migrations generated with `db:generate` into `apps/api/drizzle` and committed; never use `drizzle-kit push`. Do not edit or regenerate a migration once merged
 - Data model and its conventions (uuidv7 ids, money, dates, composite FKs, named constraints) are documented in `docs/data-model.md`; update it in the same PR as any schema change. Create tables only when a feature needs them
 - API routes are mounted under `/api`; errors use the shared `apiErrorResponseSchema` shape
@@ -56,6 +56,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Fonts: Inter (body, 14px base, use `tabular-nums` for amounts) and Bricolage Grotesque (headings, `font-heading`), self-hosted via fontsource (never Google Fonts CDN, GDPR)
 - Web tests mock the API with MSW (`test/msw.ts`, unhandled requests fail the test)
 - Tests run against a real Postgres (`splinance_test`); migrations are applied in Vitest global setup. API test files run sequentially (`fileParallelism: false`); tests that write data call `resetDatabase()` from `apps/api/test/db.ts` in `beforeEach`
+- E2E (`e2e/`, Playwright, Chromium desktop + Pixel 7): runs against the production builds (API :3100, `vite preview` :4173) and its own `splinance_e2e` database; every test registers its own users (`newUser()`), a second person is a new browser context; `*.mobile.spec.ts` runs only in the mobile project. The API runs with `RATE_LIMIT_DISABLED=true` (refused in production). Add a flow when a feature ships a new user journey
 - Password hashing uses `@node-rs/argon2` (the `argon2` package segfaults on this Windows setup)
 - Work on a branch per change (`chore/...`, `feat/...`, `ci/...`, `docs/...`) and merge via pull request; do not commit to `main` directly
 

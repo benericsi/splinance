@@ -16,6 +16,7 @@ describe('parseEnv', () => {
       ACCESS_TOKEN_TTL_SECONDS: 900,
       REFRESH_TOKEN_TTL_DAYS: 30,
       COOKIE_SECURE: false,
+      RATE_LIMIT_DISABLED: false,
     });
   });
 
@@ -45,5 +46,12 @@ describe('parseEnv', () => {
     expect(
       parseEnv({ ...required, NODE_ENV: 'production', COOKIE_SECURE: 'false' }).COOKIE_SECURE,
     ).toBe(false);
+  });
+
+  it('refuses to disable rate limits in production', () => {
+    expect(parseEnv({ ...required, RATE_LIMIT_DISABLED: 'true' }).RATE_LIMIT_DISABLED).toBe(true);
+    expect(() =>
+      parseEnv({ ...required, NODE_ENV: 'production', RATE_LIMIT_DISABLED: 'true' }),
+    ).toThrow(/RATE_LIMIT_DISABLED/);
   });
 });
