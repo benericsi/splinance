@@ -23,7 +23,10 @@ import { Route as AuthenticatedWelcomeInviteRouteImport } from './routes/_authen
 import { Route as AuthenticatedWelcomeJoinRouteImport } from './routes/_authenticated/welcome.join'
 import { Route as AuthenticatedHHouseholdIdIndexRouteImport } from './routes/_authenticated/h/$householdId/index'
 import { Route as AuthenticatedHHouseholdIdSettingsRouteImport } from './routes/_authenticated/h/$householdId/settings'
+import { Route as AuthenticatedHHouseholdIdTransactionsRouteImport } from './routes/_authenticated/h/$householdId/transactions'
 import { Route as AuthenticatedHHouseholdIdSettingsInviteRouteImport } from './routes/_authenticated/h/$householdId/settings.invite'
+import { Route as AuthenticatedHHouseholdIdTransactionsTransactionIdRouteImport } from './routes/_authenticated/h/$householdId/transactions.$transactionId'
+import { Route as AuthenticatedHHouseholdIdTransactionsNewRouteImport } from './routes/_authenticated/h/$householdId/transactions.new'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
@@ -101,11 +104,29 @@ const AuthenticatedHHouseholdIdSettingsRoute =
     path: '/settings',
     getParentRoute: () => AuthenticatedHHouseholdIdRoute,
   } as any)
+const AuthenticatedHHouseholdIdTransactionsRoute =
+  AuthenticatedHHouseholdIdTransactionsRouteImport.update({
+    id: '/transactions',
+    path: '/transactions',
+    getParentRoute: () => AuthenticatedHHouseholdIdRoute,
+  } as any)
 const AuthenticatedHHouseholdIdSettingsInviteRoute =
   AuthenticatedHHouseholdIdSettingsInviteRouteImport.update({
     id: '/invite',
     path: '/invite',
     getParentRoute: () => AuthenticatedHHouseholdIdSettingsRoute,
+  } as any)
+const AuthenticatedHHouseholdIdTransactionsTransactionIdRoute =
+  AuthenticatedHHouseholdIdTransactionsTransactionIdRouteImport.update({
+    id: '/$transactionId',
+    path: '/$transactionId',
+    getParentRoute: () => AuthenticatedHHouseholdIdTransactionsRoute,
+  } as any)
+const AuthenticatedHHouseholdIdTransactionsNewRoute =
+  AuthenticatedHHouseholdIdTransactionsNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AuthenticatedHHouseholdIdTransactionsRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -120,8 +141,11 @@ export interface FileRoutesByFullPath {
   '/welcome/join': typeof AuthenticatedWelcomeJoinRoute
   '/welcome/': typeof AuthenticatedWelcomeIndexRoute
   '/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
+  '/h/$householdId/transactions': typeof AuthenticatedHHouseholdIdTransactionsRouteWithChildren
   '/h/$householdId/': typeof AuthenticatedHHouseholdIdIndexRoute
   '/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
+  '/h/$householdId/transactions/$transactionId': typeof AuthenticatedHHouseholdIdTransactionsTransactionIdRoute
+  '/h/$householdId/transactions/new': typeof AuthenticatedHHouseholdIdTransactionsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AuthenticatedIndexRoute
@@ -134,8 +158,11 @@ export interface FileRoutesByTo {
   '/welcome/join': typeof AuthenticatedWelcomeJoinRoute
   '/welcome': typeof AuthenticatedWelcomeIndexRoute
   '/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
+  '/h/$householdId/transactions': typeof AuthenticatedHHouseholdIdTransactionsRouteWithChildren
   '/h/$householdId': typeof AuthenticatedHHouseholdIdIndexRoute
   '/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
+  '/h/$householdId/transactions/$transactionId': typeof AuthenticatedHHouseholdIdTransactionsTransactionIdRoute
+  '/h/$householdId/transactions/new': typeof AuthenticatedHHouseholdIdTransactionsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -152,8 +179,11 @@ export interface FileRoutesById {
   '/_authenticated/welcome/join': typeof AuthenticatedWelcomeJoinRoute
   '/_authenticated/welcome/': typeof AuthenticatedWelcomeIndexRoute
   '/_authenticated/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
+  '/_authenticated/h/$householdId/transactions': typeof AuthenticatedHHouseholdIdTransactionsRouteWithChildren
   '/_authenticated/h/$householdId/': typeof AuthenticatedHHouseholdIdIndexRoute
   '/_authenticated/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
+  '/_authenticated/h/$householdId/transactions/$transactionId': typeof AuthenticatedHHouseholdIdTransactionsTransactionIdRoute
+  '/_authenticated/h/$householdId/transactions/new': typeof AuthenticatedHHouseholdIdTransactionsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -169,8 +199,11 @@ export interface FileRouteTypes {
     | '/welcome/join'
     | '/welcome/'
     | '/h/$householdId/settings'
+    | '/h/$householdId/transactions'
     | '/h/$householdId/'
     | '/h/$householdId/settings/invite'
+    | '/h/$householdId/transactions/$transactionId'
+    | '/h/$householdId/transactions/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -183,8 +216,11 @@ export interface FileRouteTypes {
     | '/welcome/join'
     | '/welcome'
     | '/h/$householdId/settings'
+    | '/h/$householdId/transactions'
     | '/h/$householdId'
     | '/h/$householdId/settings/invite'
+    | '/h/$householdId/transactions/$transactionId'
+    | '/h/$householdId/transactions/new'
   id:
     | '__root__'
     | '/_auth'
@@ -200,8 +236,11 @@ export interface FileRouteTypes {
     | '/_authenticated/welcome/join'
     | '/_authenticated/welcome/'
     | '/_authenticated/h/$householdId/settings'
+    | '/_authenticated/h/$householdId/transactions'
     | '/_authenticated/h/$householdId/'
     | '/_authenticated/h/$householdId/settings/invite'
+    | '/_authenticated/h/$householdId/transactions/$transactionId'
+    | '/_authenticated/h/$householdId/transactions/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -310,12 +349,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHHouseholdIdSettingsRouteImport
       parentRoute: typeof AuthenticatedHHouseholdIdRoute
     }
+    '/_authenticated/h/$householdId/transactions': {
+      id: '/_authenticated/h/$householdId/transactions'
+      path: '/transactions'
+      fullPath: '/h/$householdId/transactions'
+      preLoaderRoute: typeof AuthenticatedHHouseholdIdTransactionsRouteImport
+      parentRoute: typeof AuthenticatedHHouseholdIdRoute
+    }
     '/_authenticated/h/$householdId/settings/invite': {
       id: '/_authenticated/h/$householdId/settings/invite'
       path: '/invite'
       fullPath: '/h/$householdId/settings/invite'
       preLoaderRoute: typeof AuthenticatedHHouseholdIdSettingsInviteRouteImport
       parentRoute: typeof AuthenticatedHHouseholdIdSettingsRoute
+    }
+    '/_authenticated/h/$householdId/transactions/$transactionId': {
+      id: '/_authenticated/h/$householdId/transactions/$transactionId'
+      path: '/$transactionId'
+      fullPath: '/h/$householdId/transactions/$transactionId'
+      preLoaderRoute: typeof AuthenticatedHHouseholdIdTransactionsTransactionIdRouteImport
+      parentRoute: typeof AuthenticatedHHouseholdIdTransactionsRoute
+    }
+    '/_authenticated/h/$householdId/transactions/new': {
+      id: '/_authenticated/h/$householdId/transactions/new'
+      path: '/new'
+      fullPath: '/h/$householdId/transactions/new'
+      preLoaderRoute: typeof AuthenticatedHHouseholdIdTransactionsNewRouteImport
+      parentRoute: typeof AuthenticatedHHouseholdIdTransactionsRoute
     }
   }
 }
@@ -347,8 +407,27 @@ const AuthenticatedHHouseholdIdSettingsRouteWithChildren =
     AuthenticatedHHouseholdIdSettingsRouteChildren,
   )
 
+interface AuthenticatedHHouseholdIdTransactionsRouteChildren {
+  AuthenticatedHHouseholdIdTransactionsTransactionIdRoute: typeof AuthenticatedHHouseholdIdTransactionsTransactionIdRoute
+  AuthenticatedHHouseholdIdTransactionsNewRoute: typeof AuthenticatedHHouseholdIdTransactionsNewRoute
+}
+
+const AuthenticatedHHouseholdIdTransactionsRouteChildren: AuthenticatedHHouseholdIdTransactionsRouteChildren =
+  {
+    AuthenticatedHHouseholdIdTransactionsTransactionIdRoute:
+      AuthenticatedHHouseholdIdTransactionsTransactionIdRoute,
+    AuthenticatedHHouseholdIdTransactionsNewRoute:
+      AuthenticatedHHouseholdIdTransactionsNewRoute,
+  }
+
+const AuthenticatedHHouseholdIdTransactionsRouteWithChildren =
+  AuthenticatedHHouseholdIdTransactionsRoute._addFileChildren(
+    AuthenticatedHHouseholdIdTransactionsRouteChildren,
+  )
+
 interface AuthenticatedHHouseholdIdRouteChildren {
   AuthenticatedHHouseholdIdSettingsRoute: typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
+  AuthenticatedHHouseholdIdTransactionsRoute: typeof AuthenticatedHHouseholdIdTransactionsRouteWithChildren
   AuthenticatedHHouseholdIdIndexRoute: typeof AuthenticatedHHouseholdIdIndexRoute
 }
 
@@ -356,6 +435,8 @@ const AuthenticatedHHouseholdIdRouteChildren: AuthenticatedHHouseholdIdRouteChil
   {
     AuthenticatedHHouseholdIdSettingsRoute:
       AuthenticatedHHouseholdIdSettingsRouteWithChildren,
+    AuthenticatedHHouseholdIdTransactionsRoute:
+      AuthenticatedHHouseholdIdTransactionsRouteWithChildren,
     AuthenticatedHHouseholdIdIndexRoute: AuthenticatedHHouseholdIdIndexRoute,
   }
 

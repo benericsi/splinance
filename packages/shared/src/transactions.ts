@@ -23,6 +23,9 @@ export const occurredOnSchema = z.iso
     'Enter a date between 2000 and 2099',
   );
 
+/** A calendar month, `YYYY-MM`. */
+export const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM');
+
 export const descriptionSchema = z
   .string()
   .trim()
@@ -136,10 +139,7 @@ export type TransactionResponse = z.infer<typeof transactionResponseSchema>;
 
 /** Query string of the list endpoint. Every filter is optional; results are newest first. */
 export const transactionListQuerySchema = z.object({
-  month: z
-    .string()
-    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM')
-    .optional(),
+  month: monthSchema.optional(),
   kind: transactionKindSchema.optional(),
   visibility: transactionVisibilitySchema.optional(),
   categoryId: z.uuid().optional(),
@@ -162,6 +162,26 @@ export const transactionListResponseSchema = z.object({
 });
 
 export type TransactionListResponse = z.infer<typeof transactionListResponseSchema>;
+
+export const transactionSummaryQuerySchema = z.object({ month: monthSchema });
+
+/**
+ * Month totals of what the caller can see (shared plus their own private transactions).
+ * `yourExpenses` is the caller's part: their shares of shared expenses plus their private
+ * expenses. Computed by the API because the list is paged.
+ */
+export const transactionSummarySchema = z.object({
+  month: monthSchema,
+  currency: currencySchema,
+  expenses: z.number().int().nonnegative(),
+  income: z.number().int().nonnegative(),
+  yourExpenses: z.number().int().nonnegative(),
+});
+
+export type TransactionSummary = z.infer<typeof transactionSummarySchema>;
+
+export const transactionSummaryResponseSchema = z.object({ summary: transactionSummarySchema });
+export type TransactionSummaryResponse = z.infer<typeof transactionSummaryResponseSchema>;
 
 export const AUDIT_ACTIONS = ['create', 'update', 'delete', 'restore'] as const;
 export const auditActionSchema = z.enum(AUDIT_ACTIONS);

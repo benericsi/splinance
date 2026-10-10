@@ -22,7 +22,7 @@ function errorText(error: unknown): string | undefined {
 interface TextFieldProps {
   field: AnyFieldApi;
   label: string;
-  type?: 'text' | 'email' | 'password';
+  type?: 'text' | 'email' | 'password' | 'date';
   placeholder?: string;
   autoComplete?: string;
   maxLength?: number;

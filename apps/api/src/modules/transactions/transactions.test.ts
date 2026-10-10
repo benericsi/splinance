@@ -4,6 +4,7 @@ import {
   transactionHistoryResponseSchema,
   transactionListResponseSchema,
   transactionResponseSchema,
+  transactionSummaryResponseSchema,
 } from '@splinance/shared';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
@@ -366,6 +367,57 @@ describe('listing', () => {
       .query({ cursor: 'garbage' })
       .set('Authorization', await bearer(anna));
     expect(res.status).toBe(400);
+  });
+});
+
+describe('month summary', () => {
+  async function summary(user: TestUser, month: string) {
+    const res = await request(app)
+      .get(base('/summary'))
+      .query({ month })
+      .set('Authorization', await bearer(user))
+      .expect(200);
+    return transactionSummaryResponseSchema.parse(res.body).summary;
+  }
+
+  it('sums what the caller can see, and their part of the expenses', async () => {
+    await create(anna, sharedInput({ amount: 10_001 })); // Anna's share 5001 or 5000
+    await create(
+      anna,
+      sharedInput({ amount: 3000, split: { method: 'equal', userIds: [ben.id] } }),
+    );
+    await create(anna, privateInput({ amount: 2500 }));
+    await create(ben, privateInput({ amount: 999 }));
+    await create(anna, sharedInput({ kind: 'income', amount: 50_000 }));
+    await create(anna, sharedInput({ occurredOn: '2026-09-30', amount: 7 }));
+    const deleted = await create(anna, sharedInput({ amount: 100 }));
+    await request(app)
+      .delete(base(`/${deleted.id}`))
+      .set('Authorization', await bearer(anna))
+      .expect(204);
+
+    const [first] = byId(anna, ben);
+    const annaShare = first === anna.id ? 5001 : 5000;
+
+    expect(await summary(anna, '2026-10')).toEqual({
+      month: '2026-10',
+      currency: 'HUF',
+      expenses: 10_001 + 3000 + 2500,
+      income: 50_000,
+      yourExpenses: annaShare + 2500,
+    });
+    expect(await summary(ben, '2026-10')).toMatchObject({
+      expenses: 10_001 + 3000 + 999,
+      yourExpenses: 10_001 - annaShare + 3000 + 999,
+    });
+    expect((await summary(anna, '2026-09')).expenses).toBe(7);
+  });
+
+  it('needs a month', async () => {
+    await request(app)
+      .get(base('/summary'))
+      .set('Authorization', await bearer(anna))
+      .expect(400);
   });
 });
 

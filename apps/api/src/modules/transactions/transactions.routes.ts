@@ -4,6 +4,8 @@ import {
   type TransactionListResponse,
   transactionListQuerySchema,
   type TransactionResponse,
+  type TransactionSummaryResponse,
+  transactionSummaryQuerySchema,
   updateTransactionInputSchema,
 } from '@splinance/shared';
 import { type Request, Router } from 'express';
@@ -13,6 +15,7 @@ import {
   deleteTransaction,
   getTransaction,
   getTransactionHistory,
+  getTransactionSummary,
   listTransactions,
   restoreTransaction,
   transactionNotFound,
@@ -42,6 +45,16 @@ export function createTransactionsRouter() {
     const input = transactionInputSchema.parse(req.body);
     const body: TransactionResponse = { transaction: await createTransaction(scope, input) };
     res.status(201).json(body);
+  });
+
+  // Before /:transactionId, which would otherwise treat "summary" as an id (and 404).
+  router.get('/summary', async (req, res) => {
+    const scope = householdScope(req);
+    const { month } = transactionSummaryQuerySchema.parse(req.query);
+    const body: TransactionSummaryResponse = {
+      summary: await getTransactionSummary(scope, month),
+    };
+    res.json(body);
   });
 
   router.get('/:transactionId', async (req, res) => {
