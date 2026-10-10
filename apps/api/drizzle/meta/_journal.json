@@ -22,6 +22,20 @@
       "when": 1791561528220,
       "tag": "0002_households",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791619537934,
+      "tag": "0003_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791619548072,
+      "tag": "0004_default_categories_backfill",
+      "breakpoints": true
     }
   ]
 }

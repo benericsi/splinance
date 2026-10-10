@@ -103,9 +103,27 @@ A user can belong to any number of households.
 - The composite FKs make both people members of this very household (and so guarantee the household exists): the database rejects an invite created by a member of another household even if service code had a bug. On accept, the member row is written first, then the invite, in one transaction.
 - When an owner leaves, is removed or is demoted, their pending invites are revoked, so a removed owner cannot rejoin through a link they made.
 
+### `categories`
+
+| Column                 | Type                                       | Notes                                                                         |
+| ---------------------- | ------------------------------------------ | ----------------------------------------------------------------------------- |
+| id                     | uuid PK                                    | uuidv7                                                                        |
+| household_id           | uuid FK -> households                      | `categories_household_id_fk`                                                  |
+| name                   | text                                       | 1-40 characters (`categories_name_length`)                                    |
+| kind                   | enum `category_kind` (`expense`, `income`) | Fixed at creation                                                             |
+| icon                   | text                                       | A lucide icon name from `CATEGORY_ICONS` (validated by Zod, not the database) |
+| color                  | text                                       | A brand palette key (validated by Zod; the palette may change)                |
+| archived_at            | timestamptz, nullable                      | Soft delete: hidden from pickers, still shown on old transactions             |
+| created_at, updated_at | timestamptz                                |                                                                               |
+
+- `(household_id, id)` is unique (`categories_household_id_id_unique`): the target of the composite foreign key from transactions, so a transaction can only use a category of its own household.
+- Active names are unique per household and kind, ignoring case: partial unique index `categories_household_kind_name_unique` on `(household_id, kind, lower(name)) WHERE archived_at IS NULL`. An archived name can be reused.
+- New households get `DEFAULT_CATEGORIES` (10 expense, 2 income) in the creating transaction. Migration `0004_default_categories_backfill` gave households that existed before the same set (a data migration; it mirrors the defaults as they were then).
+
 ## Planned (not created yet)
 
-- Phase 2: `categories` (lucide icon name, color, expense/income), `transactions` (shared/private, expense/income, `occurred_on date`, `version` for optimistic locking), `transaction_splits` (shares always sum to the amount), `settlements`, `audit_log`
+- Phase 2: `transactions` (shared/private, expense/income, `occurred_on date`, `version` for optimistic locking), `transaction_splits` (shares always sum to the amount, enforced by a deferred constraint trigger), `audit_log`
+- Phase 3: `settlements`
 - Later: imports (staging rows, duplicates flagged not rejected), category rules (no user regex), budgets (month as `date`), recurring series, notifications
 
 Business rules already agreed:
