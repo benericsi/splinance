@@ -1,6 +1,6 @@
 import type { Household } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
-import { House, type LucideIcon, Settings } from 'lucide-react';
+import { ArrowLeftRight, House, type LucideIcon, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/logo';
 import { UserMenu } from '@/features/auth/components/user-menu';
@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { HouseholdSwitcher } from './household-switcher';
 
 interface NavItem {
-  to: '/h/$householdId' | '/h/$householdId/settings';
+  to: '/h/$householdId' | '/h/$householdId/transactions' | '/h/$householdId/settings';
   label: string;
   icon: LucideIcon;
   exact?: boolean;
@@ -18,6 +18,7 @@ interface NavItem {
 // New sections (expenses, balances, budgets, ...) are added here as they ship.
 const NAV_ITEMS: NavItem[] = [
   { to: '/h/$householdId', label: 'Overview', icon: House, exact: true },
+  { to: '/h/$householdId/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { to: '/h/$householdId/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -83,7 +84,7 @@ export function HouseholdShell({
 
         <nav
           aria-label="Household sections"
-          className="bg-background fixed inset-x-0 bottom-0 z-40 grid grid-cols-2 border-t pb-[env(safe-area-inset-bottom)] md:hidden"
+          className="bg-background fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t pb-[env(safe-area-inset-bottom)] md:hidden"
         >
           <NavLinks householdId={household.id} variant="tabs" />
         </nav>

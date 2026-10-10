@@ -29,6 +29,11 @@ configure({ asyncUtilTimeout: 3000 });
 // "not implemented" error per render (the avatar library skips drawing without one).
 HTMLCanvasElement.prototype.getContext = () => null;
 
+// jsdom has no pointer capture; sonner calls it when a toast (its Undo button) is pressed.
+Element.prototype.setPointerCapture = () => undefined;
+Element.prototype.releasePointerCapture = () => undefined;
+Element.prototype.hasPointerCapture = () => false;
+
 // Any request without a handler fails the test instead of silently hitting the network.
 beforeAll(() => {
   server.listen({ onUnhandledFrame: 'error' });

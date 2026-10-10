@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phase 0 (foundation) and Phase 1 (auth, households, invites, onboarding; API and web) are done. Phase 2 (transactions and splits) is in progress: split math, the categories API and the transactions API exist; their UI does not yet.
+Status: Phase 0 (foundation) and Phase 1 (auth, households, invites, onboarding; API and web) are done. Phase 2 (transactions and splits) is in progress: split math, categories (API), transactions (API and web: list, add, edit, delete) exist; category management in the UI and an e2e flow follow.
 
 ## Contents
 
@@ -179,6 +179,7 @@ Transactions. Also under a household. "Visible" means shared, or private and cre
 | Method and path                                                | Who                                | Request                                                                  | Success                                      | Errors (besides the above)                                                             |
 | -------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `GET /api/households/:id/transactions`                         | member                             | query: `month, kind, visibility, categoryId, memberId, q, cursor, limit` | 200 `{ transactions, nextCursor }`           | 400 (bad filter or cursor)                                                             |
+| `GET /api/households/:id/transactions/summary`                 | member                             | query: `month` (required)                                                | 200 `{ summary }`                            | 400                                                                                    |
 | `POST /api/households/:id/transactions`                        | member                             | transaction input (below)                                                | 201 `{ transaction }`                        | 400 `VALIDATION_ERROR`, `INVALID_MEMBER`, `INVALID_CATEGORY`                           |
 | `GET /api/households/:id/transactions/:transactionId`          | member, visible                    |                                                                          | 200 `{ transaction }`                        | 404 `TRANSACTION_NOT_FOUND` (also deleted)                                             |
 | `PUT /api/households/:id/transactions/:transactionId`          | member, visible                    | transaction input + `version`                                            | 200 `{ transaction }`, version + 1           | 400 as create, 403 `FORBIDDEN` (making someone else's private), 409 `VERSION_CONFLICT` |
@@ -196,6 +197,7 @@ Write rules (all in `transactions.service.ts`):
 - Any member may edit or delete a shared transaction (audited). Only the author may make one private, because the payer becomes the author and the others lose sight of it.
 - The server computes the shares from the entered split. People are sorted by user id first, so the same input always gives the same shares (and the same person gets a leftover unit).
 - `PUT` replaces the transaction and must name the `version` it was based on. The row is locked (`FOR UPDATE`) before the comparison, so two concurrent edits of the same version produce one 200 and one 409. Delete and restore also bump the version, so a form opened before a delete cannot overwrite the restored row.
+- The summary is `{ month, currency, expenses, income, yourExpenses }` over what the caller can see: `yourExpenses` adds their shares of shared expenses and their private expenses. The list is paged, so the client could not total a month itself.
 - The list is keyset-paginated: newest `occurred_on` first, then id descending. `nextCursor` encodes the last row's `(occurred_on, id)` and the next page asks for rows strictly before it, so inserts never shift pages (unlike `OFFSET`). `q` is a case-insensitive substring match with `%` and `_` escaped.
 
 `household` is `{ id, name, baseCurrency, role, createdAt }` where `role` is the caller's role; members are `{ userId, displayName, role, joinedAt }` (no emails). The raw invite token appears only in the create response; the web app builds the link (and later a QR code) from it.
@@ -345,6 +347,9 @@ _authenticated.tsx         pathless layout: if not authenticated -> redirect /lo
     _authenticated/h/$householdId/index.tsx    /h/:id           overview
     _authenticated/h/$householdId/settings.tsx /h/:id/settings  rename, members, danger zone; <Outlet /> for modals
       _authenticated/h/$householdId/settings.invite.tsx /h/:id/settings/invite  invite dialog (owners only)
+    _authenticated/h/$householdId/transactions.tsx /h/:id/transactions?month=YYYY-MM  list; <Outlet /> for modals
+      _authenticated/h/$householdId/transactions.new.tsx            /h/:id/transactions/new   add dialog
+      _authenticated/h/$householdId/transactions.$transactionId.tsx /h/:id/transactions/:tid  edit dialog
 invite.tsx                 /invite#<token>  public invite landing page (logged in or out)
 ```
 
@@ -390,6 +395,16 @@ invitee: opens /invite#<token>
 - `authStore` remembers why the session ended (`endedBy`). After a failed refresh the guard keeps `?redirect=<page>`, so the same person continues where they were. After an explicit logout it does not: the next person on the browser is often someone else, and the previous user's household would be a 404 for them.
 - Not found and errors: the root shows full-page versions; the router defaults (`defaultNotFoundComponent`, `defaultErrorComponent`) render inline inside layouts. "Try again" resets the error boundary and re-runs loaders.
 - Page titles: each page renders exactly one `<PageTitle title="..." />`. React 19 hoists `<title>` into `<head>`; multiple titles at once are unsupported, so layouts never render one.
+
+### Transactions
+
+- The page shows one month (`?month=YYYY-MM`, absent means the current month, so a bookmark always opens "now"). The loader awaits the first page, the month summary and the categories; "Load more" fetches the next cursor page (`useSuspenseInfiniteQuery`).
+- Rows are grouped by day (the API returns them newest first, so a group is a run of equal dates) with a signed day total. A row shows the category tile (brand color fill, icon black or white by contrast), a lock for private ones, "who paid · how it is split", the signed amount (income in `text-positive`) and the viewer's share.
+- Add and edit are child routes over the list (drawer on phones; a floating "+" above the bottom tabs, an "Add" button in the header on desktop). The edit route's loader turns a 404 into a toast and a redirect to the list.
+- The form keeps text as typed (`TransactionFormValues`); `toTransactionInput` reads amounts and percentages and builds the shared input, and the validator runs `transactionInputSchema` on it and maps its issues back to fields, so the form and the API apply the same rules.
+- The split editor is collapsed to one line for the default ("Paid by you · split equally between you and Bela") and opens for anything else. Switching to percentages or amounts prefills an even split; a live hint shows what is left to assign, and the preview orders people by user id like the API, so it shows the same leftover unit the server will assign.
+- A save based on an old version gets 409 `VERSION_CONFLICT`: the dialog offers to load the latest version (refetch, reset the form to it) instead of overwriting. Delete closes the dialog and shows an 8 second toast with Undo (restore).
+- Money formatting (`features/transactions/money.ts`): Hungarian conventions whatever the UI language (`10 001 Ft`, `1 234,56 €`, no grouping below five digits). `parseAmount` accepts what people type: spaces, commas or dots as thousands separators, a decimal comma or point only where the currency has decimals. Dates are built from parts in local time (`new Date('2026-10-10')` would be midnight UTC).
 
 ### URL-driven modals
 
@@ -444,6 +459,7 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 - Query retries: none for 4xx (`ApiError` with status 400-499), up to 2 otherwise.
 - `MutationCache.onError` shows a sonner toast for every failed mutation. A mutation opts out with `meta: { suppressErrorToast: true }` when the component shows the error itself (the auth forms do).
 - `useLogout` clears `authStore` and the whole query cache in `onSettled`, even if the request fails, so no data of the previous user stays in memory.
+- Transactions: everything of a household lives under `['transactions', householdId]` (list per month as an infinite query, summary per month, detail per id); every write invalidates that prefix. Delete marks the deleted detail stale without refetching it, for the same reason as leaving a household (below).
 - Households: `householdQueries.list()` and `.detail(id)` under the `['households']` key; mutations invalidate the whole key. Leaving and archiving only mark it stale (`refetchType: 'none'`) and navigate to `/`: refetching the detail first would hit the new 404 while the page is still mounted. The household layout's loader awaits the detail (a 404 becomes `notFound()`) and warms the list for the switcher; components read the detail with `useSuspenseQuery`, which never suspends there because the loader filled the cache.
 
 ## 11. Web: forms
@@ -451,6 +467,8 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 - TanStack Form with the shared Zod schema as validator, using `validationLogic: revalidateLogic()` and `validators: { onDynamic: schema }`: nothing is validated until the first submit, then fields re-validate live while the user fixes them.
 - `onSubmit` parses the values with the schema again (applying trim/lowercase transforms) and calls `mutateAsync`.
 - API errors: field-specific ones go next to the field (`EMAIL_TAKEN` on the email field via `serverError`); everything else appears in `FormError` above the form. Editing the field calls `mutation.reset()`, which clears the server error.
+- Forms whose fields hold text that is not the API value yet (amounts, percentages) keep a form-values type and map it to the shared input in one function; the validator runs the shared schema on the mapped value (see Transactions above).
+- `SegmentedControl` (a ToggleGroup that cannot be emptied) is the control for one-of-few choices: Expense / Income, Shared / Just me, the payer, the split method.
 - `TextField` handles labels, placeholders, the red required asterisk (`aria-hidden`, plus `aria-required` on the input), `aria-invalid` and `aria-describedby`, and a show/hide toggle for password fields.
 - The register form shows `PasswordRequirements`, a live checklist computed by `checkPassword()` from the shared rules. Unmet required rules turn red only after a submit attempt.
 

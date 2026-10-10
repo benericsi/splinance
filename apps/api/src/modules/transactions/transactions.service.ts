@@ -9,6 +9,7 @@ import {
   type TransactionInput,
   type TransactionListFilters,
   type TransactionListResponse,
+  type TransactionSummary,
   type UpdateTransactionInput,
 } from '@splinance/shared';
 import {
@@ -253,6 +254,51 @@ export async function listTransactions(
   return {
     transactions: await toTransactions(db, page),
     nextCursor: rows.length > query.limit && last ? encodeCursor(last) : null,
+  };
+}
+
+/** Month totals for the list header (the list itself is paged, so the client cannot sum it). */
+export async function getTransactionSummary(
+  scope: HouseholdScope,
+  month: string,
+): Promise<TransactionSummary> {
+  const { household } = await requireMembership(db, scope);
+  const [from, to] = monthRange(month);
+  const isExpense = sql`${transactions.kind} = 'expense'`;
+  // The caller's part of an expense: the whole amount if private, else their share (if any).
+  const yourPart = sql`case when ${transactions.visibility} = 'private' then ${transactions.amount} else coalesce(${transactionSplits.amount}, 0) end`;
+
+  const [row] = await db
+    .select({
+      expenses: sql<string>`coalesce(sum(${transactions.amount}) filter (where ${isExpense}), 0)`,
+      income: sql<string>`coalesce(sum(${transactions.amount}) filter (where not ${isExpense}), 0)`,
+      yourExpenses: sql<string>`coalesce(sum(${yourPart}) filter (where ${isExpense}), 0)`,
+    })
+    .from(transactions)
+    .leftJoin(
+      transactionSplits,
+      and(
+        eq(transactionSplits.transactionId, transactions.id),
+        eq(transactionSplits.userId, scope.userId),
+      ),
+    )
+    .where(
+      and(
+        eq(transactions.householdId, scope.householdId),
+        isNull(transactions.deletedAt),
+        visibleTo(scope.userId),
+        gte(transactions.occurredOn, from),
+        lt(transactions.occurredOn, to),
+      ),
+    );
+
+  // Postgres returns bigint sums as strings; they stay far below 2^53 (see MAX_AMOUNT_MINOR).
+  return {
+    month,
+    currency: household.baseCurrency,
+    expenses: Number(row?.expenses ?? 0),
+    income: Number(row?.income ?? 0),
+    yourExpenses: Number(row?.yourExpenses ?? 0),
   };
 }
 
