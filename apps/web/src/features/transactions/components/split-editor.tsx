@@ -12,15 +12,13 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { ShareRow } from '../form';
 import {
-  AMOUNT_INPUT_MAX_LENGTH,
-  currencySymbol,
   formatMoney,
   formatPercentInput,
   parseAmount,
   parsePercent,
-  sanitizeAmountInput,
   sanitizePercentInput,
 } from '../money';
+import { ShareAmountInput } from './amount-inputs';
 
 const METHODS = [
   { value: 'equal', label: 'Equally' },
@@ -208,30 +206,32 @@ export function SplitEditor(props: SplitEditorProps) {
                   {row.former && <span className="text-muted-foreground"> (left)</span>}
                 </span>
               </label>
-              {splitMethod !== 'equal' && row.included && (
+              {splitMethod === 'percentage' && row.included && (
                 <div className="relative w-24 shrink-0">
                   <Input
-                    aria-label={
-                      splitMethod === 'percentage' ? `Percent for ${label}` : `Amount for ${label}`
-                    }
+                    aria-label={`Percent for ${label}`}
                     inputMode="decimal"
                     autoComplete="off"
-                    value={splitMethod === 'percentage' ? row.percent : row.amount}
+                    value={row.percent}
                     onChange={(e) => {
-                      setRow(
-                        row.userId,
-                        splitMethod === 'percentage'
-                          ? { percent: sanitizePercentInput(e.target.value) }
-                          : { amount: sanitizeAmountInput(e.target.value) },
-                      );
+                      setRow(row.userId, { percent: sanitizePercentInput(e.target.value) });
                     }}
-                    maxLength={AMOUNT_INPUT_MAX_LENGTH}
                     className="h-8 pr-7 text-right tabular-nums"
                   />
                   <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-xs">
-                    {splitMethod === 'percentage' ? '%' : currencySymbol(currency)}
+                    %
                   </span>
                 </div>
+              )}
+              {splitMethod === 'fixed' && row.included && (
+                <ShareAmountInput
+                  label={`Amount for ${label}`}
+                  value={row.amount}
+                  currency={currency}
+                  onChange={(amount) => {
+                    setRow(row.userId, { amount });
+                  }}
+                />
               )}
               {splitMethod !== 'fixed' && (
                 <span className="text-muted-foreground w-24 shrink-0 text-right text-sm tabular-nums">

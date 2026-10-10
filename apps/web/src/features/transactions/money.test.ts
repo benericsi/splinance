@@ -6,7 +6,8 @@ import {
   formatPercentInput,
   parseAmount,
   parsePercent,
-  sanitizeAmountInput,
+  caretAfterFormat,
+  formatAmountTyping,
   sanitizePercentInput,
 } from './money';
 
@@ -69,11 +70,42 @@ describe('parseAmount', () => {
   });
 });
 
-describe('input sanitizing', () => {
-  it('drops everything an amount cannot contain while typing', () => {
-    expect(sanitizeAmountInput('10000000000asdasdasld,000000')).toBe('10000000000,000000');
-    expect(sanitizeAmountInput('-1e5 Ft')).toBe('15 ');
-    expect(sanitizeAmountInput('1'.repeat(30))).toHaveLength(20);
+describe('formatting while typing', () => {
+  it('groups forints like the rest of the app and drops anything else', () => {
+    expect(plain(formatAmountTyping('100000000', 'HUF'))).toBe('100 000 000');
+    expect(plain(formatAmountTyping('2500', 'HUF'))).toBe('2500');
+    expect(plain(formatAmountTyping('12345', 'HUF'))).toBe('12 345');
+    // 17 digits typed, capped at 13: exactly the largest amount the API accepts.
+    expect(plain(formatAmountTyping('10000000000asdasdasld,000000', 'HUF'))).toBe(
+      '1 000 000 000 000',
+    );
+    expect(formatAmountTyping('007', 'HUF')).toBe('7');
+    expect(formatAmountTyping('Ft', 'HUF')).toBe('');
+    expect(formatAmountTyping('9'.repeat(20), 'HUF').replace(/\D/g, '')).toHaveLength(13);
+  });
+
+  it('keeps a decimal comma for euros', () => {
+    expect(plain(formatAmountTyping('12345.6', 'EUR'))).toBe('12 345,6');
+    expect(formatAmountTyping('12,', 'EUR')).toBe('12,');
+    expect(formatAmountTyping(',5', 'EUR')).toBe('0,5');
+    expect(formatAmountTyping('1,999', 'EUR')).toBe('1,99');
+    expect(plain(formatAmountTyping('1.234,56', 'EUR'))).toBe('1234,56');
+  });
+
+  it('keeps the caret behind the same digit', () => {
+    // Typing the 6th digit at the end of "12 345" -> "123 456": caret at the end.
+    const raw = '12\u00a03456';
+    const formatted = formatAmountTyping(raw, 'HUF');
+    expect(caretAfterFormat(raw, raw.length, formatted, 'HUF')).toBe(formatted.length);
+    // A digit inserted after "1" in "1 000 000": caret right behind it.
+    const inserted = '19\u00a0000\u00a0000';
+    const regrouped = formatAmountTyping(inserted, 'HUF');
+    expect(plain(regrouped)).toBe('19 000 000');
+    expect(caretAfterFormat(inserted, 2, regrouped, 'HUF')).toBe(2);
+    expect(caretAfterFormat('', 0, '', 'HUF')).toBe(0);
+  });
+
+  it('cleans percentages', () => {
     expect(sanitizePercentInput('33,3x%')).toBe('33,3%');
   });
 });

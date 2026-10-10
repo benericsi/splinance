@@ -79,15 +79,60 @@ export function parseAmount(text: string, currency: Currency): number | undefine
   return Number.isSafeInteger(minor) && minor > 0 && minor <= MAX_AMOUNT_MINOR ? minor : undefined;
 }
 
-/** Longest amount text worth typing: 10^12 with grouping spaces and decimals fits easily. */
-export const AMOUNT_INPUT_MAX_LENGTH = 20;
+/** Whole-unit digits accepted while typing: MAX_AMOUNT_MINOR (10^12) has 13. */
+const MAX_WHOLE_DIGITS = 13;
+
+const wholeFormatter = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
 
 /**
- * Keeps only what an amount can contain (digits, spaces, `.` and `,`) while typing, so
- * letters never reach the field. Validation (`parseAmount`) still decides what is valid.
+ * Formats an amount while it is typed: "100000000" shows as "100 000 000", the same
+ * grouping as everywhere else. Letters never get in. Spaces and separators people type
+ * are dropped and regrouped; for currencies with decimals the last `.` or `,` is the
+ * decimal comma ("12.5" -> "12,5") and extra decimals are cut. Validation stays with
+ * `parseAmount`, which reads the result.
  */
-export function sanitizeAmountInput(text: string): string {
-  return text.replace(/[^\d\s.,]/g, '').slice(0, AMOUNT_INPUT_MAX_LENGTH);
+export function formatAmountTyping(text: string, currency: Currency): string {
+  const decimals = CURRENCY_EXPONENTS[currency];
+  const cleaned = text.replace(/[^\d.,]/g, '');
+
+  let whole = cleaned;
+  let fraction: string | undefined;
+  const separator =
+    decimals > 0 ? Math.max(cleaned.lastIndexOf('.'), cleaned.lastIndexOf(',')) : -1;
+  if (separator !== -1) {
+    whole = cleaned.slice(0, separator);
+    fraction = cleaned.slice(separator + 1).slice(0, decimals);
+  }
+  whole = whole
+    .replace(/[.,]/g, '')
+    .replace(/^0+(?=\d)/, '')
+    .slice(0, MAX_WHOLE_DIGITS);
+
+  const grouped = whole === '' ? '' : wholeFormatter.format(BigInt(whole));
+  return fraction === undefined ? grouped : `${grouped || '0'},${fraction}`;
+}
+
+/**
+ * Where the caret belongs after `formatAmountTyping`: behind the same number of digits
+ * (and decimal separator) as before, so inserted grouping spaces do not move it.
+ */
+export function caretAfterFormat(
+  raw: string,
+  caret: number,
+  formatted: string,
+  currency: Currency,
+): number {
+  const decimals = CURRENCY_EXPONENTS[currency];
+  const significant = (char: string) => /\d/.test(char) || (decimals > 0 && /[.,]/.test(char));
+  let count = 0;
+  for (let i = 0; i < caret && i < raw.length; i++) {
+    if (significant(raw.charAt(i))) count++;
+  }
+  if (count === 0) return 0;
+  for (let i = 0; i < formatted.length; i++) {
+    if (significant(formatted.charAt(i)) && --count === 0) return i + 1;
+  }
+  return formatted.length;
 }
 
 /** Same for percentages: digits, a decimal separator and an optional `%`. */

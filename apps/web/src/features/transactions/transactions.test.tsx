@@ -297,17 +297,33 @@ describe('adding a transaction', () => {
     });
   });
 
-  it('explains an unreadable amount', async () => {
+  it('groups digits while typing and keeps the caret in place', async () => {
     fakeApi();
     const user = userEvent.setup();
     renderRoute(page);
 
     await user.click(await screen.findByRole('link', { name: 'Add' }));
     const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
-    const amount = within(dialog).getByLabelText('Amount');
-    // Letters never reach the field (they used to stretch the dialog off screen).
-    await user.type(amount, '1x2.5abc');
-    expect(amount).toHaveValue('12.5');
+    const amount = within(dialog).getByLabelText<HTMLInputElement>('Amount');
+
+    // Letters and (for forints) separators never get in; digits are grouped as typed.
+    await user.type(amount, '1x00.000abc000');
+    expect(amount).toHaveValue('100\u00a0000\u00a0000');
+
+    // Inserting after the first digit regroups, and the caret stays behind the new digit.
+    amount.setSelectionRange(1, 1);
+    await user.type(amount, '5', { initialSelectionStart: 1, initialSelectionEnd: 1 });
+    expect(amount).toHaveValue('1\u00a0500\u00a0000\u00a0000');
+    expect(amount.selectionStart).toBe(3); // "1 5|00 000 000"
+  });
+
+  it('explains a missing amount and description', async () => {
+    fakeApi();
+    const user = userEvent.setup();
+    renderRoute(page);
+
+    await user.click(await screen.findByRole('link', { name: 'Add' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(await within(dialog).findByText('Enter an amount, like 12 500')).toBeVisible();

@@ -29,13 +29,9 @@ import {
   useRestoreTransaction,
   useUpdateTransaction,
 } from '../hooks';
-import {
-  AMOUNT_INPUT_MAX_LENGTH,
-  currencySymbol,
-  parseAmount,
-  sanitizeAmountInput,
-} from '../money';
+import { parseAmount } from '../money';
 import { transactionQueries } from '../queries';
+import { HeroAmountInput } from './amount-inputs';
 import { SplitEditor } from './split-editor';
 
 /** Validators may report strings or Standard Schema issues ({ message }). */
@@ -184,34 +180,15 @@ export function TransactionDialog({
                 <Label htmlFor="field-amount" className="sr-only">
                   Amount
                 </Label>
-                <div className="flex min-w-0 items-baseline justify-center gap-2">
-                  <input
-                    id="field-amount"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    placeholder="0"
-                    autoFocus={!base}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    maxLength={AMOUNT_INPUT_MAX_LENGTH}
-                    onChange={(e) => {
-                      field.handleChange(sanitizeAmountInput(e.target.value));
-                    }}
-                    aria-invalid={error !== undefined}
-                    aria-describedby={error ? 'field-amount-error' : undefined}
-                    className={cn(
-                      'font-heading placeholder:text-muted-foreground/60 focus-visible:border-ring aria-invalid:border-destructive max-w-full min-w-[2ch] border-b-2 border-transparent bg-transparent text-center font-semibold tabular-nums outline-none',
-                      // Long numbers get smaller instead of overflowing the row.
-                      field.state.value.length > 12
-                        ? 'text-2xl'
-                        : field.state.value.length > 8
-                          ? 'text-3xl'
-                          : 'text-4xl',
-                    )}
-                    style={{ fieldSizing: 'content' }}
-                  />
-                  <span className="text-muted-foreground text-xl">{currencySymbol(currency)}</span>
-                </div>
+                <HeroAmountInput
+                  id="field-amount"
+                  value={field.state.value}
+                  onChange={field.handleChange}
+                  onBlur={field.handleBlur}
+                  currency={currency}
+                  error={error}
+                  autoFocus={!base}
+                />
                 {error && (
                   <p id="field-amount-error" className="text-destructive text-center text-sm">
                     {error}
