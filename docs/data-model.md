@@ -120,9 +120,61 @@ A user can belong to any number of households.
 - Active names are unique per household and kind, ignoring case: partial unique index `categories_household_kind_name_unique` on `(household_id, kind, lower(name)) WHERE archived_at IS NULL`. An archived name can be reused.
 - New households get `DEFAULT_CATEGORIES` (10 expense, 2 income) in the creating transaction. Migration `0004_default_categories_backfill` gave households that existed before the same set (a data migration; it mirrors the defaults as they were then).
 
+### `transactions`
+
+| Column                 | Type                          | Notes                                                                                        |
+| ---------------------- | ----------------------------- | -------------------------------------------------------------------------------------------- |
+| id                     | uuid PK                       | uuidv7                                                                                       |
+| household_id           | uuid                          | Part of every composite FK below                                                             |
+| created_by             | uuid                          | Composite FK `(household_id, created_by)` -> members                                         |
+| paid_by                | uuid                          | Composite FK -> members. For income: who received it. Private: always `created_by` (CHECK)   |
+| kind                   | enum `category_kind`          | expense / income; the categories enum, so the category FK can include it                     |
+| visibility             | enum `transaction_visibility` | shared / private                                                                             |
+| amount                 | bigint                        | Minor units, 1 to 10^12 (`transactions_amount_range`)                                        |
+| currency               | enum `currency`               | The household's base currency (until Phase 7)                                                |
+| occurred_on            | date                          | The calendar day it happened                                                                 |
+| description            | text                          | 1-120 characters                                                                             |
+| category_id            | uuid, nullable                | Composite FK `(household_id, category_id, kind)` -> categories: same household and same kind |
+| split_method           | enum `split_method`, nullable | equal / percentage / fixed; set exactly when shared (`transactions_split_method_iff_shared`) |
+| version                | integer                       | Starts at 1, +1 on every update, delete and restore (optimistic locking)                     |
+| deleted_at             | timestamptz, nullable         | Soft delete                                                                                  |
+| created_at, updated_at | timestamptz                   |                                                                                              |
+
+- `(household_id, id)` is unique: the target of the split rows' composite FK.
+- Partial index `transactions_household_occurred_idx` on `(household_id, occurred_on DESC, id DESC) WHERE deleted_at IS NULL` serves the list and its keyset pagination.
+
+### `transaction_splits`
+
+| Column         | Type              | Notes                                                                       |
+| -------------- | ----------------- | --------------------------------------------------------------------------- |
+| transaction_id | uuid              | PK part; composite FK `(household_id, transaction_id)` -> transactions      |
+| household_id   | uuid              |                                                                             |
+| user_id        | uuid              | PK part; composite FK `(household_id, user_id)` -> members                  |
+| amount         | bigint            | The share in minor units, `>= 0` (0 when there are fewer units than people) |
+| basis_points   | integer, nullable | Entered percentage (100% = 10 000), for percentage splits only              |
+
+- Shared transactions have shares that sum to the amount; private ones have none. A CHECK cannot see other rows, so two deferred constraint triggers (migration 0006) check it at commit and raise a `check_violation` named `transaction_splits_sum_matches`.
+- Rows are replaced on every edit. Indexed on `(household_id, user_id)` for balances.
+
+### `audit_log`
+
+| Column       | Type                | Notes                                                           |
+| ------------ | ------------------- | --------------------------------------------------------------- |
+| id           | uuid PK             | uuidv7                                                          |
+| household_id | uuid                |                                                                 |
+| actor_id     | uuid                | Composite FK `(household_id, actor_id)` -> members              |
+| entity       | enum `audit_entity` | `transaction` for now                                           |
+| entity_id    | uuid                | No FK, so the log can cover more entity types later             |
+| action       | enum `audit_action` | create / update / delete / restore                              |
+| before       | jsonb, nullable     | API representation before the change (null for create, restore) |
+| after        | jsonb, nullable     | After the change (null for delete)                              |
+| created_at   | timestamptz         | Indexed with `(entity, entity_id)`                              |
+
+- Append-only, written in the same database transaction as the change: never a change without its entry, or the other way round.
+- Snapshots are the API shape, including display names at that time.
+
 ## Planned (not created yet)
 
-- Phase 2: `transactions` (shared/private, expense/income, `occurred_on date`, `version` for optimistic locking), `transaction_splits` (shares always sum to the amount, enforced by a deferred constraint trigger), `audit_log`
 - Phase 3: `settlements`
 - Later: imports (staging rows, duplicates flagged not rejected), category rules (no user regex), budgets (month as `date`), recurring series, notifications
 

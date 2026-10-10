@@ -85,13 +85,23 @@ export async function lockHousehold(
   tx: Db,
   householdId: string,
   onMissing: () => HttpError = householdNotFound,
+  strength: 'update' | 'share' = 'update',
 ): Promise<void> {
   const [row] = await tx
     .select({ id: households.id })
     .from(households)
     .where(and(eq(households.id, householdId), isNull(households.archivedAt)))
-    .for('update');
+    .for(strength);
   if (!row) throw onMissing();
+}
+
+/**
+ * For writes that depend on who is a member (transactions naming payers and shares): a
+ * shared lock waits for a running membership change and blocks new ones until commit, but
+ * does not serialize these writes against each other.
+ */
+export async function lockHouseholdShared(tx: Db, householdId: string): Promise<void> {
+  await lockHousehold(tx, householdId, householdNotFound, 'share');
 }
 
 /**

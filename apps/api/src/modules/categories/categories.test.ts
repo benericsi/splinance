@@ -1,47 +1,18 @@
 import {
-  apiErrorResponseSchema,
   categoryListResponseSchema,
   categoryResponseSchema,
-  createInviteResponseSchema,
   DEFAULT_CATEGORIES,
-  householdResponseSchema,
 } from '@splinance/shared';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDatabase } from '../../../test/db';
+import { type App, createHousehold, errorCode, join, leave } from '../../../test/households';
 import { bearer, createTestUser, pgErrorOf, type TestUser } from '../../../test/users';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
 import { categories } from '../../db/schema';
 
-type App = ReturnType<typeof createApp>;
-
 const pets = { name: 'Pets', kind: 'expense', icon: 'paw-print', color: 'orange' } as const;
-
-function errorCode(res: request.Response): string {
-  return apiErrorResponseSchema.parse(res.body).error.code;
-}
-
-async function createHousehold(app: App, user: TestUser): Promise<string> {
-  const res = await request(app)
-    .post('/api/households')
-    .set('Authorization', await bearer(user))
-    .send({ name: 'Otthon' })
-    .expect(201);
-  return householdResponseSchema.parse(res.body).household.id;
-}
-
-async function join(app: App, owner: TestUser, householdId: string, user: TestUser) {
-  const res = await request(app)
-    .post(`/api/households/${householdId}/invites`)
-    .set('Authorization', await bearer(owner))
-    .expect(201);
-  const { token } = createInviteResponseSchema.parse(res.body);
-  await request(app)
-    .post(`/api/invites/${token}/accept`)
-    .set('Authorization', await bearer(user))
-    .expect(200);
-}
 
 async function list(app: App, user: TestUser, householdId: string) {
   const res = await request(app)
@@ -204,10 +175,7 @@ describe('categories', () => {
     // A member who left loses access.
     const member = await createTestUser('Ben');
     await join(app, owner, householdId, member);
-    await request(app)
-      .post(`/api/households/${householdId}/leave`)
-      .set('Authorization', await bearer(member))
-      .expect(204);
+    await leave(app, householdId, member);
     await request(app)
       .patch(`/api/households/${householdId}/categories/${mine?.id ?? ''}`)
       .set('Authorization', await bearer(member))

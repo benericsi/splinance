@@ -12,6 +12,7 @@ import {
 import { Router } from 'express';
 import { getAuth, requireAuth } from '../../middleware/require-auth';
 import { createCategoriesRouter } from '../categories/categories.routes';
+import { createTransactionsRouter } from '../transactions/transactions.routes';
 import {
   createInvite,
   inviteNotFound,
@@ -105,6 +106,7 @@ export function createHouseholdsRouter() {
   });
 
   router.use('/:id/categories', createCategoriesRouter());
+  router.use('/:id/transactions', createTransactionsRouter());
 
   return router;
 }

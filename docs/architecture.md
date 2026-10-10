@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phase 0 (foundation) and Phase 1 (auth, households, invites, onboarding; API and web) are done. Phase 2 (transactions and splits) is in progress: split math and the categories API exist; transactions and their UI do not yet.
+Status: Phase 0 (foundation) and Phase 1 (auth, households, invites, onboarding; API and web) are done. Phase 2 (transactions and splits) is in progress: split math, the categories API and the transactions API exist; their UI does not yet.
 
 ## Contents
 
@@ -47,6 +47,7 @@ Key files by concern:
 | Auth (API)                    | `apps/api/src/modules/auth/*`, `apps/api/src/middleware/require-auth.ts`                                         |
 | Households and invites (API)  | `apps/api/src/modules/households/*`, `apps/api/src/modules/invites/*`                                            |
 | Categories (API)              | `apps/api/src/modules/categories/*`                                                                              |
+| Transactions (API)            | `apps/api/src/modules/transactions/*`, trigger in `apps/api/drizzle/0006_transaction_split_sum_trigger.sql`      |
 | Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`                                                  |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts` |
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                          |
@@ -172,6 +173,30 @@ Categories. Mounted under a household, so the same 404 rules apply first. Every 
 | `DELETE /api/households/:id/categories/:categoryId` | member |                                           | 204, archived                                | 404 `CATEGORY_NOT_FOUND`                      |
 
 `category` is `{ id, name, kind, icon, color, archivedAt }`; the list is sorted by kind (expense first), then name. New households get `DEFAULT_CATEGORIES` in the same transaction that creates them.
+
+Transactions. Also under a household. "Visible" means shared, or private and created by the caller; anything else is 404 `TRANSACTION_NOT_FOUND`, exactly like an unknown id.
+
+| Method and path                                                | Who                                | Request                                                                  | Success                                      | Errors (besides the above)                                                             |
+| -------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `GET /api/households/:id/transactions`                         | member                             | query: `month, kind, visibility, categoryId, memberId, q, cursor, limit` | 200 `{ transactions, nextCursor }`           | 400 (bad filter or cursor)                                                             |
+| `POST /api/households/:id/transactions`                        | member                             | transaction input (below)                                                | 201 `{ transaction }`                        | 400 `VALIDATION_ERROR`, `INVALID_MEMBER`, `INVALID_CATEGORY`                           |
+| `GET /api/households/:id/transactions/:transactionId`          | member, visible                    |                                                                          | 200 `{ transaction }`                        | 404 `TRANSACTION_NOT_FOUND` (also deleted)                                             |
+| `PUT /api/households/:id/transactions/:transactionId`          | member, visible                    | transaction input + `version`                                            | 200 `{ transaction }`, version + 1           | 400 as create, 403 `FORBIDDEN` (making someone else's private), 409 `VERSION_CONFLICT` |
+| `DELETE /api/households/:id/transactions/:transactionId`       | member, visible                    |                                                                          | 204, soft deleted                            |                                                                                        |
+| `POST /api/households/:id/transactions/:transactionId/restore` | member, visible (deleted included) |                                                                          | 200 `{ transaction }` (no-op if not deleted) |                                                                                        |
+| `GET /api/households/:id/transactions/:transactionId/history`  | member, visible (deleted included) |                                                                          | 200 `{ entries }`, oldest first              |                                                                                        |
+
+Transaction input is a union on `visibility`. Both carry `kind, amount, occurredOn, description, categoryId`. `private` has nothing else: the author paid, no split. `shared` adds `paidBy` (for income: who received it) and `split`: `{ method: 'equal', userIds }`, `{ method: 'percentage', shares: [{ userId, basisPoints }] }` or `{ method: 'fixed', shares: [{ userId, amount }] }`, which must add up (`splitProblem`, checked by the schema). The response `transaction` has `paidBy` and `createdBy` as `{ userId, displayName }`, `split` as `{ method, shares: [{ userId, displayName, amount, basisPoints }] }` (null when private), `currency` (always the household's), `version` and timestamps.
+
+Write rules (all in `transactions.service.ts`):
+
+- Every write runs in one database transaction: shared household lock, membership check, the change, the split rows, the audit entry.
+- Payer and split people must be active members, except people who were already on the transaction before this edit, so an old expense with someone who left can still be corrected.
+- New category references must be active, of the transaction's kind, and in this household. Keeping the current category is allowed even if it was archived since.
+- Any member may edit or delete a shared transaction (audited). Only the author may make one private, because the payer becomes the author and the others lose sight of it.
+- The server computes the shares from the entered split. People are sorted by user id first, so the same input always gives the same shares (and the same person gets a leftover unit).
+- `PUT` replaces the transaction and must name the `version` it was based on. The row is locked (`FOR UPDATE`) before the comparison, so two concurrent edits of the same version produce one 200 and one 409. Delete and restore also bump the version, so a form opened before a delete cannot overwrite the restored row.
+- The list is keyset-paginated: newest `occurred_on` first, then id descending. `nextCursor` encodes the last row's `(occurred_on, id)` and the next page asks for rows strictly before it, so inserts never shift pages (unlike `OFFSET`). `q` is a case-insensitive substring match with `%` and `_` escaped.
 
 `household` is `{ id, name, baseCurrency, role, createdAt }` where `role` is the caller's role; members are `{ userId, displayName, role, joinedAt }` (no emails). The raw invite token appears only in the create response; the web app builds the link (and later a QR code) from it.
 
@@ -503,6 +528,9 @@ Things that took real debugging or are easy to break. Read these before changing
 18. **Exiting a household must not refetch it in place.** After leave or archive the household detail is a 404 for the user. An immediate refetch (normal invalidation) would make the still-mounted settings page throw into the error boundary before the navigation to `/` happens. The hooks invalidate with `refetchType: 'none'`; the `/` loader then refetches the list.
 19. **Preview port collisions.** A tool or platform that sets `PORT` for a process makes the API bind that port (`--env-file` never overrides existing env vars). Vite uses `strictPort`, so it fails instead of silently moving.
 20. **Playwright starts the web servers before global setup.** The API boots while `splinance_e2e` may not exist yet. That works only because the pg pool connects lazily and the readiness URL is `/api/health/live`, which does not touch the database. Pointing it at `/ready`, or querying at boot, would deadlock the first run.
+21. **Split sums are checked at commit, not per statement.** The constraint triggers from migration 0006 are `DEFERRABLE INITIALLY DEFERRED`: an edit updates the amount, deletes the old split rows and inserts new ones, and the sum is only consistent at the end. An immediate check would fail halfway through every edit. The flip side: the error surfaces at `COMMIT`, so a test must await the whole `db.transaction(...)`, not a single statement.
+22. **Transaction writes take a shared household lock.** Membership changes take `FOR UPDATE` on the household row (hard part 12); transaction writes take `FOR SHARE`. A member being removed therefore cannot slip between "is the payer an active member?" and the insert, while two transaction writes do not block each other. Lock order is always household first, then the transaction row.
+23. **The category foreign key includes the kind.** `transactions(household_id, category_id, kind)` references `categories(household_id, id, kind)`, so an expense under an income category is impossible even for raw SQL. It works because `transactions.kind` uses the `category_kind` enum type (a foreign key needs identical types) and because a null `category_id` skips the whole check (`MATCH SIMPLE`). Drizzle generated the referenced unique constraint after the foreign key; migration 0005 was reordered by hand before merging.
 
 ## 15. Known limitations
 
