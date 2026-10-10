@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phase 0 (foundation) and Phase 1 (auth, households, invites, onboarding; API and web) are done. Transactions (Phase 2) and everything after are not built yet.
+Status: Phase 0 (foundation) and Phase 1 (auth, households, invites, onboarding; API and web) are done. Phase 2 (transactions and splits) is in progress: split math and the categories API exist; transactions and their UI do not yet.
 
 ## Contents
 
@@ -46,6 +46,8 @@ Key files by concern:
 | DB client, schema, migrations | `apps/api/src/db/*`, `apps/api/drizzle/*.sql`                                                                    |
 | Auth (API)                    | `apps/api/src/modules/auth/*`, `apps/api/src/middleware/require-auth.ts`                                         |
 | Households and invites (API)  | `apps/api/src/modules/households/*`, `apps/api/src/modules/invites/*`                                            |
+| Categories (API)              | `apps/api/src/modules/categories/*`                                                                              |
+| Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`                                                  |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts` |
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                          |
 | HTTP client, auth store       | `apps/web/src/lib/http.ts`, `apps/web/src/lib/auth-store.ts`                                                     |
@@ -160,6 +162,17 @@ Households and invites. Every route needs a Bearer token except the invite previ
 | `GET /api/invites/:token`                      | none, 60 / 15 min     |            | 200 `{ invite: { householdName, invitedBy, expiresAt } }` | 404 `INVITE_NOT_FOUND`, 410 `INVITE_REVOKED` / `INVITE_USED` / `INVITE_EXPIRED` |
 | `POST /api/invites/:token/accept`              | any user, 30 / 15 min |            | 200 `{ household }`, caller is member                     | same as preview, 409 `ALREADY_MEMBER` (invite stays unused)                     |
 
+Categories. Mounted under a household, so the same 404 rules apply first. Every member may manage them.
+
+| Method and path                                     | Who    | Request                                   | Success                                      | Errors (besides the above)                    |
+| --------------------------------------------------- | ------ | ----------------------------------------- | -------------------------------------------- | --------------------------------------------- |
+| `GET /api/households/:id/categories`                | member |                                           | 200 `{ categories }`, archived ones included |                                               |
+| `POST /api/households/:id/categories`               | member | `{ name, kind, icon, color }`             | 201 `{ category }`                           | 400, 409 `CATEGORY_NAME_TAKEN`                |
+| `PATCH /api/households/:id/categories/:categoryId`  | member | any of `{ name, icon, color }` (not kind) | 200 `{ category }`                           | 404 `CATEGORY_NOT_FOUND` (also archived), 409 |
+| `DELETE /api/households/:id/categories/:categoryId` | member |                                           | 204, archived                                | 404 `CATEGORY_NOT_FOUND`                      |
+
+`category` is `{ id, name, kind, icon, color, archivedAt }`; the list is sorted by kind (expense first), then name. New households get `DEFAULT_CATEGORIES` in the same transaction that creates them.
+
 `household` is `{ id, name, baseCurrency, role, createdAt }` where `role` is the caller's role; members are `{ userId, displayName, role, joinedAt }` (no emails). The raw invite token appears only in the create response; the web app builds the link (and later a QR code) from it.
 
 The refresh cookie: name `refresh_token`, `HttpOnly`, `SameSite=Strict`, `Path=/api/auth` (never sent to other endpoints), `Secure` when `COOKIE_SECURE` is true (default in production), expires with the session (30 days, sliding).
@@ -176,6 +189,7 @@ Environment (`apps/api/src/config/env.ts`, validated with Zod at startup, the pr
 | `ACCESS_TOKEN_TTL_SECONDS` | 900                |                                    |
 | `REFRESH_TOKEN_TTL_DAYS`   | 30                 |                                    |
 | `COOKIE_SECURE`            | true in production | must be false for local http       |
+| `RATE_LIMIT_DISABLED`      | false              | e2e only; refused in production    |
 
 ## 5. Database and migrations
 
@@ -266,6 +280,11 @@ Reads `Authorization: Bearer`, verifies the JWT (algorithm pinned to HS256, issu
 | `brand.ts`          | palette, logo pairings, `pairingFor(id)`, `contrastRatio()`, `readableTextOn()`                                                      | web brand components, a contrast test                       |
 | `households.ts`     | `HOUSEHOLD_ROLES`, `CURRENCIES` (also the Postgres enums), household/member input and response schemas                               | API routes and Drizzle enums, web (next PR)                 |
 | `invites.ts`        | `INVITE_TTL_DAYS`, `inviteTokenSchema`, create/list/preview response schemas                                                         | API routes, web (next PR)                                   |
+| `money.ts`          | `CURRENCY_EXPONENTS`, `MAX_AMOUNT_MINOR`, `amountMinorSchema` (positive integer minor units)                                         | transaction schemas, amount formatting                      |
+| `splits.ts`         | `SPLIT_METHODS`, `allocate()` (largest remainder), `computeSplits()`, `splitProblem()`, `splitRemainder()`                           | API (authoritative shares), web (live preview in the form)  |
+| `categories.ts`     | `CATEGORY_KINDS` (Postgres enum), `CATEGORY_ICONS` (lucide names), colors (brand keys), schemas, `DEFAULT_CATEGORIES`                | API routes and seeding, web pickers                         |
+
+Split math: `allocate(total, weights)` gives everyone the floor of their exact share, then hands the units lost to rounding to the largest fractional parts, earlier positions first on ties. Shares therefore always sum to the total and never differ from the exact share by a whole unit. It computes `total * weight` with BigInt, because 10^12 minor units times 10 000 basis points passes 2^53. Equal splits are weights of 1, percentages are basis points (100% = 10 000), fixed splits must already sum to the total. The order of people decides who gets a leftover unit, so callers pass a stable order.
 
 Password policy: required rules (10+ characters, does not contain the email local part or display name, not in the common list) block registration and are enforced by the API through `registerInputSchema.superRefine`. Composition rules (lowercase, uppercase, number) are only hints in the UI, following NIST SP 800-63B, which advises against mandatory composition rules. The login schema deliberately has no policy, so existing passwords keep working if rules change.
 

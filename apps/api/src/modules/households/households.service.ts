@@ -1,14 +1,16 @@
-import type {
-  CreateHouseholdInput,
-  Household,
-  HouseholdDetail,
-  HouseholdMember,
-  HouseholdRole,
-  UpdateHouseholdInput,
+import {
+  DEFAULT_CATEGORIES,
+  type CreateHouseholdInput,
+  type Household,
+  type HouseholdDetail,
+  type HouseholdMember,
+  type HouseholdRole,
+  type UpdateHouseholdInput,
 } from '@splinance/shared';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
 import {
+  categories,
   householdInvites,
   householdMembers,
   type HouseholdMemberRow,
@@ -150,6 +152,9 @@ export async function createHousehold(
     if (!household) throw new Error('Household insert returned no row');
 
     await tx.insert(householdMembers).values({ householdId: household.id, userId, role: 'owner' });
+    await tx
+      .insert(categories)
+      .values(DEFAULT_CATEGORIES.map((category) => ({ ...category, householdId: household.id })));
     return toHousehold(household, 'owner');
   });
 }
