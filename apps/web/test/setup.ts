@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
+import { MotionGlobalConfig } from 'motion/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { resetSessionRestore } from '@/features/auth/session';
 import { resetAuthStore } from '@/lib/auth-store';
@@ -34,6 +35,9 @@ HTMLCanvasElement.prototype.getContext = () => null;
 Element.prototype.setPointerCapture = () => undefined;
 Element.prototype.releasePointerCapture = () => undefined;
 Element.prototype.hasPointerCapture = () => false;
+
+// Motion animations finish instantly, so exits (a deleted row) leave the DOM right away.
+MotionGlobalConfig.skipAnimations = true;
 
 // Rolling numbers are a browser-only custom element; see test/number-flow-mock.tsx.
 vi.mock('@number-flow/react', () => import('./number-flow-mock'));

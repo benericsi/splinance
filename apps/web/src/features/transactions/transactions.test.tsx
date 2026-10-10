@@ -461,6 +461,9 @@ describe('editing a transaction', () => {
         `POST ${base}/${pizza.id}/restore`,
       ]);
     });
-    expect(await screen.findByText('Pizza night')).toBeVisible();
+    // The restored row animates in (instantly in tests, but from opacity 0 on the next frame).
+    await waitFor(() => {
+      expect(screen.getByText('Pizza night')).toBeVisible();
+    });
   });
 });

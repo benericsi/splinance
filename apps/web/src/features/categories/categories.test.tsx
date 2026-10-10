@@ -131,7 +131,10 @@ describe('categories in household settings', () => {
     expect(categories.queryByText('Old pets')).not.toBeInTheDocument();
 
     await user.click(categories.getByRole('button', { name: 'Archived (1)' }));
-    expect(categories.getByText('Old pets')).toBeVisible();
+    // The archived list opens with an animation (instant in tests, settled a frame later).
+    await waitFor(() => {
+      expect(categories.getByText('Old pets')).toBeVisible();
+    });
 
     await user.click(categories.getByRole('button', { name: 'Income (1)' }));
     expect(categories.getByRole('link', { name: 'Salary' })).toBeVisible();

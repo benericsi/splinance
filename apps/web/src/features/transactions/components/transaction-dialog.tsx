@@ -2,6 +2,7 @@ import type { Category, HouseholdDetail, SplitMethod, Transaction } from '@splin
 import { useQueryClient } from '@tanstack/react-query';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { Lock, Trash2 } from 'lucide-react';
+import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { FormError } from '@/components/form/form-error';
@@ -13,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { CategoryPicker } from '@/features/categories/components/category-picker';
 import { useAuth } from '@/lib/auth-store';
 import { ApiError } from '@/lib/http';
+import { COLLAPSE, TRANSITION_FAST } from '@/lib/motion';
 import { errorMessage } from '@/lib/query-client';
 import { cn } from '@/lib/utils';
 import {
@@ -268,34 +270,40 @@ export function TransactionDialog({
         <form.Field name="shares">
           {(sharesField) => (
             <form.Subscribe selector={(state) => state.values}>
-              {(values) =>
-                values.visibility === 'private' ? (
-                  <p className="text-muted-foreground text-sm">
-                    Only you can see it. It counts toward your own spending, not the shared balance.
-                  </p>
-                ) : (
-                  <SplitEditor
-                    currency={currency}
-                    kind={values.kind}
-                    amount={parseAmount(values.amount, currency)}
-                    viewerId={viewerId}
-                    paidBy={values.paidBy}
-                    splitMethod={values.splitMethod}
-                    shares={values.shares}
-                    error={firstError(sharesField.state.meta.errors)}
-                    onPaidByChange={(userId) => {
-                      form.setFieldValue('paidBy', userId);
-                    }}
-                    onMethodChange={(method: SplitMethod) => {
-                      sharesField.handleChange(prefillShares(values, method, currency));
-                      form.setFieldValue('splitMethod', method);
-                    }}
-                    onSharesChange={(shares: TransactionFormValues['shares']) => {
-                      sharesField.handleChange(shares);
-                    }}
-                  />
-                )
-              }
+              {(values) => (
+                // Shared <-> Just me swaps the split editor and the note by height.
+                <AnimatePresence initial={false} mode="wait">
+                  <m.div key={values.visibility} {...COLLAPSE} transition={TRANSITION_FAST}>
+                    {values.visibility === 'private' ? (
+                      <p className="text-muted-foreground text-sm">
+                        Only you can see it. It counts toward your own spending, not the shared
+                        balance.
+                      </p>
+                    ) : (
+                      <SplitEditor
+                        currency={currency}
+                        kind={values.kind}
+                        amount={parseAmount(values.amount, currency)}
+                        viewerId={viewerId}
+                        paidBy={values.paidBy}
+                        splitMethod={values.splitMethod}
+                        shares={values.shares}
+                        error={firstError(sharesField.state.meta.errors)}
+                        onPaidByChange={(userId) => {
+                          form.setFieldValue('paidBy', userId);
+                        }}
+                        onMethodChange={(method: SplitMethod) => {
+                          sharesField.handleChange(prefillShares(values, method, currency));
+                          form.setFieldValue('splitMethod', method);
+                        }}
+                        onSharesChange={(shares: TransactionFormValues['shares']) => {
+                          sharesField.handleChange(shares);
+                        }}
+                      />
+                    )}
+                  </m.div>
+                </AnimatePresence>
+              )}
             </form.Subscribe>
           )}
         </form.Field>

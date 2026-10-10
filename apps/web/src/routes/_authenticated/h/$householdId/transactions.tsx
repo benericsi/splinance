@@ -59,6 +59,8 @@ function TransactionsPage() {
         </div>
       ) : (
         <TransactionList
+          // A new month is a new list: no row-by-row exit and enter animations.
+          key={month}
           householdId={householdId}
           transactions={transactions}
           categories={categories}

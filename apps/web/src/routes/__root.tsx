@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { lazy, Suspense } from 'react';
 import { Toaster } from 'sonner';
+import { MotionProvider } from '@/components/motion-provider';
 import { ErrorPage, NotFoundPage } from '@/components/route-states';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ensureSessionRestored } from '@/features/auth/session';
@@ -30,9 +31,11 @@ function RootLayout() {
 
   return (
     <TooltipProvider>
-      <div className="bg-background text-foreground min-h-svh">
-        <Outlet />
-      </div>
+      <MotionProvider>
+        <div className="bg-background text-foreground min-h-svh">
+          <Outlet />
+        </div>
+      </MotionProvider>
       <Toaster position="top-center" richColors closeButton theme={resolved} />
       <Suspense>
         <Devtools />
