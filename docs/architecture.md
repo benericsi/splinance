@@ -488,6 +488,7 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 - `LogoMark`: chunky split S with a pink-to-orange gradient on a radially lit blue tile. The glow is capped at `#1515E8` so the orange end keeps 3:1 contrast. `public/favicon.svg` (crisp) and `public/logo.svg` (grainy) must match the component.
 - `PosterWall` (auth panel): 8 hand-composed SVG cards (grainy gradients and geometric symbols). It is a CSS size container: a container query switches 4x2 (landscape) and 2x4 (portrait), and the grid width is `min(100cqw, 150cqh)` (or `37.5cqh`), the largest size that keeps cards at 3:4 without overflowing.
 - Avatars: `UserAvatar` (Facehash with brand colors, seeded by user id, no initial) and `HouseholdAvatar` (`@outpacelabs/avatars` mesh gradient, brand colors minus cream, seeded by household id, rounded square so households never look like people; drawn once at a fixed resolution and detail level and scaled with CSS, because the library otherwise simplifies small sizes and one household would look different in the menu and on the settings page). Pass `decorative` when the name is shown next to it.
+- Motion: amounts that change in place (month totals, day totals, later balances) use `MoneyFlow`, a wrapper around NumberFlow (`@number-flow/react`): each digit rolls to its new value, with the same `Intl` options as `formatMoney` (`moneyFormatOptions`). Growing values drop new digits in from above, shrinking ones bring them up from below (`rollTrend`, the opposite of NumberFlow's default). The first render is static, so page loads do not animate, and the OS "reduce motion" setting turns rolling off. The digits sit in a shadow root, so the element is `aria-hidden` and a visually hidden copy of the formatted value is what screen readers, find-in-page and tests read. Rows that appear or disappear do not roll.
 - Shadcn components in `src/components/ui` are owned code (Base UI primitives underneath). Links styled as buttons use `buttonVariants()` on the `Link`, because Base UI's `Button` must render a real `<button>`.
 
 ## 13. Testing
@@ -510,7 +511,7 @@ API specifics:
 
 Web specifics:
 
-- MSW runs with `onUnhandledFrame: 'error'` (MSW 3's name for unhandled requests): any request without a handler fails the test. `test/msw.ts` has one default handler, an empty category list, because the settings page loads it in passing; tests that care override it.
+- MSW runs with `onUnhandledFrame: 'error'` (MSW 3's name for unhandled requests): any request without a handler fails the test. NumberFlow is replaced by a plain formatted `<span>` in tests (`test/number-flow-mock.tsx`): its custom element only registers in a real browser, and jsdom has no Web Animations. `test/msw.ts` has one default handler, an empty category list, because the settings page loads it in passing; tests that care override it.
 - `test/setup.ts` stubs `window.matchMedia` (jsdom lacks it) and resets the auth store and session-restore cache after each test.
 - `getField(label)` finds inputs by label while ignoring the required asterisk.
 - jsdom has no `navigator.locks` and no CSS animations, so cross-tab locking is not covered, and Base UI popups close after their exit animation (tests use `waitFor`).

@@ -10,28 +10,47 @@ import {
  * language: that is how the people using it read money. Hungarian groups digits only from
  * five digits on ("2500 Ft", "10 001 Ft"). Formatters are cached per options.
  */
-const LOCALE = 'hu-HU';
+export const MONEY_LOCALE = 'hu-HU';
 const formatters = new Map<string, Intl.NumberFormat>();
+
+/** The Intl options behind every amount; the animated `MoneyFlow` uses the same ones. */
+export function moneyFormatOptions(
+  currency: Currency,
+  { style = 'currency', signed = false }: { style?: 'currency' | 'decimal'; signed?: boolean } = {},
+) {
+  const digits = CURRENCY_EXPONENTS[currency];
+  // Inferred, not Intl.NumberFormatOptions: NumberFlow accepts a narrower type (no
+  // scientific notation), and these options fit both.
+  return {
+    style,
+    // narrowSymbol: "€" rather than "EUR" (hu-HU writes the code by default).
+    ...(style === 'currency' && { currency, currencyDisplay: 'narrowSymbol' as const }),
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+    signDisplay: signed ? ('exceptZero' as const) : ('auto' as const),
+  };
+}
 
 function formatter(currency: Currency, style: 'currency' | 'decimal', signed: boolean) {
   const key = `${currency}:${style}:${String(signed)}`;
   let cached = formatters.get(key);
   if (!cached) {
-    const digits = CURRENCY_EXPONENTS[currency];
-    cached = new Intl.NumberFormat(LOCALE, {
-      style,
-      // narrowSymbol: "€" rather than "EUR" (hu-HU writes the code by default).
-      ...(style === 'currency' && { currency, currencyDisplay: 'narrowSymbol' }),
-      minimumFractionDigits: digits,
-      maximumFractionDigits: digits,
-      signDisplay: signed ? 'exceptZero' : 'auto',
-    });
+    cached = new Intl.NumberFormat(MONEY_LOCALE, moneyFormatOptions(currency, { style, signed }));
     formatters.set(key, cached);
   }
   return cached;
 }
 
-const toMajor = (minor: number, currency: Currency) => minor / 10 ** CURRENCY_EXPONENTS[currency];
+/**
+ * For `MoneyFlow`: digits roll the other way round from an odometer. A growing value drops
+ * new digits in from above, a shrinking one brings them up from below (the "reverse order"
+ * of the motion reference); NumberFlow's default trend has the opposite sign.
+ */
+export const rollTrend = (previous: number, next: number) => Math.sign(previous - next);
+
+/** Minor units to the currency's main unit (forints, euros), as Intl expects. */
+export const toMajor = (minor: number, currency: Currency) =>
+  minor / 10 ** CURRENCY_EXPONENTS[currency];
 
 /** "10 001 Ft". With `signed`, a sign for anything but zero: "-10 001 Ft", "+420 000 Ft". */
 export function formatMoney(minor: number, currency: Currency, { signed = false } = {}): string {
@@ -109,7 +128,7 @@ export function amountProblemMessage(problem: AmountProblem, currency: Currency)
 /** Whole-unit digits accepted while typing: MAX_AMOUNT_MINOR (10^12) has 13. */
 const MAX_WHOLE_DIGITS = 13;
 
-const wholeFormatter = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 });
+const wholeFormatter = new Intl.NumberFormat(MONEY_LOCALE, { maximumFractionDigits: 0 });
 
 /**
  * Formats an amount while it is typed: "100000000" shows as "100 000 000", the same
@@ -177,7 +196,8 @@ export function parsePercent(text: string): number | undefined {
 
 /** Basis points as an editable percentage: 6000 -> "60", 3333 -> "33,33". */
 export function formatPercentInput(basisPoints: number): string {
-  return new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 2, useGrouping: false }).format(
-    basisPoints / 100,
-  );
+  return new Intl.NumberFormat(MONEY_LOCALE, {
+    maximumFractionDigits: 2,
+    useGrouping: false,
+  }).format(basisPoints / 100);
 }

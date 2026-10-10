@@ -1,10 +1,11 @@
 import type { TransactionSummary } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
+import type { ReactNode } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { addMonths, currentMonth, formatMonth } from '../dates';
-import { formatMoney } from '../money';
+import { MoneyFlow } from './money-flow';
 
 /** Previous / next month links (the month lives in the URL) and the month's totals. */
 export function MonthHeader({ month, summary }: { month: string; summary: TransactionSummary }) {
@@ -39,11 +40,17 @@ export function MonthHeader({ month, summary }: { month: string; summary: Transa
         )}
       </div>
       <dl className="grid grid-cols-3 gap-3">
-        <Stat label="Spent" value={formatMoney(summary.expenses, summary.currency)} />
-        <Stat label="Your share" value={formatMoney(summary.yourExpenses, summary.currency)} />
+        <Stat
+          label="Spent"
+          value={<MoneyFlow minor={summary.expenses} currency={summary.currency} />}
+        />
+        <Stat
+          label="Your share"
+          value={<MoneyFlow minor={summary.yourExpenses} currency={summary.currency} />}
+        />
         <Stat
           label="Income"
-          value={formatMoney(summary.income, summary.currency, { signed: true })}
+          value={<MoneyFlow minor={summary.income} currency={summary.currency} signed />}
           className={summary.income > 0 ? 'text-positive' : undefined}
         />
       </dl>
@@ -57,7 +64,7 @@ function Stat({
   className,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   className?: string | undefined;
 }) {
   return (
