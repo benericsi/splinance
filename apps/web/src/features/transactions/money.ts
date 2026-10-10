@@ -79,6 +79,22 @@ export function parseAmount(text: string, currency: Currency): number | undefine
   return Number.isSafeInteger(minor) && minor > 0 && minor <= MAX_AMOUNT_MINOR ? minor : undefined;
 }
 
+/** Longest amount text worth typing: 10^12 with grouping spaces and decimals fits easily. */
+export const AMOUNT_INPUT_MAX_LENGTH = 20;
+
+/**
+ * Keeps only what an amount can contain (digits, spaces, `.` and `,`) while typing, so
+ * letters never reach the field. Validation (`parseAmount`) still decides what is valid.
+ */
+export function sanitizeAmountInput(text: string): string {
+  return text.replace(/[^\d\s.,]/g, '').slice(0, AMOUNT_INPUT_MAX_LENGTH);
+}
+
+/** Same for percentages: digits, a decimal separator and an optional `%`. */
+export function sanitizePercentInput(text: string): string {
+  return text.replace(/[^\d.,%\s]/g, '').slice(0, 8);
+}
+
 /** "60", "33.33" or "33,33" (percent, up to two decimals) to basis points; undefined if invalid. */
 export function parsePercent(text: string): number | undefined {
   const value = text.replace(/\s|%/g, '').replace(',', '.');

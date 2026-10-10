@@ -6,6 +6,8 @@ import {
   formatPercentInput,
   parseAmount,
   parsePercent,
+  sanitizeAmountInput,
+  sanitizePercentInput,
 } from './money';
 
 // Intl uses no-break spaces as group separators; compare with plain spaces.
@@ -64,6 +66,15 @@ describe('parseAmount', () => {
   it('rejects too many euro decimals', () => {
     expect(parseAmount('1,234', 'EUR')).toBe(123_400);
     expect(parseAmount('1,2345', 'EUR')).toBeUndefined();
+  });
+});
+
+describe('input sanitizing', () => {
+  it('drops everything an amount cannot contain while typing', () => {
+    expect(sanitizeAmountInput('10000000000asdasdasld,000000')).toBe('10000000000,000000');
+    expect(sanitizeAmountInput('-1e5 Ft')).toBe('15 ');
+    expect(sanitizeAmountInput('1'.repeat(30))).toHaveLength(20);
+    expect(sanitizePercentInput('33,3x%')).toBe('33,3%');
   });
 });
 

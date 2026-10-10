@@ -304,7 +304,10 @@ describe('adding a transaction', () => {
 
     await user.click(await screen.findByRole('link', { name: 'Add' }));
     const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
-    await user.type(within(dialog).getByLabelText('Amount'), '12.5');
+    const amount = within(dialog).getByLabelText('Amount');
+    // Letters never reach the field (they used to stretch the dialog off screen).
+    await user.type(amount, '1x2.5abc');
+    expect(amount).toHaveValue('12.5');
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(await within(dialog).findByText('Enter an amount, like 12 500')).toBeVisible();

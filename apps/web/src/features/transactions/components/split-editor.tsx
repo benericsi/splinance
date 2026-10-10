@@ -12,11 +12,14 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { ShareRow } from '../form';
 import {
+  AMOUNT_INPUT_MAX_LENGTH,
   currencySymbol,
   formatMoney,
   formatPercentInput,
   parseAmount,
   parsePercent,
+  sanitizeAmountInput,
+  sanitizePercentInput,
 } from '../money';
 
 const METHODS = [
@@ -218,10 +221,11 @@ export function SplitEditor(props: SplitEditorProps) {
                       setRow(
                         row.userId,
                         splitMethod === 'percentage'
-                          ? { percent: e.target.value }
-                          : { amount: e.target.value },
+                          ? { percent: sanitizePercentInput(e.target.value) }
+                          : { amount: sanitizeAmountInput(e.target.value) },
                       );
                     }}
+                    maxLength={AMOUNT_INPUT_MAX_LENGTH}
                     className="h-8 pr-7 text-right tabular-nums"
                   />
                   <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-xs">

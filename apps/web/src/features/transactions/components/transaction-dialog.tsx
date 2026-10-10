@@ -29,7 +29,12 @@ import {
   useRestoreTransaction,
   useUpdateTransaction,
 } from '../hooks';
-import { currencySymbol, parseAmount } from '../money';
+import {
+  AMOUNT_INPUT_MAX_LENGTH,
+  currencySymbol,
+  parseAmount,
+  sanitizeAmountInput,
+} from '../money';
 import { transactionQueries } from '../queries';
 import { SplitEditor } from './split-editor';
 
@@ -132,9 +137,10 @@ export function TransactionDialog({
 
   return (
     <RouteDialog title={base ? 'Edit transaction' : 'Add transaction'} onClose={onClose}>
+      {/* min-w-0: a grid item, so long content must not widen the dialog's column. */}
       <form
         noValidate
-        className="space-y-4"
+        className="min-w-0 space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
           void form.handleSubmit();
@@ -178,7 +184,7 @@ export function TransactionDialog({
                 <Label htmlFor="field-amount" className="sr-only">
                   Amount
                 </Label>
-                <div className="flex items-baseline justify-center gap-2">
+                <div className="flex min-w-0 items-baseline justify-center gap-2">
                   <input
                     id="field-amount"
                     inputMode="decimal"
@@ -187,13 +193,22 @@ export function TransactionDialog({
                     autoFocus={!base}
                     value={field.state.value}
                     onBlur={field.handleBlur}
+                    maxLength={AMOUNT_INPUT_MAX_LENGTH}
                     onChange={(e) => {
-                      field.handleChange(e.target.value);
+                      field.handleChange(sanitizeAmountInput(e.target.value));
                     }}
                     aria-invalid={error !== undefined}
                     aria-describedby={error ? 'field-amount-error' : undefined}
-                    className="font-heading placeholder:text-muted-foreground/60 focus-visible:border-ring aria-invalid:border-destructive min-w-[2ch] border-b-2 border-transparent bg-transparent text-center text-4xl font-semibold tabular-nums outline-none"
-                    style={{ fieldSizing: 'content', maxWidth: '100%' }}
+                    className={cn(
+                      'font-heading placeholder:text-muted-foreground/60 focus-visible:border-ring aria-invalid:border-destructive max-w-full min-w-[2ch] border-b-2 border-transparent bg-transparent text-center font-semibold tabular-nums outline-none',
+                      // Long numbers get smaller instead of overflowing the row.
+                      field.state.value.length > 12
+                        ? 'text-2xl'
+                        : field.state.value.length > 8
+                          ? 'text-3xl'
+                          : 'text-4xl',
+                    )}
+                    style={{ fieldSizing: 'content' }}
                   />
                   <span className="text-muted-foreground text-xl">{currencySymbol(currency)}</span>
                 </div>
