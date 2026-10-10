@@ -31,6 +31,8 @@ export const categories = pgTable(
     }),
     // Target of composite foreign keys: a transaction can only use its own household's categories.
     unique('categories_household_id_id_unique').on(t.householdId, t.id),
+    // Same, including the kind: an expense can only be filed under an expense category.
+    unique('categories_household_id_id_kind_unique').on(t.householdId, t.id, t.kind),
     // Names are unique per household and kind, ignoring case, among active categories only, so
     // an archived name can be reused.
     uniqueIndex('categories_household_kind_name_unique')

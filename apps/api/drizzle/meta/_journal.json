@@ -36,6 +36,20 @@
       "when": 1791619548072,
       "tag": "0004_default_categories_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791621104331,
+      "tag": "0005_transactions",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791621115853,
+      "tag": "0006_transaction_split_sum_trigger",
+      "breakpoints": true
     }
   ]
 }
