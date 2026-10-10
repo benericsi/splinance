@@ -32,6 +32,7 @@ pnpm monorepo, three packages:
 apps/api          Express 5 REST API (Node 22, TypeScript, Drizzle, Postgres)
 apps/web          React 19 SPA (Vite 8, TanStack Router/Query/Form, shadcn/ui on Base UI, Tailwind v4)
 packages/shared   Zod schemas, password rules, brand palette: the contract between api and web
+e2e               Playwright end-to-end suite against the production builds
 docs/             data-model.md, architecture.md (this file)
 docker/           Postgres init script (creates the test database)
 ```
@@ -72,12 +73,14 @@ Open http://localhost:5173. Vite proxies `/api/*` to the API, so the browser see
 
 ### Checks
 
-`pnpm check` runs exactly what CI runs: Prettier check, ESLint (type-aware, `strictTypeChecked`), `tsc` per package, all tests, all builds. Run it before pushing.
+`pnpm check` runs exactly what the main CI job runs: Prettier check, ESLint (type-aware, `strictTypeChecked`), `tsc` per package, all tests, all builds. Run it before pushing.
+
+`pnpm e2e` builds everything and runs the Playwright suite (see [Testing](#13-testing)). It uses its own ports and database, so it can run next to `pnpm dev`. First time only: `pnpm --filter @splinance/e2e exec playwright install chromium`.
 
 ### Branches and pull requests
 
 - One branch per change (`feat/...`, `chore/...`, `ci/...`, `docs/...`), merged via pull request. `main` has a GitHub ruleset: PR required, the CI check `Lint, typecheck, test, build` must pass and be up to date, no force push, no deletion.
-- CI (`.github/workflows/ci.yml`) runs on Ubuntu with a Postgres 18 service container using the same credentials as Docker Compose, so the default test database URL works unchanged.
+- CI (`.github/workflows/ci.yml`) runs on Ubuntu with a Postgres 18 service container using the same credentials as Docker Compose, so the default test database URL works unchanged. A second job, `End-to-end (Playwright)`, runs `pnpm e2e` with its own Postgres service and uploads the HTML report and traces when it fails. It is not a required check (yet).
 - `gh` is not installed locally; PRs are opened from the GitHub compare page.
 
 ### Generators
@@ -215,6 +218,7 @@ Passwords use Argon2id via `@node-rs/argon2` (m=19456 KiB, t=2, p=1, the OWASP m
 - Register: hash the password, then in one database transaction insert the user and create the session. A unique-constraint violation on `users_email_unique` becomes 409 `EMAIL_TAKEN` (`isUniqueViolation` checks the error and its `cause`, because Drizzle wraps driver errors).
 - Login: if the email does not exist, the service still runs an Argon2 verification against a dummy hash before answering, so response time does not reveal which emails are registered. Wrong password and unknown email return the identical 401 body.
 - Only failed login attempts count against the rate limit (`skipSuccessfulRequests`).
+- `RATE_LIMIT_DISABLED=true` turns every limiter into a no-op. Only the e2e suite sets it (it registers dozens of users from one IP, against a limit of 5 per 15 minutes); env validation refuses it when `NODE_ENV=production`.
 
 ### Refresh rotation (the core of the design)
 
@@ -424,6 +428,7 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 | shared  | Vitest                                 | Pure unit tests (schemas, password rules, contrast math, pairing distribution)           |
 | api     | Vitest + Supertest                     | Integration tests against a real Postgres (`splinance_test`); migrations in global setup |
 | web     | Vitest + jsdom + Testing Library + MSW | Components and the HTTP client against MSW handlers; router tests with a memory history  |
+| e2e     | Playwright (Chromium)                  | Whole user flows in a real browser against the production builds and a real database     |
 
 API specifics:
 
@@ -440,6 +445,17 @@ Web specifics:
 - `test/setup.ts` stubs `window.matchMedia` (jsdom lacks it) and resets the auth store and session-restore cache after each test.
 - `getField(label)` finds inputs by label while ignoring the required asterisk.
 - jsdom has no `navigator.locks` and no CSS animations, so cross-tab locking is not covered, and Base UI popups close after their exit animation (tests use `waitFor`).
+
+E2E specifics (`e2e/`):
+
+- Runs against what ships: the bundled API (`node dist/index.mjs`) on :3100 and `vite preview` on :4173, which proxies `/api` there (`API_PROXY_TARGET` in `vite.config.ts`). `pnpm e2e` builds first; Playwright starts and stops both servers.
+- Global setup creates `splinance_e2e` if missing (it refuses any other name), applies migrations with the bundled `dist/migrate.mjs` and truncates every table. `E2E_DATABASE_URL` overrides the default URL.
+- Every test registers its own users with unique emails, so tests share no state and run fully in parallel. A second person (a partner opening an invite link) is a separate `browser.newContext()`: own cookies, own sessionStorage.
+- The API runs with `RATE_LIMIT_DISABLED=true`.
+- Projects: `desktop` (Desktop Chrome) runs every spec except `*.mobile.spec.ts`; `mobile` (Pixel 7 emulation) runs only those.
+- Flows covered: register, onboarding with an invite link, the partner signing up from the link and joining (token out of the address bar, single use), joining by pasting the link, a revoked link, session restore on reload, deep link through login and a wrong password, logout followed by a different user, and the phone shell (bottom tabs, drawer, no horizontal overflow).
+- Locators go by role and label, like the web tests. `field(page, label)` matches a label exactly, ignoring the required asterisk, so "Password" does not also match the "Show password" button.
+- Debugging: `pnpm --filter @splinance/e2e e2e:ui` (UI mode) or `e2e:report` (last HTML report with traces of failed tests).
 
 ## 14. The hard parts
 
@@ -467,6 +483,7 @@ Things that took real debugging or are easy to break. Read these before changing
 17. **A hidden browser pane freezes Base UI exit animations.** Popups wait for their CSS transitions (and `requestAnimationFrame`) before unmounting. In a background or hidden browser view those never advance, so a closed drawer stays mounted with `data-ending-style` until the page is visible again. Not a bug in the app; verify closing behavior in a visible window or in jsdom tests.
 18. **Exiting a household must not refetch it in place.** After leave or archive the household detail is a 404 for the user. An immediate refetch (normal invalidation) would make the still-mounted settings page throw into the error boundary before the navigation to `/` happens. The hooks invalidate with `refetchType: 'none'`; the `/` loader then refetches the list.
 19. **Preview port collisions.** A tool or platform that sets `PORT` for a process makes the API bind that port (`--env-file` never overrides existing env vars). Vite uses `strictPort`, so it fails instead of silently moving.
+20. **Playwright starts the web servers before global setup.** The API boots while `splinance_e2e` may not exist yet. That works only because the pg pool connects lazily and the readiness URL is `/api/health/live`, which does not touch the database. Pointing it at `/ready`, or querying at boot, would deadlock the first run.
 
 ## 15. Known limitations
 
@@ -478,4 +495,5 @@ Things that took real debugging or are easy to break. Read these before changing
 - A removed member can rejoin through any other valid invite link they see; there is no ban list.
 - Leaving and archiving do not check balances yet (Phase 3).
 - The inline theme script in `index.html` needs a CSP hash if a Content Security Policy is added to the frontend.
-- Cross-tab refresh locking is covered by reasoning and the server grace window, not by automated tests (jsdom has no Web Locks).
+- Cross-tab refresh locking is covered by reasoning and the server grace window, not by automated tests (jsdom has no Web Locks, and the e2e suite does not open two tabs of one user).
+- The e2e suite runs Chromium only (desktop and Pixel 7 emulation), not Firefox or WebKit/Safari.

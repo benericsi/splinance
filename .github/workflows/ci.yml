@@ -54,3 +54,50 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Global setup creates the splinance_e2e database in this server.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: splinance
+          POSTGRES_PASSWORD: splinance
+          POSTGRES_DB: splinance_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U splinance -d splinance_e2e"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Chromium only (desktop and Pixel 7 emulation); --with-deps adds the system libraries.
+      - run: pnpm --filter @splinance/e2e exec playwright install --with-deps chromium
+
+      - run: pnpm e2e
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 14
