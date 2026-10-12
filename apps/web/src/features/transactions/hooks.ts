@@ -1,12 +1,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { balanceQueries } from '@/features/balances/queries';
 import { transactionsApi } from './api';
 import { transactionQueries } from './queries';
 
-/** Any write can move a transaction between months, days and totals: refresh the household. */
+/**
+ * Any write can move a transaction between months, days and totals, and change who owes
+ * whom: refresh the household's transactions and balances.
+ */
 function useInvalidateHousehold() {
   const queryClient = useQueryClient();
   return (_data: unknown, { householdId }: { householdId: string }) =>
-    queryClient.invalidateQueries({ queryKey: transactionQueries.household(householdId) });
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: transactionQueries.household(householdId) }),
+      queryClient.invalidateQueries({ queryKey: balanceQueries.household(householdId) }),
+    ]);
 }
 
 // The form shows errors next to the fields (and the version conflict), not as a toast.
@@ -44,6 +51,7 @@ export function useDeleteTransaction() {
           queryKey: transactionQueries.household(householdId),
           predicate: (query) => query.queryKey[2] !== 'detail',
         }),
+        queryClient.invalidateQueries({ queryKey: balanceQueries.household(householdId) }),
       ]);
     },
   });

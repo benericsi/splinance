@@ -10,4 +10,11 @@ import { setupServer } from 'msw/node';
 export const server = setupServer(
   // The settings page lists the household's categories.
   http.get('/api/households/:id/categories', () => HttpResponse.json({ categories: [] })),
+  // The overview, where most household tests land, shows balances and settlements.
+  http.get('/api/households/:id/balances', () =>
+    HttpResponse.json({ balances: { currency: 'HUF', debts: [] } }),
+  ),
+  http.get('/api/households/:id/settlements', () =>
+    HttpResponse.json({ settlements: [], nextCursor: null }),
+  ),
 );
