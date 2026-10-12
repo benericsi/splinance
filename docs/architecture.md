@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phase 0 (foundation), Phase 1 (auth, households, invites, onboarding) and Phase 2 (transactions and splits: split math, categories, transactions with add, edit, delete and undo, end-to-end flows) are done, API and web. Phase 3 (balances and settle-up, first deploy) is in progress: balances and settlements exist in the API and on the overview page; an e2e flow and the deploy follow.
+Status: Phase 0 (foundation), Phase 1 (auth, households, invites, onboarding) and Phase 2 (transactions and splits: split math, categories, transactions with add, edit, delete and undo, end-to-end flows) are done, API and web. Phase 3 (balances and settle-up, first deploy) is in progress: balances and settlements exist in the API and on the overview page; end-to-end flows cover them; the deploy follows.
 
 ## Contents
 
@@ -555,6 +555,7 @@ E2E specifics (`e2e/`):
 - Projects: `desktop` (Desktop Chrome) runs every spec except `*.mobile.spec.ts`; `mobile` (Pixel 7 emulation) runs only those.
 - Flows covered: register, onboarding with an invite link, the partner signing up from the link and joining (token out of the address bar, single use), joining by pasting the link, a revoked link, session restore on reload, deep link through login and a wrong password, logout followed by a different user, and the phone shell (bottom tabs, drawer, no horizontal overflow).
 - Transaction flows (`transactions.spec.ts`, two people in one household via `householdWithPartner`): a percentage split whose leftover unit goes to the larger remainder, seen from both sides (row, share, month totals, the edit form); a private expense that the partner sees neither in the list nor in the totals, and whose direct link sends them back to the list; two people editing the same version (the second save gets the conflict, loads the newer version and saves again); delete with undo, then delete for good. On a phone (`transactions.mobile.spec.ts`): adding from the empty state and the floating button in the drawer, opening a row, back closes it.
+- Settling up (`settle-up.spec.ts`): leaving with a debt is refused with the reason in the dialog; a partial payment (with the live hint and a note) leaves the rest open for both people; the prefilled rest squares them up and the partner can leave. Deleting a payment reopens the debt, undo closes it again, for both people.
 - Amounts are matched with `money('10 001 Ft')`, which accepts any whitespace (the app groups with a no-break space). Month totals are read with `monthStat(page, 'Spent')`; `MoneyFlow`'s visually hidden copy is what the assertion sees.
 - Locators go by role and label, like the web tests. `field(page, label)` matches a label exactly, ignoring the required asterisk, so "Password" does not also match the "Show password" button.
 - Debugging: `pnpm --filter @splinance/e2e e2e:ui` (UI mode) or `e2e:report` (last HTML report with traces of failed tests).
