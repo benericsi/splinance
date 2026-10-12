@@ -38,6 +38,7 @@ import {
   users,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
+import { decodeCursor, encodeCursor } from '../../lib/keyset-cursor';
 import {
   lockHouseholdShared,
   type Membership,
@@ -62,8 +63,6 @@ const invalidMember = () =>
 
 const onlyAuthorCanMakePrivate = () =>
   new HttpError(403, 'Only the person who added it can make it private', 'FORBIDDEN');
-
-const invalidCursor = () => new HttpError(400, 'Invalid cursor', 'VALIDATION_ERROR');
 
 interface HouseholdScope {
   userId: string;
@@ -173,19 +172,6 @@ export async function getTransaction(scope: TransactionScope): Promise<Transacti
   return toTransaction(db, row);
 }
 
-/** `occurred_on` and id of the last row of a page, base64url encoded. Opaque to clients. */
-function encodeCursor(row: Pick<TransactionRow, 'occurredOn' | 'id'>): string {
-  return Buffer.from(`${row.occurredOn}|${row.id}`).toString('base64url');
-}
-
-function decodeCursor(cursor: string): { occurredOn: string; id: string } {
-  const match = /^(\d{4}-\d{2}-\d{2})\|([0-9a-f-]{36})$/.exec(
-    Buffer.from(cursor, 'base64url').toString(),
-  );
-  if (!match?.[1] || !match[2]) throw invalidCursor();
-  return { occurredOn: match[1], id: match[2] };
-}
-
 /** First day of the month and of the month after, as `YYYY-MM-DD`. */
 function monthRange(month: string): [string, string] {
   const [year = 0, monthIndex = 1] = month.split('-').map(Number);
@@ -238,7 +224,7 @@ export async function listTransactions(
     const cursor = decodeCursor(query.cursor);
     // Row comparison matches the (occurred_on desc, id desc) order of the index.
     conditions.push(
-      sql`(${transactions.occurredOn}, ${transactions.id}) < (${cursor.occurredOn}::date, ${cursor.id}::uuid)`,
+      sql`(${transactions.occurredOn}, ${transactions.id}) < (${cursor.date}::date, ${cursor.id}::uuid)`,
     );
   }
 
@@ -253,7 +239,10 @@ export async function listTransactions(
   const last = page.at(-1);
   return {
     transactions: await toTransactions(db, page),
-    nextCursor: rows.length > query.limit && last ? encodeCursor(last) : null,
+    nextCursor:
+      rows.length > query.limit && last
+        ? encodeCursor({ date: last.occurredOn, id: last.id })
+        : null,
   };
 }
 
@@ -322,8 +311,9 @@ export async function getTransactionHistory(
     action: entry.action,
     actor: { userId: entry.actorId, displayName: actorName },
     createdAt: entry.createdAt.toISOString(),
-    before: entry.before,
-    after: entry.after,
+    // Filtered to entity = 'transaction' above, so the snapshots are transactions.
+    before: entry.before as Transaction | null,
+    after: entry.after as Transaction | null,
   }));
 }
 

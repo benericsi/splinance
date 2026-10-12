@@ -5,6 +5,7 @@ export * from './household-invites';
 export * from './household-members';
 export * from './households';
 export * from './sessions';
+export * from './settlements';
 export * from './transaction-splits';
 export * from './transactions';
 export * from './users';

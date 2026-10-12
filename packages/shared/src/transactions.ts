@@ -101,7 +101,8 @@ export const updateTransactionInputSchema = z.intersection(
 
 export type UpdateTransactionInput = z.infer<typeof updateTransactionInputSchema>;
 
-const personSchema = z.object({ userId: z.uuid(), displayName: z.string() });
+/** Someone named on a transaction or settlement, with their display name. */
+export const personSchema = z.object({ userId: z.uuid(), displayName: z.string() });
 export type TransactionPerson = z.infer<typeof personSchema>;
 
 export const transactionShareSchema = personSchema.extend({

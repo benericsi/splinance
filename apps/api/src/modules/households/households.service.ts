@@ -19,6 +19,7 @@ import {
   users,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
+import { assertSettled } from '../balances/ledger';
 
 export const householdNotFound = () =>
   new HttpError(404, 'Household not found', 'HOUSEHOLD_NOT_FOUND');
@@ -216,11 +217,14 @@ export async function updateHousehold(
   return toHousehold(updated, role);
 }
 
-/** Soft delete. Phase 3 adds: only when all balances are settled. */
+/** Soft delete, only once nobody owes anybody (balances would be lost with the household). */
 export async function archiveHousehold(scope: HouseholdScope): Promise<void> {
   await db.transaction(async (tx) => {
     await lockHousehold(tx, scope.householdId);
     await requireMembership(tx, { ...scope, role: 'owner' });
+    await assertSettled(tx, scope.householdId, {
+      message: 'Settle all balances before archiving the household',
+    });
     await tx
       .update(households)
       .set({ archivedAt: new Date() })
@@ -281,12 +285,16 @@ export async function removeMember({ targetUserId, ...scope }: MemberScope): Pro
       .from(householdMembers)
       .where(activeMember(scope.householdId, targetUserId));
     if (!target) throw memberNotFound();
+    await assertSettled(tx, scope.householdId, {
+      userId: targetUserId,
+      message: 'Settle balances with this member before removing them',
+    });
 
     await endMembership(tx, scope.householdId, targetUserId);
   });
 }
 
-/** Phase 3 adds: blocked while the member has an unsettled balance. */
+/** Blocked while the member owes or is owed money by anyone in the household. */
 export async function leaveHousehold(scope: HouseholdScope): Promise<void> {
   await db.transaction(async (tx) => {
     await lockHousehold(tx, scope.householdId);
@@ -294,6 +302,10 @@ export async function leaveHousehold(scope: HouseholdScope): Promise<void> {
 
     // Also applies to a sole member: they archive the household instead of orphaning it.
     if (role === 'owner' && (await countOwners(tx, scope.householdId)) <= 1) throw lastOwner();
+    await assertSettled(tx, scope.householdId, {
+      userId: scope.userId,
+      message: 'Settle your balances before leaving the household',
+    });
 
     await endMembership(tx, scope.householdId, scope.userId);
   });

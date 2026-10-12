@@ -156,6 +156,40 @@ A user can belong to any number of households.
 - Shared transactions have shares that sum to the amount; private ones have none. A CHECK cannot see other rows, so two deferred constraint triggers (migration 0006) check it at commit and raise a `check_violation` named `transaction_splits_sum_matches`.
 - Rows are replaced on every edit. Indexed on `(household_id, user_id)` for balances.
 
+### `settlements`
+
+A payment between two members made outside the app (cash, a bank transfer): the "mark as paid" record that reduces the debt between them. The app never moves money.
+
+| Column                 | Type                  | Notes                                                                                 |
+| ---------------------- | --------------------- | ------------------------------------------------------------------------------------- |
+| id                     | uuid PK               | uuidv7                                                                                |
+| household_id           | uuid                  | Part of every composite FK below                                                      |
+| from_user_id           | uuid                  | Who paid. Composite FK `(household_id, from_user_id)` -> members                      |
+| to_user_id             | uuid                  | Who received it. Composite FK -> members; `from_user_id <> to_user_id` (CHECK)        |
+| amount                 | bigint                | Minor units, 1 to 10^12 (`settlements_amount_range`). Any amount: partial or overpaid |
+| currency               | enum `currency`       | The household's base currency (until Phase 7)                                         |
+| settled_on             | date                  | The day the money changed hands                                                       |
+| note                   | text, nullable        | Up to 200 characters ("cash", "Revolut")                                              |
+| created_by             | uuid                  | Composite FK -> members: who recorded it (one of the two people, or an owner)         |
+| deleted_at             | timestamptz, nullable | Soft delete; undo restores it                                                         |
+| created_at, updated_at | timestamptz           |                                                                                       |
+
+- Never edited: a wrong settlement is deleted and recorded again, so there is no version column. Create, delete and restore are audited.
+- The member FKs accept former members (their rows stay), so a debt with someone who left can still be settled.
+- Partial index `settlements_household_settled_idx` on `(household_id, settled_on DESC, id DESC) WHERE deleted_at IS NULL` serves the list.
+
+### Balances (derived, not a table)
+
+Who owes whom is computed on every read from live rows, per pair of people:
+
+| Source                                    | Debt                                                      |
+| ----------------------------------------- | --------------------------------------------------------- |
+| Shared expense paid by P, share s of M    | M owes P s (M != P)                                       |
+| Shared income received by R, share s of M | R owes M s (M != R)                                       |
+| Settlement from A to B, amount x          | B owes A x (nets against what A owed B; overpaying flips) |
+
+Private and deleted rows never count. Debts are netted within each pair (`netDebts` in the shared package) and never simplified across pairs: if Cara owes Ben and Ben owes Anna, that stays two debts. Storing balances would mean keeping them in sync with every edit, delete and restore; deriving them costs two grouped queries over indexed columns.
+
 ### `audit_log`
 
 | Column       | Type                | Notes                                                           |
@@ -163,7 +197,7 @@ A user can belong to any number of households.
 | id           | uuid PK             | uuidv7                                                          |
 | household_id | uuid                |                                                                 |
 | actor_id     | uuid                | Composite FK `(household_id, actor_id)` -> members              |
-| entity       | enum `audit_entity` | `transaction` for now                                           |
+| entity       | enum `audit_entity` | `transaction` or `settlement`                                   |
 | entity_id    | uuid                | No FK, so the log can cover more entity types later             |
 | action       | enum `audit_action` | create / update / delete / restore                              |
 | before       | jsonb, nullable     | API representation before the change (null for create, restore) |
@@ -175,10 +209,9 @@ A user can belong to any number of households.
 
 ## Planned (not created yet)
 
-- Phase 3: `settlements`
 - Later: imports (staging rows, duplicates flagged not rejected), category rules (no user regex), budgets (month as `date`), recurring series, notifications
 
 Business rules already agreed:
 
 - Private transactions are paid by their author and never split; anything involving another person is shared.
-- A member cannot leave a household with an unsettled balance; an owner can record a settlement for any pair (audited). The balance check for leaving and archiving arrives in Phase 3.
+- A member cannot leave or be removed while they owe or are owed money, and a household cannot be archived while anyone does (409 `UNSETTLED_BALANCE`). Members record settlements they are part of; an owner can record one for any pair (audited).
