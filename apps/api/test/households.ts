@@ -1,5 +1,6 @@
 import {
   apiErrorResponseSchema,
+  balancesResponseSchema,
   createInviteResponseSchema,
   householdResponseSchema,
 } from '@splinance/shared';
@@ -41,4 +42,27 @@ export async function leave(app: App, householdId: string, user: TestUser) {
     .post(`/api/households/${householdId}/leave`)
     .set('Authorization', await bearer(user))
     .expect(204);
+}
+
+/** Records a payment for every open debt of `user`, so they can leave. */
+export async function settleUp(app: App, householdId: string, user: TestUser) {
+  const res = await request(app)
+    .get(`/api/households/${householdId}/balances`)
+    .set('Authorization', await bearer(user))
+    .expect(200);
+  const { debts } = balancesResponseSchema.parse(res.body).balances;
+  for (const debt of debts) {
+    if (debt.from.userId !== user.id && debt.to.userId !== user.id) continue;
+    await request(app)
+      .post(`/api/households/${householdId}/settlements`)
+      .set('Authorization', await bearer(user))
+      .send({
+        fromUserId: debt.from.userId,
+        toUserId: debt.to.userId,
+        amount: debt.amount,
+        settledOn: '2026-10-12',
+        note: null,
+      })
+      .expect(201);
+  }
 }

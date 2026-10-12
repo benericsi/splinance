@@ -1,4 +1,4 @@
-import type { Transaction } from '@splinance/shared';
+import type { Settlement, Transaction } from '@splinance/shared';
 import { foreignKey, index, jsonb, pgTable, uuid } from 'drizzle-orm/pg-core';
 import { createdAt, id } from './columns';
 import { auditAction, auditEntity } from './enums';
@@ -18,8 +18,8 @@ export const auditLog = pgTable(
     entity: auditEntity().notNull(),
     entityId: uuid().notNull(),
     action: auditAction().notNull(),
-    before: jsonb().$type<Transaction>(),
-    after: jsonb().$type<Transaction>(),
+    before: jsonb().$type<Transaction | Settlement>(),
+    after: jsonb().$type<Transaction | Settlement>(),
     createdAt: createdAt(),
   },
   (t) => [

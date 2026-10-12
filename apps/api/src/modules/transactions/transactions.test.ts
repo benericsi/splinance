@@ -10,7 +10,14 @@ import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDatabase } from '../../../test/db';
-import { type App, createHousehold, errorCode, join, leave } from '../../../test/households';
+import {
+  type App,
+  createHousehold,
+  errorCode,
+  join,
+  leave,
+  settleUp,
+} from '../../../test/households';
 import { bearer, createTestUser, pgErrorOf, type TestUser } from '../../../test/users';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
@@ -282,6 +289,7 @@ describe('visibility', () => {
     expect(res.status).toBe(404);
     expect(errorCode(res)).toBe('HOUSEHOLD_NOT_FOUND');
 
+    await settleUp(app, householdId, ben);
     await leave(app, householdId, ben);
     await request(app)
       .get(base(`/${transaction.id}`))
@@ -476,6 +484,7 @@ describe('updating', () => {
       anna,
       sharedInput({ split: { method: 'equal', userIds: [anna.id, ben.id] } }),
     );
+    await settleUp(app, householdId, ben);
     await leave(app, householdId, ben);
 
     const fixTypo = await put(anna, old.id, {

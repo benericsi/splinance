@@ -16,4 +16,4 @@ export const categoryKind = pgEnum('category_kind', CATEGORY_KINDS);
 export const transactionVisibility = pgEnum('transaction_visibility', TRANSACTION_VISIBILITIES);
 export const splitMethod = pgEnum('split_method', SPLIT_METHODS);
 export const auditAction = pgEnum('audit_action', AUDIT_ACTIONS);
-export const auditEntity = pgEnum('audit_entity', ['transaction']);
+export const auditEntity = pgEnum('audit_entity', ['transaction', 'settlement']);

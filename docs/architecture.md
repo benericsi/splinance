@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phase 0 (foundation), Phase 1 (auth, households, invites, onboarding) and Phase 2 (transactions and splits: split math, categories, transactions with add, edit, delete and undo, end-to-end flows) are done, API and web. Phase 3 (balances and settle-up, first deploy) is next.
+Status: Phase 0 (foundation), Phase 1 (auth, households, invites, onboarding) and Phase 2 (transactions and splits: split math, categories, transactions with add, edit, delete and undo, end-to-end flows) are done, API and web. Phase 3 (balances and settle-up, first deploy) is in progress: the balances and settlements API exists; the web UI and the deploy follow.
 
 ## Contents
 
@@ -48,7 +48,8 @@ Key files by concern:
 | Households and invites (API)  | `apps/api/src/modules/households/*`, `apps/api/src/modules/invites/*`                                            |
 | Categories (API)              | `apps/api/src/modules/categories/*`                                                                              |
 | Transactions (API)            | `apps/api/src/modules/transactions/*`, trigger in `apps/api/drizzle/0006_transaction_split_sum_trigger.sql`      |
-| Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`                                                  |
+| Balances and settlements      | `apps/api/src/modules/balances/*` (`ledger.ts` derives debts), `apps/api/src/modules/settlements/*`              |
+| Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`, `packages/shared/src/balances.ts`               |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts` |
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                          |
 | HTTP client, auth store       | `apps/web/src/lib/http.ts`, `apps/web/src/lib/auth-store.ts`                                                     |
@@ -153,10 +154,10 @@ Households and invites. Every route needs a Bearer token except the invite previ
 | `GET /api/households`                          | any user              |            | 200 `{ households }` (active memberships)                 |                                                                                 |
 | `GET /api/households/:id`                      | member                |            | 200 `{ household }` with `members`                        |                                                                                 |
 | `PATCH /api/households/:id`                    | owner                 | `{ name }` | 200 `{ household }`                                       | 400                                                                             |
-| `DELETE /api/households/:id`                   | owner                 |            | 204, archived (404 for everyone after)                    |                                                                                 |
-| `POST /api/households/:id/leave`               | member                |            | 204                                                       | 409 `LAST_OWNER`                                                                |
+| `DELETE /api/households/:id`                   | owner                 |            | 204, archived (404 for everyone after)                    | 409 `UNSETTLED_BALANCE` (anyone still owes anybody)                             |
+| `POST /api/households/:id/leave`               | member                |            | 204                                                       | 409 `LAST_OWNER`, 409 `UNSETTLED_BALANCE`                                       |
 | `PATCH /api/households/:id/members/:userId`    | owner                 | `{ role }` | 200 `{ member }`                                          | 404 `MEMBER_NOT_FOUND`, 409 `LAST_OWNER`                                        |
-| `DELETE /api/households/:id/members/:userId`   | owner                 |            | 204                                                       | 400 `CANNOT_REMOVE_SELF`, 404 `MEMBER_NOT_FOUND`                                |
+| `DELETE /api/households/:id/members/:userId`   | owner                 |            | 204                                                       | 400 `CANNOT_REMOVE_SELF`, 404 `MEMBER_NOT_FOUND`, 409 `UNSETTLED_BALANCE`       |
 | `POST /api/households/:id/invites`             | owner                 |            | 201 `{ invite, token }`                                   |                                                                                 |
 | `GET /api/households/:id/invites`              | owner                 |            | 200 `{ invites }` (pending only)                          |                                                                                 |
 | `DELETE /api/households/:id/invites/:inviteId` | owner                 |            | 204                                                       | 404 `INVITE_NOT_FOUND` (unknown or no longer pending)                           |
@@ -200,6 +201,22 @@ Write rules (all in `transactions.service.ts`):
 - `PUT` replaces the transaction and must name the `version` it was based on. The row is locked (`FOR UPDATE`) before the comparison, so two concurrent edits of the same version produce one 200 and one 409. Delete and restore also bump the version, so a form opened before a delete cannot overwrite the restored row.
 - The summary is `{ month, currency, expenses, income, yourExpenses }` over what the caller can see: `yourExpenses` adds their shares of shared expenses and their private expenses. The list is paged, so the client could not total a month itself.
 - The list is keyset-paginated: newest `occurred_on` first, then id descending. `nextCursor` encodes the last row's `(occurred_on, id)` and the next page asks for rows strictly before it, so inserts never shift pages (unlike `OFFSET`). `q` is a case-insensitive substring match with `%` and `_` escaped.
+
+Balances and settlements. Also under a household; every member sees all of them (they come only from shared transactions, which everyone sees).
+
+| Method and path                                              | Who                                          | Request                                             | Success                                     | Errors (besides the above)                     |
+| ------------------------------------------------------------ | -------------------------------------------- | --------------------------------------------------- | ------------------------------------------- | ---------------------------------------------- |
+| `GET /api/households/:id/balances`                           | member                                       |                                                     | 200 `{ balances: { currency, debts } }`     |                                                |
+| `GET /api/households/:id/settlements`                        | member                                       | query: `cursor, limit`                              | 200 `{ settlements, nextCursor }`           | 400 (bad cursor)                               |
+| `POST /api/households/:id/settlements`                       | one of the two people, or an owner           | `{ fromUserId, toUserId, amount, settledOn, note }` | 201 `{ settlement }`                        | 400 `VALIDATION_ERROR`, `INVALID_MEMBER`; 403  |
+| `DELETE /api/households/:id/settlements/:settlementId`       | the two people, who recorded it, or an owner |                                                     | 204, soft deleted                           | 404 `SETTLEMENT_NOT_FOUND` (also deleted), 403 |
+| `POST /api/households/:id/settlements/:settlementId/restore` | same                                         |                                                     | 200 `{ settlement }` (no-op if not deleted) | 404, 403                                       |
+
+- A debt is `{ from, to, amount }`: `from` owes `to`, both `{ userId, displayName }`. Debts are per pair, netted within the pair and never simplified across pairs (see [data-model.md](data-model.md#balances-derived-not-a-table)). People who left appear while a debt with them is open.
+- `ledger.ts` computes them: one grouped query over shares (debtor and creditor swap for income), one over settlements (the receiver owes the amount back), then `netDebts()` from the shared package. It lives apart from the balances service so the households service can use it without an import cycle.
+- A settlement is any amount: partial payments leave the rest open, paying too much flips the debt. Settlements are never edited (delete and record again). `fromUserId` and `toUserId` must have been members at some point, so a debt with someone who left stays settleable.
+- Leaving, removing a member and archiving call `assertSettled()` after `lockHousehold()` (see hard part 24).
+- Settlement writes take the same shared household lock as transaction writes and are audited (`audit_log.entity = 'settlement'`).
 
 `household` is `{ id, name, baseCurrency, role, createdAt }` where `role` is the caller's role; members are `{ userId, displayName, role, joinedAt }` (no emails). The raw invite token appears only in the create response; the web app builds the link (and later a QR code) from it.
 
@@ -311,6 +328,7 @@ Reads `Authorization: Bearer`, verifies the JWT (algorithm pinned to HS256, issu
 | `money.ts`          | `CURRENCY_EXPONENTS`, `MAX_AMOUNT_MINOR`, `amountMinorSchema` (positive integer minor units)                                         | transaction schemas, amount formatting                      |
 | `splits.ts`         | `SPLIT_METHODS`, `allocate()` (largest remainder), `computeSplits()`, `splitProblem()`, `splitRemainder()`                           | API (authoritative shares), web (live preview in the form)  |
 | `categories.ts`     | `CATEGORY_KINDS` (Postgres enum), `CATEGORY_ICONS` (lucide names), colors (brand keys), schemas, `DEFAULT_CATEGORIES`                | API routes and seeding, web pickers                         |
+| `balances.ts`       | `netDebts()` (pairwise netting), balance and settlement schemas                                                                      | API ledger and routes, web (next PR)                        |
 
 Split math: `allocate(total, weights)` gives everyone the floor of their exact share, then hands the units lost to rounding to the largest fractional parts, earlier positions first on ties. Shares therefore always sum to the total and never differ from the exact share by a whole unit. It computes `total * weight` with BigInt, because 10^12 minor units times 10 000 basis points passes 2^53. Equal splits are weights of 1, percentages are basis points (100% = 10 000), fixed splits must already sum to the total. The order of people decides who gets a leftover unit, so callers pass a stable order.
 
@@ -561,6 +579,8 @@ Things that took real debugging or are easy to break. Read these before changing
 22. **Transaction writes take a shared household lock.** Membership changes take `FOR UPDATE` on the household row (hard part 12); transaction writes take `FOR SHARE`. A member being removed therefore cannot slip between "is the payer an active member?" and the insert, while two transaction writes do not block each other. Lock order is always household first, then the transaction row.
 23. **The category foreign key includes the kind.** `transactions(household_id, category_id, kind)` references `categories(household_id, id, kind)`, so an expense under an income category is impossible even for raw SQL. It works because `transactions.kind` uses the `category_kind` enum type (a foreign key needs identical types) and because a null `category_id` skips the whole check (`MATCH SIMPLE`). Drizzle generated the referenced unique constraint after the foreign key; migration 0005 was reordered by hand before merging.
 
+24. **Balance checks run under the exclusive household lock.** "Does Ben owe anything?" followed by ending his membership is a check-then-act race with a new expense naming him. Leaving, removal and archiving take `FOR UPDATE` on the household (hard part 12), transaction and settlement writes take `FOR SHARE` (hard part 22), so one waits for the other: either the expense is refused (`INVALID_MEMBER`, Ben already left) or leaving is (`UNSETTLED_BALANCE`). A test fires both at once and accepts either outcome, never both succeeding. The ledger's two queries run one after the other, not with `Promise.all`: inside a transaction they share one connection.
+
 ## 15. Known limitations
 
 - Access tokens cannot be revoked before they expire (15 minutes).
@@ -569,7 +589,7 @@ Things that took real debugging or are easy to break. Read these before changing
 - No email verification, password reset, account deletion or session list yet.
 - Invite links are not bound to an email: whoever holds a valid link can join. Owners can list and revoke pending links; links expire after 7 days.
 - A removed member can rejoin through any other valid invite link they see; there is no ban list.
-- Leaving and archiving do not check balances yet (Phase 3).
+- Editing an old transaction that involves someone who left, or deleting or restoring a transaction or settlement, can reopen a debt with a former member. It shows up in the balances and can be settled (an owner records it), but the former member cannot see it.
 - The inline theme script in `index.html` needs a CSP hash if a Content Security Policy is added to the frontend.
 - Cross-tab refresh locking is covered by reasoning and the server grace window, not by automated tests (jsdom has no Web Locks, and the e2e suite does not open two tabs of one user).
 - The e2e suite runs Chromium only (desktop and Pixel 7 emulation), not Firefox or WebKit/Safari.
