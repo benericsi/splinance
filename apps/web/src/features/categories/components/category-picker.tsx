@@ -8,6 +8,7 @@ import {
   ComboboxSearchInput,
   ComboboxTrigger,
 } from '@/components/ui/combobox';
+import { cn } from '@/lib/utils';
 import { CategoryTile } from './category-tile';
 
 /** "No category" is an item like the others, so it can be picked (and found) the same way. */
@@ -30,6 +31,8 @@ export function CategoryPicker({
   value,
   onChange,
   onBlur,
+  label,
+  compact = false,
 }: {
   id: string;
   /** Already narrowed to what may be picked (kind, active or current). */
@@ -37,6 +40,10 @@ export function CategoryPicker({
   value: string;
   onChange: (categoryId: string) => void;
   onBlur?: (() => void) | undefined;
+  /** For pickers without a visible <label> (rows of a table). */
+  label?: string | undefined;
+  /** A shorter trigger for dense rows. */
+  compact?: boolean;
 }) {
   const options = [
     NONE,
@@ -60,7 +67,11 @@ export function CategoryPicker({
       <ComboboxTrigger
         id={id}
         onBlur={onBlur}
-        className="border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border bg-transparent px-2 text-left text-sm outline-none focus-visible:ring-3 [&>svg]:shrink-0"
+        aria-label={label}
+        className={cn(
+          'border-input focus-visible:border-ring focus-visible:ring-ring/50 dark:bg-input/30 flex w-full min-w-0 items-center gap-2 rounded-lg border bg-transparent px-2 text-left text-sm outline-none focus-visible:ring-3 [&>svg]:shrink-0',
+          compact ? 'h-8' : 'h-10',
+        )}
       >
         <CategoryTile category={selected.category} size="sm" />
         <span className="min-w-0 flex-1 truncate">{selected.name}</span>

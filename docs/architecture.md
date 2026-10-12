@@ -39,26 +39,26 @@ docker/           Postgres init script (creates the test database)
 
 Key files by concern:
 
-| Concern                       | Files                                                                                                            |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| API entry, middleware chain   | `apps/api/src/index.ts`, `apps/api/src/app.ts`                                                                   |
-| Env validation                | `apps/api/src/config/env.ts`                                                                                     |
-| DB client, schema, migrations | `apps/api/src/db/*`, `apps/api/drizzle/*.sql`                                                                    |
-| Auth (API)                    | `apps/api/src/modules/auth/*`, `apps/api/src/middleware/require-auth.ts`                                         |
-| Households and invites (API)  | `apps/api/src/modules/households/*`, `apps/api/src/modules/invites/*`                                            |
-| Categories (API)              | `apps/api/src/modules/categories/*`                                                                              |
-| Transactions (API)            | `apps/api/src/modules/transactions/*`, trigger in `apps/api/drizzle/0006_transaction_split_sum_trigger.sql`      |
-| Balances and settlements      | `apps/api/src/modules/balances/*` (`ledger.ts` derives debts), `apps/api/src/modules/settlements/*`              |
-| Bank imports                  | `packages/shared/src/imports/*` (parsers, contract), `apps/api/src/modules/imports/*`                            |
-| Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`, `packages/shared/src/balances.ts`               |
-| Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts` |
-| Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                          |
-| HTTP client, auth store       | `apps/web/src/lib/http.ts`, `apps/web/src/lib/auth-store.ts`                                                     |
-| Auth (web)                    | `apps/web/src/features/auth/*`                                                                                   |
-| Households (web), app shell   | `apps/web/src/features/households/*`, `apps/web/src/routes/_authenticated/h/*`                                   |
-| URL-driven modals             | `apps/web/src/components/route-dialog.tsx`, `apps/web/src/lib/route-modal.ts`                                    |
-| Theme                         | `apps/web/src/lib/theme.ts` + inline script in `apps/web/index.html`                                             |
-| Brand                         | `packages/shared/src/brand.ts`, `apps/web/src/components/brand/*`, `apps/web/src/index.css`                      |
+| Concern                       | Files                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| API entry, middleware chain   | `apps/api/src/index.ts`, `apps/api/src/app.ts`                                                                           |
+| Env validation                | `apps/api/src/config/env.ts`                                                                                             |
+| DB client, schema, migrations | `apps/api/src/db/*`, `apps/api/drizzle/*.sql`                                                                            |
+| Auth (API)                    | `apps/api/src/modules/auth/*`, `apps/api/src/middleware/require-auth.ts`                                                 |
+| Households and invites (API)  | `apps/api/src/modules/households/*`, `apps/api/src/modules/invites/*`                                                    |
+| Categories (API)              | `apps/api/src/modules/categories/*`                                                                                      |
+| Transactions (API)            | `apps/api/src/modules/transactions/*`, trigger in `apps/api/drizzle/0006_transaction_split_sum_trigger.sql`              |
+| Balances and settlements      | `apps/api/src/modules/balances/*` (`ledger.ts` derives debts), `apps/api/src/modules/settlements/*`                      |
+| Bank imports                  | `packages/shared/src/imports/*` (parsers, contract), `apps/api/src/modules/imports/*`, `apps/web/src/features/imports/*` |
+| Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`, `packages/shared/src/balances.ts`                       |
+| Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts`         |
+| Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                                  |
+| HTTP client, auth store       | `apps/web/src/lib/http.ts`, `apps/web/src/lib/auth-store.ts`                                                             |
+| Auth (web)                    | `apps/web/src/features/auth/*`                                                                                           |
+| Households (web), app shell   | `apps/web/src/features/households/*`, `apps/web/src/routes/_authenticated/h/*`                                           |
+| URL-driven modals             | `apps/web/src/components/route-dialog.tsx`, `apps/web/src/lib/route-modal.ts`                                            |
+| Theme                         | `apps/web/src/lib/theme.ts` + inline script in `apps/web/index.html`                                                     |
+| Brand                         | `packages/shared/src/brand.ts`, `apps/web/src/components/brand/*`, `apps/web/src/index.css`                              |
 
 `packages/shared` has no build step: its `package.json` exports `src/index.ts` directly. Every consumer compiles it (Vite in web, tsx in api dev, Vitest in tests) and tsdown inlines it into the production API bundle (`deps.alwaysBundle`).
 
@@ -402,6 +402,7 @@ _authenticated.tsx         pathless layout: if not authenticated -> redirect /lo
     _authenticated/h/$householdId/transactions.tsx /h/:id/transactions?month=YYYY-MM  list; <Outlet /> for modals
       _authenticated/h/$householdId/transactions.new.tsx            /h/:id/transactions/new   add dialog
       _authenticated/h/$householdId/transactions.$transactionId.tsx /h/:id/transactions/:tid  edit dialog
+    _authenticated/h/$householdId/transactions_.import.tsx  /h/:id/transactions/import  import page (own page, not nested)
 invite.tsx                 /invite#<token>  public invite landing page (logged in or out)
 ```
 
@@ -449,6 +450,15 @@ invitee: opens /invite#<token>
 - `authStore` remembers why the session ended (`endedBy`). After a failed refresh the guard keeps `?redirect=<page>`, so the same person continues where they were. After an explicit logout it does not: the next person on the browser is often someone else, and the previous user's household would be a 404 for them.
 - Not found and errors: the root shows full-page versions; the router defaults (`defaultNotFoundComponent`, `defaultErrorComponent`) render inline inside layouts. "Try again" resets the error boundary and re-runs loaders.
 - Page titles: each page renders exactly one `<PageTitle title="..." />`. React 19 hoists `<title>` into `<head>`; multiple titles at once are unsupported, so layouts never render one.
+
+### Importing bank exports
+
+- A page of its own (`transactions_.import.tsx`: the trailing underscore opts out of nesting under the transactions layout, so it is not a dialog over the list). Transactions has an Import button next to Add.
+- The browser reads the file (`readExport`: strict UTF-8, else Windows-1250), parses it with `parseStatement` and sends only normalized rows: first to `/imports/check`, then the picked ones to `/imports`. State lives in the component (pick, review, done); a reload starts over.
+- The review is grouped by decision (`review.ts`): "Needs a look" (possible duplicates, rows deleted before, own-account transfers, cash withdrawals: not picked, each with its reason), "Ready to import" (picked, private, no category; bulk "Mark picked shared", "Just me", "Set category" for the picked rows of that kind) and "Left out" (already imported, card holds, other currencies), folded into one line. Shared rows are paid by the viewer and split equally between all members.
+- "Your name at the bank" spots own transfers in exports that do not name the holder (Revolut). A K&H file fills it from its account holder; names are kept per user in this browser only (`bank-names.ts`), so the legal name stays off the server. Changing it re-reads the file.
+- After importing: a summary with Undo and "Import another file". "Your imports" lists the viewer's imports; undoing one asks first (it deletes many transactions). Its mutation and dialog live in the list, not the row, for the same unmount reason as the settlement list.
+- `CategoryPicker` takes `label` (no visible label in a row) and `compact` (an 8-unit trigger).
 
 ### Overview and settling up
 
@@ -522,7 +532,8 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 - `MutationCache.onError` shows a sonner toast for every failed mutation. A mutation opts out with `meta: { suppressErrorToast: true }` when the component shows the error itself (the auth forms do).
 - `useLogout` clears `authStore` and the whole query cache in `onSettled`, even if the request fails, so no data of the previous user stays in memory.
 - Transactions: everything of a household lives under `['transactions', householdId]` (list per month as an infinite query, summary per month, detail per id); every write invalidates that prefix and `['balances', householdId]`, because transactions change who owes whom.
-- Balances: debts and the settlement list live under `['balances', householdId]`; settlement writes invalidate it. Delete marks the deleted detail stale without refetching it, for the same reason as leaving a household (below).
+- Balances: debts and the settlement list live under `['balances', householdId]`; settlement writes invalidate it.
+- Imports: the history lives under `['imports', householdId]`; an import or its undo invalidates it, the household's transactions and its balances. The check is a mutation (a POST with a body), not a query. Delete marks the deleted detail stale without refetching it, for the same reason as leaving a household (below).
 - Households: `householdQueries.list()` and `.detail(id)` under the `['households']` key; mutations invalidate the whole key. Leaving and archiving only mark it stale (`refetchType: 'none'`) and navigate to `/`: refetching the detail first would hit the new 404 while the page is still mounted. The household layout's loader awaits the detail (a 404 becomes `notFound()`) and warms the list for the switcher; components read the detail with `useSuspenseQuery`, which never suspends there because the loader filled the cache.
 
 ## 11. Web: forms
