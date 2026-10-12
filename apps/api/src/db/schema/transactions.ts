@@ -10,12 +10,14 @@ import {
   pgTable,
   text,
   unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { categories } from './categories';
 import { createdAt, id, timestamptz, updatedAt } from './columns';
 import { categoryKind, currency, splitMethod, transactionVisibility } from './enums';
 import { householdMembers } from './household-members';
+import { importBatches } from './import-batches';
 
 /**
  * Money movements of a household. Amounts are positive minor units; `kind` says the
@@ -38,6 +40,11 @@ export const transactions = pgTable(
     description: text().notNull(),
     categoryId: uuid(),
     splitMethod: splitMethod(),
+    /** The merchant or other party as the bank named it; only imported rows have one. */
+    counterparty: text(),
+    importBatchId: uuid(),
+    /** Identifies the bank row across exports, per person (see the unique index). */
+    importFingerprint: text(),
     version: integer().notNull().default(1),
     deletedAt: timestamptz(),
     createdAt: createdAt(),
@@ -60,6 +67,15 @@ export const transactions = pgTable(
       columns: [t.householdId, t.categoryId, t.kind],
       foreignColumns: [categories.householdId, categories.id, categories.kind],
     }),
+    foreignKey({
+      name: 'transactions_import_batch_fk',
+      columns: [t.householdId, t.importBatchId],
+      foreignColumns: [importBatches.householdId, importBatches.id],
+    }),
+    // A bank row is imported once per person; deleted ones may come back (undo, re-import).
+    uniqueIndex('transactions_import_fingerprint_unique')
+      .on(t.householdId, t.createdBy, t.importFingerprint)
+      .where(sql`${t.importFingerprint} is not null and ${t.deletedAt} is null`),
     // Target of the composite foreign key from transaction_splits.
     unique('transactions_household_id_id_unique').on(t.householdId, t.id),
     // The list query: a household's live transactions, newest first.
@@ -81,6 +97,11 @@ export const transactions = pgTable(
       sql`(${t.visibility} = 'shared') = (${t.splitMethod} is not null)`,
     ),
     check('transactions_version_positive', sql`${t.version} >= 1`),
+    check(
+      'transactions_import_consistent',
+      sql`(${t.importBatchId} is null) = (${t.importFingerprint} is null)`,
+    ),
+    check('transactions_counterparty_length', sql`char_length(${t.counterparty}) <= 120`),
   ],
 );
 

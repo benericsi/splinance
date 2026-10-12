@@ -49,6 +49,7 @@ Key files by concern:
 | Categories (API)              | `apps/api/src/modules/categories/*`                                                                              |
 | Transactions (API)            | `apps/api/src/modules/transactions/*`, trigger in `apps/api/drizzle/0006_transaction_split_sum_trigger.sql`      |
 | Balances and settlements      | `apps/api/src/modules/balances/*` (`ledger.ts` derives debts), `apps/api/src/modules/settlements/*`              |
+| Bank imports                  | `packages/shared/src/imports/*` (parsers, contract), `apps/api/src/modules/imports/*`                            |
 | Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`, `packages/shared/src/balances.ts`               |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts` |
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                          |
@@ -106,7 +107,7 @@ Middleware order:
 helmet()                 security headers (CSP, HSTS, nosniff, ...)
 pinoHttp()               request id, req.log, one log line per request (method, url, status only;
                          invite tokens in the url are redacted)
-express.json(100kb)      body parsing with a size cap
+express.json             body parsing with a size cap: 100kb, 1mb for bank imports (a thousand rows)
 cookieParser()           req.cookies (needed for the refresh token)
 /api router
   /health                live + ready
@@ -201,6 +202,19 @@ Write rules (all in `transactions.service.ts`):
 - `PUT` replaces the transaction and must name the `version` it was based on. The row is locked (`FOR UPDATE`) before the comparison, so two concurrent edits of the same version produce one 200 and one 409. Delete and restore also bump the version, so a form opened before a delete cannot overwrite the restored row.
 - The summary is `{ month, currency, expenses, income, yourExpenses }` over what the caller can see: `yourExpenses` adds their shares of shared expenses and their private expenses. The list is paged, so the client could not total a month itself.
 - The list is keyset-paginated: newest `occurred_on` first, then id descending. `nextCursor` encodes the last row's `(occurred_on, id)` and the next page asks for rows strictly before it, so inserts never shift pages (unlike `OFFSET`). `q` is a case-insensitive substring match with `%` and `_` escaped.
+
+Imports. Also under a household. They are personal: a person sees and undoes only their own, and fingerprints are per person (the same bank row imported by someone else is theirs).
+
+| Method and path                                | Who          | Request                                                                    | Success                                                   | Errors (besides the above)                                                        |
+| ---------------------------------------------- | ------------ | -------------------------------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `POST /api/households/:id/imports/check`       | member       | `{ rows: [{ fingerprint, occurredOn, kind, amount }] }` (max 1000)         | 200 `{ rows: [{ fingerprint, status, match }] }`          | 400                                                                               |
+| `POST /api/households/:id/imports`             | member       | `{ source, fileName, rows: [{ fingerprint, counterparty, transaction }] }` | 201 `{ batch, skipped }`                                  | 400 (names the row: `Row 3: ...`), 409 `NOTHING_TO_IMPORT`, 409 `IMPORT_CONFLICT` |
+| `GET /api/households/:id/imports`              | member       |                                                                            | 200 `{ batches }`, own, newest first (50)                 |                                                                                   |
+| `DELETE /api/households/:id/imports/:importId` | the importer |                                                                            | 204, its live transactions soft deleted (no-op if undone) | 404 `IMPORT_NOT_FOUND` (also someone else's)                                      |
+
+- `check` is a read with a body, so a `POST`. Statuses: `new`, `imported` (the caller has it), `undone` (its import was undone: import again), `deleted` (deleted on its own: probably not wanted), `possible-duplicate` (a hand-entered transaction the caller paid, same kind and amount, within two days; each one matches a single row, the closest).
+- `transaction` in an import row is the ordinary transaction input, created through the same `insertTransaction` as `POST /transactions` (category and member rules, splits, audit entry) with the batch, fingerprint and counterparty attached. Rows the caller already has are skipped and counted; any refused row fails the whole import.
+- Two imports of the same rows at once: the unique index makes the second one fail with 409 `IMPORT_CONFLICT`, and the client checks again.
 
 Balances and settlements. Also under a household; every member sees all of them (they come only from shared transactions, which everyone sees).
 
@@ -606,6 +620,8 @@ Things that took real debugging or are easy to break. Read these before changing
 23. **The category foreign key includes the kind.** `transactions(household_id, category_id, kind)` references `categories(household_id, id, kind)`, so an expense under an income category is impossible even for raw SQL. It works because `transactions.kind` uses the `category_kind` enum type (a foreign key needs identical types) and because a null `category_id` skips the whole check (`MATCH SIMPLE`). Drizzle generated the referenced unique constraint after the foreign key; migration 0005 was reordered by hand before merging.
 
 24. **Balance checks run under the exclusive household lock.** "Does Ben owe anything?" followed by ending his membership is a check-then-act race with a new expense naming him. Leaving, removal and archiving take `FOR UPDATE` on the household (hard part 12), transaction and settlement writes take `FOR SHARE` (hard part 22), so one waits for the other: either the expense is refused (`INVALID_MEMBER`, Ben already left) or leaving is (`UNSETTLED_BALANCE`). A test fires both at once and accepts either outcome, never both succeeding. The ledger's two queries run one after the other, not with `Promise.all`: inside a transaction they share one connection.
+
+25. **Undo and its timestamp.** Undoing an import soft deletes its transactions and marks the batch with one shared timestamp. That is how the duplicate check knows a row was removed by the undo (import it again) rather than deleted by the person on their own (leave it out): `deleted_at = undone_at`. Separate timestamps per row would turn every undone row into "deleted".
 
 ## 15. Known limitations
 

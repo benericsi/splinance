@@ -122,6 +122,10 @@ export const transactionSchema = z.object({
   occurredOn: z.iso.date(),
   description: z.string(),
   categoryId: z.uuid().nullable(),
+  /** The merchant or other party as the bank named it (imported transactions only). */
+  counterparty: z.string().nullable(),
+  /** The import that created it, if any. */
+  importBatchId: z.uuid().nullable(),
   paidBy: personSchema,
   createdBy: personSchema,
   /** Null for private transactions. Shares always sum to `amount`. */

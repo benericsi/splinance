@@ -64,7 +64,7 @@ const invalidMember = () =>
 const onlyAuthorCanMakePrivate = () =>
   new HttpError(403, 'Only the person who added it can make it private', 'FORBIDDEN');
 
-interface HouseholdScope {
+export interface HouseholdScope {
   userId: string;
   householdId: string;
 }
@@ -114,6 +114,8 @@ async function toTransactions(executor: Db, rows: TransactionRow[]): Promise<Tra
     occurredOn: row.occurredOn,
     description: row.description,
     categoryId: row.categoryId,
+    counterparty: row.counterparty,
+    importBatchId: row.importBatchId,
     paidBy: person(row.paidBy),
     createdBy: person(row.createdBy),
     split: row.splitMethod
@@ -370,7 +372,7 @@ function prepareSplit(
   };
 }
 
-async function activeMemberIds(tx: Db, householdId: string): Promise<Set<string>> {
+export async function activeMemberIds(tx: Db, householdId: string): Promise<Set<string>> {
   const rows = await tx
     .select({ userId: householdMembers.userId })
     .from(householdMembers)
@@ -439,40 +441,64 @@ async function inWriteTransaction<T>(
   });
 }
 
+/** Where an imported transaction came from. */
+export interface TransactionOrigin {
+  importBatchId: string;
+  importFingerprint: string;
+  counterparty: string | null;
+}
+
+/**
+ * Creates a transaction inside a write transaction that already holds the household lock
+ * and checked membership (`inWriteTransaction`, or the import service's). `allowed` are
+ * the people who may pay or share: the active members.
+ */
+export async function insertTransaction(
+  tx: Db,
+  scope: HouseholdScope,
+  household: Membership['household'],
+  input: TransactionInput,
+  allowed: Set<string>,
+  origin?: TransactionOrigin,
+): Promise<Transaction> {
+  if (input.categoryId) {
+    await assertUsableCategory(tx, scope.householdId, input.categoryId, input.kind);
+  }
+  const split = prepareSplit(input, scope.userId, allowed);
+
+  const [row] = await tx
+    .insert(transactions)
+    .values({
+      householdId: scope.householdId,
+      createdBy: scope.userId,
+      paidBy: split.paidBy,
+      kind: input.kind,
+      visibility: input.visibility,
+      amount: input.amount,
+      // One currency per household until multi-currency (Phase 7).
+      currency: household.baseCurrency,
+      occurredOn: input.occurredOn,
+      description: input.description,
+      categoryId: input.categoryId,
+      splitMethod: split.splitMethod,
+      ...origin,
+    })
+    .returning();
+  if (!row) throw new Error('Transaction insert returned no row');
+  await replaceSplits(tx, row, split.shares);
+
+  const after = await toTransaction(tx, row);
+  await recordAudit(tx, scope, 'create', row.id, null, after);
+  return after;
+}
+
 export async function createTransaction(
   scope: HouseholdScope,
   input: TransactionInput,
 ): Promise<Transaction> {
-  return inWriteTransaction(scope, async (tx, { household }) => {
-    if (input.categoryId) {
-      await assertUsableCategory(tx, scope.householdId, input.categoryId, input.kind);
-    }
-    const split = prepareSplit(input, scope.userId, await activeMemberIds(tx, scope.householdId));
-
-    const [row] = await tx
-      .insert(transactions)
-      .values({
-        householdId: scope.householdId,
-        createdBy: scope.userId,
-        paidBy: split.paidBy,
-        kind: input.kind,
-        visibility: input.visibility,
-        amount: input.amount,
-        // One currency per household until multi-currency (Phase 7).
-        currency: household.baseCurrency,
-        occurredOn: input.occurredOn,
-        description: input.description,
-        categoryId: input.categoryId,
-        splitMethod: split.splitMethod,
-      })
-      .returning();
-    if (!row) throw new Error('Transaction insert returned no row');
-    await replaceSplits(tx, row, split.shares);
-
-    const after = await toTransaction(tx, row);
-    await recordAudit(tx, scope, 'create', row.id, null, after);
-    return after;
-  });
+  return inWriteTransaction(scope, async (tx, { household }) =>
+    insertTransaction(tx, scope, household, input, await activeMemberIds(tx, scope.householdId)),
+  );
 }
 
 export async function updateTransaction(
@@ -523,18 +549,44 @@ export async function updateTransaction(
   });
 }
 
+/** Soft deletes a locked row and audits it, inside a write transaction. */
+export async function softDeleteTransaction(
+  tx: Db,
+  scope: HouseholdScope,
+  existing: TransactionRow,
+  at = new Date(),
+): Promise<void> {
+  const before = await toTransaction(tx, existing);
+  await tx
+    .update(transactions)
+    .set({ deletedAt: at, version: existing.version + 1 })
+    .where(eq(transactions.id, existing.id));
+  await recordAudit(tx, scope, 'delete', existing.id, before, null);
+}
+
 /** Soft delete: gone from lists and balances, kept for history and restore. */
 export async function deleteTransaction(scope: TransactionScope): Promise<void> {
   await inWriteTransaction(scope, async (tx) => {
     const existing = await findVisible(tx, scope, { lock: true });
     if (!existing) throw transactionNotFound();
-    const before = await toTransaction(tx, existing);
-    await tx
-      .update(transactions)
-      .set({ deletedAt: new Date(), version: existing.version + 1 })
-      .where(eq(transactions.id, existing.id));
-    await recordAudit(tx, scope, 'delete', existing.id, before, null);
+    await softDeleteTransaction(tx, scope, existing);
   });
+}
+
+/** Whether a live transaction holds the same bank row (re-imported after this was deleted). */
+async function importedAgain(tx: Db, row: TransactionRow): Promise<boolean> {
+  const [other] = await tx
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.householdId, row.householdId),
+        eq(transactions.createdBy, row.createdBy),
+        eq(transactions.importFingerprint, row.importFingerprint ?? ''),
+        isNull(transactions.deletedAt),
+      ),
+    );
+  return other !== undefined;
 }
 
 /** Undo for a delete. Restoring a transaction that is not deleted changes nothing. */
@@ -543,6 +595,13 @@ export async function restoreTransaction(scope: TransactionScope): Promise<Trans
     const existing = await findVisible(tx, scope, { deleted: true, lock: true });
     if (!existing) throw transactionNotFound();
     if (!existing.deletedAt) return toTransaction(tx, existing);
+    if (existing.importFingerprint && (await importedAgain(tx, existing))) {
+      throw new HttpError(
+        409,
+        'This transaction was imported again since it was deleted',
+        'ALREADY_IMPORTED',
+      );
+    }
 
     const [row] = await tx
       .update(transactions)

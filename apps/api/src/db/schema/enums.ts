@@ -4,6 +4,7 @@ import {
   CURRENCIES,
   HOUSEHOLD_ROLES,
   SPLIT_METHODS,
+  STATEMENT_SOURCES,
   TRANSACTION_VISIBILITIES,
 } from '@splinance/shared';
 import { pgEnum } from 'drizzle-orm/pg-core';
@@ -17,3 +18,4 @@ export const transactionVisibility = pgEnum('transaction_visibility', TRANSACTIO
 export const splitMethod = pgEnum('split_method', SPLIT_METHODS);
 export const auditAction = pgEnum('audit_action', AUDIT_ACTIONS);
 export const auditEntity = pgEnum('audit_entity', ['transaction', 'settlement']);
+export const importSource = pgEnum('import_source', STATEMENT_SOURCES);

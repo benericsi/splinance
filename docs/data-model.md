@@ -122,26 +122,49 @@ A user can belong to any number of households.
 
 ### `transactions`
 
-| Column                 | Type                          | Notes                                                                                        |
-| ---------------------- | ----------------------------- | -------------------------------------------------------------------------------------------- |
-| id                     | uuid PK                       | uuidv7                                                                                       |
-| household_id           | uuid                          | Part of every composite FK below                                                             |
-| created_by             | uuid                          | Composite FK `(household_id, created_by)` -> members                                         |
-| paid_by                | uuid                          | Composite FK -> members. For income: who received it. Private: always `created_by` (CHECK)   |
-| kind                   | enum `category_kind`          | expense / income; the categories enum, so the category FK can include it                     |
-| visibility             | enum `transaction_visibility` | shared / private                                                                             |
-| amount                 | bigint                        | Minor units, 1 to 10^12 (`transactions_amount_range`)                                        |
-| currency               | enum `currency`               | The household's base currency (until Phase 7)                                                |
-| occurred_on            | date                          | The calendar day it happened                                                                 |
-| description            | text                          | 1-120 characters                                                                             |
-| category_id            | uuid, nullable                | Composite FK `(household_id, category_id, kind)` -> categories: same household and same kind |
-| split_method           | enum `split_method`, nullable | equal / percentage / fixed; set exactly when shared (`transactions_split_method_iff_shared`) |
-| version                | integer                       | Starts at 1, +1 on every update, delete and restore (optimistic locking)                     |
-| deleted_at             | timestamptz, nullable         | Soft delete                                                                                  |
-| created_at, updated_at | timestamptz                   |                                                                                              |
+| Column                 | Type                          | Notes                                                                                            |
+| ---------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| id                     | uuid PK                       | uuidv7                                                                                           |
+| household_id           | uuid                          | Part of every composite FK below                                                                 |
+| created_by             | uuid                          | Composite FK `(household_id, created_by)` -> members                                             |
+| paid_by                | uuid                          | Composite FK -> members. For income: who received it. Private: always `created_by` (CHECK)       |
+| kind                   | enum `category_kind`          | expense / income; the categories enum, so the category FK can include it                         |
+| visibility             | enum `transaction_visibility` | shared / private                                                                                 |
+| amount                 | bigint                        | Minor units, 1 to 10^12 (`transactions_amount_range`)                                            |
+| currency               | enum `currency`               | The household's base currency (until Phase 7)                                                    |
+| occurred_on            | date                          | The calendar day it happened                                                                     |
+| description            | text                          | 1-120 characters                                                                                 |
+| category_id            | uuid, nullable                | Composite FK `(household_id, category_id, kind)` -> categories: same household and same kind     |
+| split_method           | enum `split_method`, nullable | equal / percentage / fixed; set exactly when shared (`transactions_split_method_iff_shared`)     |
+| counterparty           | text, nullable                | The merchant or other party exactly as the bank named it (imports only), up to 120 characters    |
+| import_batch_id        | uuid, nullable                | Composite FK `(household_id, import_batch_id)` -> import_batches                                 |
+| import_fingerprint     | text, nullable                | The bank row it came from; set exactly with `import_batch_id` (`transactions_import_consistent`) |
+| version                | integer                       | Starts at 1, +1 on every update, delete and restore (optimistic locking)                         |
+| deleted_at             | timestamptz, nullable         | Soft delete                                                                                      |
+| created_at, updated_at | timestamptz                   |                                                                                                  |
 
 - `(household_id, id)` is unique: the target of the split rows' composite FK.
 - Partial index `transactions_household_occurred_idx` on `(household_id, occurred_on DESC, id DESC) WHERE deleted_at IS NULL` serves the list and its keyset pagination.
+- Partial unique index `transactions_import_fingerprint_unique` on `(household_id, created_by, import_fingerprint) WHERE import_fingerprint IS NOT NULL AND deleted_at IS NULL`: a bank row is imported once per person. Deleted rows do not count, so an undone import can be imported again; restoring a deleted row whose bank row was imported again since is refused (409 `ALREADY_IMPORTED`).
+- `counterparty` stays as the bank wrote it while `description` is edited, so later rules and recurring detection can match on it. Account numbers are never stored.
+
+### `import_batches`
+
+One bank export imported by one person. The file itself is never uploaded: the browser parses it and sends normalized rows.
+
+| Column       | Type                  | Notes                                                                       |
+| ------------ | --------------------- | --------------------------------------------------------------------------- |
+| id           | uuid PK               | uuidv7                                                                      |
+| household_id | uuid                  | `(household_id, id)` unique: target of the transactions' composite FK       |
+| created_by   | uuid                  | Composite FK -> members                                                     |
+| source       | enum `import_source`  | `revolut`, `kh` (`STATEMENT_SOURCES`)                                       |
+| file_name    | text, nullable        | Up to 200 characters, for the import history                                |
+| row_count    | integer               | Transactions created (rows the person already had are skipped, not counted) |
+| undone_at    | timestamptz, nullable | Undo soft deletes the import's live transactions with this same timestamp   |
+| created_at   | timestamptz           | Indexed with `(household_id, created_by)` for "my imports"                  |
+
+- Imports are personal bank data: only the importer lists or undoes them. The transactions they create follow the normal rules (private ones stay private).
+- A transaction deleted at exactly `undone_at` was removed by the undo; one deleted earlier was the person's own choice. The duplicate check tells the two apart (`undone` vs `deleted`).
 
 ### `transaction_splits`
 
@@ -209,7 +232,7 @@ Private and deleted rows never count. Debts are netted within each pair (`netDeb
 
 ## Planned (not created yet)
 
-- Later: imports (staging rows, duplicates flagged not rejected), category rules (no user regex), budgets (month as `date`), recurring series, notifications
+- Later: category rules (no user regex), budgets (month as `date`), recurring series, notifications
 
 Business rules already agreed:
 
