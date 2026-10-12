@@ -110,6 +110,7 @@ export async function householdWithPartner(
   await submitRegister(partner, newUser('Ben'));
   await partner.getByRole('button', { name: 'Join Home' }).click();
   await expect(partner).toHaveURL(`/h/${householdId}`);
+  await expect(partner.getByRole('heading', { name: 'Balance' })).toBeAttached();
 
   return { householdId, partner, partnerContext };
 }
@@ -176,4 +177,33 @@ export function monthStat(page: Page, label: 'Spent' | 'Your share' | 'Income') 
 export function money(text: string): RegExp {
   const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s');
   return new RegExp(escaped);
+}
+
+/** The household overview, with its balance section loaded. */
+export async function openOverview(page: Page, householdId: string) {
+  await page.goto(`/h/${householdId}`);
+  await expect(page.getByRole('heading', { name: 'Balance' })).toBeAttached();
+}
+
+/** The balance section at the top of the overview. */
+export function balance(page: Page) {
+  return page.getByRole('region', { name: 'Balance' });
+}
+
+/**
+ * Opens Settle up from the overview's balance card, optionally changes the prefilled
+ * amount and adds a note, records the payment and waits for the dialog to close.
+ */
+export async function recordPayment(
+  page: Page,
+  { amount, note, hint }: { amount?: string; note?: string; hint?: string | RegExp } = {},
+) {
+  await balance(page).getByRole('link', { name: 'Settle up' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Settle up' });
+  if (amount !== undefined) await field(dialog, 'Amount').fill(amount);
+  if (hint !== undefined) await expect(dialog.getByText(hint)).toBeVisible();
+  if (note !== undefined) await field(dialog, 'Note').fill(note);
+  await dialog.getByRole('button', { name: 'Record payment' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Payment recorded').last()).toBeVisible();
 }
