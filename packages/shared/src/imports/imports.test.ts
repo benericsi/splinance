@@ -179,7 +179,8 @@ const byDescription = (rows: StatementRow[], description: string) => {
 
 describe('readDelimited', () => {
   it('reads quotes, doubled quotes, line breaks in quotes and CRLF', () => {
-    const text = '﻿a,b,c\r\n"x, y","say ""hi""","two\nlines"\r\nlast,,\r\n\r\n';
+    const text =
+      String.fromCharCode(0xfeff) + 'a,b,c\r\n"x, y","say ""hi""","two\nlines"\r\nlast,,\r\n\r\n';
     expect(readDelimited(text, ',')).toEqual([
       { line: 1, cells: ['a', 'b', 'c'] },
       { line: 2, cells: ['x, y', 'say "hi"', 'two\nlines'] },

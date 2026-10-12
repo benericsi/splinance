@@ -1,3 +1,6 @@
+/** Byte order mark some exports start with (written as a code point, not a raw character). */
+const BOM = String.fromCharCode(0xfeff);
+
 /**
  * A small RFC 4180 reader: quoted fields may hold the delimiter, line breaks and doubled
  * quotes (`""`). Lines end in LF or CRLF; a leading byte order mark is dropped. Returns
@@ -22,7 +25,7 @@ export function readDelimited(
     cell = '';
   };
 
-  const input = text.startsWith('﻿') ? text.slice(1) : text;
+  const input = text.startsWith(BOM) ? text.slice(1) : text;
   for (let i = 0; i < input.length; i++) {
     const char = input.charAt(i);
     if (quoted) {
@@ -57,7 +60,7 @@ export function readDelimited(
 
 /** The first line of a file, for telling formats apart by their header. */
 export function firstLine(text: string): string {
-  const input = text.startsWith('﻿') ? text.slice(1) : text;
+  const input = text.startsWith(BOM) ? text.slice(1) : text;
   const end = input.search(/\r?\n/);
   return end === -1 ? input : input.slice(0, end);
 }
