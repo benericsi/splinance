@@ -5,10 +5,12 @@ import {
   type SplitMethod,
   type TransactionKind,
 } from '@splinance/shared';
+import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { COLLAPSE, TRANSITION_FAST } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 import type { ShareRow } from '../form';
 import {
@@ -136,31 +138,29 @@ export function SplitEditor(props: SplitEditorProps) {
   const preview = previewShares(props);
   const hint = remainderHint(props);
 
-  if (!open) {
-    return (
-      <div className="bg-muted/50 flex items-center justify-between gap-3 rounded-lg px-3 py-2.5">
-        <p className="min-w-0 text-sm">{summarize(props)}</p>
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="text-link h-auto px-0"
-          onClick={() => {
-            setExpanded(true);
-          }}
-        >
-          Change
-        </Button>
-      </div>
-    );
-  }
+  const summary = (
+    <div className="bg-muted/50 flex items-center justify-between gap-3 rounded-lg px-3 py-2.5">
+      <p className="min-w-0 text-sm">{summarize(props)}</p>
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        className="text-link h-auto px-0"
+        onClick={() => {
+          setExpanded(true);
+        }}
+      >
+        Change
+      </Button>
+    </div>
+  );
 
   const payers = shares.filter((row) => !row.former || row.userId === props.paidBy);
   const setRow = (userId: string, patch: Partial<ShareRow>) => {
     props.onSharesChange(shares.map((row) => (row.userId === userId ? { ...row, ...patch } : row)));
   };
 
-  return (
+  const editor = (
     <fieldset className="space-y-4 rounded-lg border p-3">
       <legend className="sr-only">Split</legend>
       <div className="space-y-1.5">
@@ -252,5 +252,14 @@ export function SplitEditor(props: SplitEditorProps) {
         </p>
       )}
     </fieldset>
+  );
+
+  // The summary line opens into the editor (and back) by height, one after the other.
+  return (
+    <AnimatePresence initial={false} mode="wait">
+      <m.div key={open ? 'editor' : 'summary'} {...COLLAPSE} transition={TRANSITION_FAST}>
+        {open ? editor : summary}
+      </m.div>
+    </AnimatePresence>
   );
 }

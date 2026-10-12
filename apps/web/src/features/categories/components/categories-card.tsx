@@ -1,8 +1,10 @@
 import type { Category, CategoryKind } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { Archive, ArchiveRestore, ChevronDown, Ellipsis, Pencil, Plus } from 'lucide-react';
+import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { Collapse } from '@/components/collapse';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -13,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { COLLAPSE } from '@/lib/motion';
 import { errorMessage } from '@/lib/query-client';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { useArchiveCategory, useRestoreCategory } from '../hooks';
@@ -69,21 +72,24 @@ export function CategoriesCard({
             without one.
           </p>
         ) : (
-          <ul className="divide-y">
-            {active(kind).map((category) => (
-              <li key={category.id} className="flex items-center gap-1">
-                <Link
-                  to="/h/$householdId/settings/categories/$categoryId"
-                  params={{ householdId, categoryId: category.id }}
-                  state={OPEN_MODAL_STATE}
-                  className="hover:bg-muted/60 focus-visible:ring-ring/50 -mx-1 flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-2 outline-none focus-visible:ring-[3px]"
-                >
-                  <CategoryTile category={category} />
-                  <span className="truncate">{category.name}</span>
-                </Link>
-                <CategoryActions householdId={householdId} category={category} />
-              </li>
-            ))}
+          // Keyed by kind: switching tabs swaps the list instead of animating every row.
+          <ul key={kind} className="divide-y">
+            <AnimatePresence initial={false}>
+              {active(kind).map((category) => (
+                <m.li key={category.id} {...COLLAPSE} className="flex items-center gap-1">
+                  <Link
+                    to="/h/$householdId/settings/categories/$categoryId"
+                    params={{ householdId, categoryId: category.id }}
+                    state={OPEN_MODAL_STATE}
+                    className="hover:bg-muted/60 focus-visible:ring-ring/50 -mx-1 flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-2 outline-none focus-visible:ring-[3px]"
+                  >
+                    <CategoryTile category={category} />
+                    <span className="truncate">{category.name}</span>
+                  </Link>
+                  <CategoryActions householdId={householdId} category={category} />
+                </m.li>
+              ))}
+            </AnimatePresence>
           </ul>
         )}
 
@@ -106,13 +112,15 @@ export function CategoriesCard({
               />
               Archived ({archived.length})
             </Button>
-            {showArchived && (
+            <Collapse open={showArchived}>
               <ul className="mt-1">
-                {archived.map((category) => (
-                  <ArchivedRow key={category.id} householdId={householdId} category={category} />
-                ))}
+                <AnimatePresence initial={false}>
+                  {archived.map((category) => (
+                    <ArchivedRow key={category.id} householdId={householdId} category={category} />
+                  ))}
+                </AnimatePresence>
               </ul>
-            )}
+            </Collapse>
           </div>
         )}
       </CardContent>
@@ -192,7 +200,7 @@ function ArchivedRow({ householdId, category }: { householdId: string; category:
   const restore = useRestoreCategory();
 
   return (
-    <li className="flex items-center gap-3 py-1.5">
+    <m.li {...COLLAPSE} className="flex items-center gap-3 py-1.5">
       <CategoryTile category={category} className="opacity-60" />
       <span className="text-muted-foreground min-w-0 flex-1 truncate">{category.name}</span>
       <Button
@@ -214,6 +222,6 @@ function ArchivedRow({ householdId, category }: { householdId: string; category:
         <ArchiveRestore aria-hidden />
         Restore
       </Button>
-    </li>
+    </m.li>
   );
 }
