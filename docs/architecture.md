@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phase 0 (foundation), Phase 1 (auth, households, invites, onboarding) and Phase 2 (transactions and splits: split math, categories, transactions with add, edit, delete and undo, end-to-end flows) are done, API and web. Phase 3 (balances and settle-up, first deploy) is in progress: the balances and settlements API exists; the web UI and the deploy follow.
+Status: Phase 0 (foundation), Phase 1 (auth, households, invites, onboarding) and Phase 2 (transactions and splits: split math, categories, transactions with add, edit, delete and undo, end-to-end flows) are done, API and web. Phase 3 (balances and settle-up, first deploy) is in progress: balances and settlements exist in the API and on the overview page; an e2e flow and the deploy follow.
 
 ## Contents
 
@@ -319,7 +319,7 @@ Reads `Authorization: Bearer`, verifies the JWT (algorithm pinned to HS256, issu
 | Module              | Contents                                                                                                                             | Used by                                                     |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
 | `api-error.ts`      | `apiErrorResponseSchema`                                                                                                             | API error handler (types), web HTTP client (parsing)        |
-| `health.ts`         | live/ready response schemas                                                                                                          | API health routes, web status panel                         |
+| `health.ts`         | live/ready response schemas                                                                                                          | API health routes                                           |
 | `auth.ts`           | `emailSchema` (trims, lowercases), `registerInputSchema`, `loginInputSchema`, `userSchema`, `authResponseSchema`, `meResponseSchema` | API route parsing, web forms and API client                 |
 | `password/rules.ts` | `PASSWORD_RULES`, `checkPassword()`                                                                                                  | register schema (server enforcement) and the live checklist |
 | `brand.ts`          | palette, logo pairings, `pairingFor(id)`, `contrastRatio()`, `readableTextOn()`                                                      | web brand components, a contrast test                       |
@@ -363,7 +363,10 @@ _authenticated.tsx         pathless layout: if not authenticated -> redirect /lo
                                 /welcome/done (?household=<id>), /welcome/join
   _authenticated/h/$householdId.tsx           household layout: loads the household (404 -> notFound()),
                                               remembers it as last used, renders HouseholdShell
-    _authenticated/h/$householdId/index.tsx    /h/:id           overview
+    _authenticated/h/$householdId/_overview.tsx        pathless layout: the overview page (balances, settlements,
+                                                       members); <Outlet /> for the settle up dialog
+      _authenticated/h/$householdId/_overview.index.tsx  /h/:id         nothing on top
+      _authenticated/h/$householdId/_overview.settle.tsx /h/:id/settle?with=<userId>  settle up dialog
     _authenticated/h/$householdId/settings.tsx /h/:id/settings  rename, members, danger zone; <Outlet /> for modals
       _authenticated/h/$householdId/settings.invite.tsx /h/:id/settings/invite  invite dialog (owners only)
       _authenticated/h/$householdId/settings.categories.new.tsx         /h/:id/settings/categories/new?kind=  new category
@@ -419,6 +422,13 @@ invitee: opens /invite#<token>
 - Not found and errors: the root shows full-page versions; the router defaults (`defaultNotFoundComponent`, `defaultErrorComponent`) render inline inside layouts. "Try again" resets the error boundary and re-runs loaders.
 - Page titles: each page renders exactly one `<PageTitle title="..." />`. React 19 hoists `<title>` into `<head>`; multiple titles at once are unsupported, so layouts never render one.
 
+### Overview and settling up
+
+- The overview is a pathless layout route (`_overview`), so the settle up dialog can be a child route over it at `/h/:id/settle` like the other page-bound modals. The sidebar keeps "Overview" highlighted there (`alsoActiveOn` in `NAV_ITEMS`; the link is `exact`, or it would match every section).
+- `BalanceOverview`: the viewer's largest debt as a big line ("Ben owes you", `MoneyFlow` in `text-positive`, or "You owe Cara" in `text-negative`) with Settle up and View transactions; every other debt in "Also in <household>", with Settle up only on the viewer's own. No debts: "You're all square". Debts come from `GET /balances`, already per pair and sorted by amount.
+- `SettleUpDialog`: picks the person from `?with=` (else the viewer's largest debt, else any other member; people who left appear while a debt with them is open). "Who paid" defaults to whoever owes, the amount to the whole debt. Any amount is accepted; `remainingHint` says what is left ("Ben still owes you 2000 Ft"), when it is square, and when paying more flips the debt. Records a payment made outside the app; nothing moves money.
+- `SettlementList` ("Recent settlements", hidden while empty): a row menu deletes a payment the viewer may manage (the two people, who recorded it, owners, as the API decides) with an 8 second undo toast. The delete mutation lives in the list, not the row: the row unmounts when the refetch drops it, and per-call `mutate` callbacks of an unmounted component never run, so the toast would never appear.
+
 ### Transactions
 
 - The page shows one month (`?month=YYYY-MM`, absent means the current month, so a bookmark always opens "now"). The loader awaits the first page, the month summary and the categories; "Load more" fetches the next cursor page (`useSuspenseInfiniteQuery`).
@@ -449,7 +459,7 @@ Layering, per feature folder (`src/features/<name>/`):
 
 ```
 component  --uses-->  hooks.ts (useLogin, useLogout, ...)       mutations + cache invalidation
-           --uses-->  queries.ts (healthQueries.live(), ...)    queryOptions: key + fetcher
+           --uses-->  queries.ts (transactionQueries.list(), ...) queryOptions: key + fetcher
                            |
                       api.ts (authApi.login, ...)               service functions, the only importers of http
                            |
@@ -479,11 +489,12 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 
 ### Queries and mutations
 
-- Queries are `queryOptions` factories with hierarchical keys (`healthQueries.all()`, `.live()`), usable both in route loaders (`queryClient.query(...)`) and components (`useQuery(...)`).
+- Queries are `queryOptions` factories with hierarchical keys (`balanceQueries.all()`, `.household(id)`, `.debts(id)`), usable both in route loaders (`queryClient.query(...)`) and components (`useQuery(...)`).
 - Query retries: none for 4xx (`ApiError` with status 400-499), up to 2 otherwise.
 - `MutationCache.onError` shows a sonner toast for every failed mutation. A mutation opts out with `meta: { suppressErrorToast: true }` when the component shows the error itself (the auth forms do).
 - `useLogout` clears `authStore` and the whole query cache in `onSettled`, even if the request fails, so no data of the previous user stays in memory.
-- Transactions: everything of a household lives under `['transactions', householdId]` (list per month as an infinite query, summary per month, detail per id); every write invalidates that prefix. Delete marks the deleted detail stale without refetching it, for the same reason as leaving a household (below).
+- Transactions: everything of a household lives under `['transactions', householdId]` (list per month as an infinite query, summary per month, detail per id); every write invalidates that prefix and `['balances', householdId]`, because transactions change who owes whom.
+- Balances: debts and the settlement list live under `['balances', householdId]`; settlement writes invalidate it. Delete marks the deleted detail stale without refetching it, for the same reason as leaving a household (below).
 - Households: `householdQueries.list()` and `.detail(id)` under the `['households']` key; mutations invalidate the whole key. Leaving and archiving only mark it stale (`refetchType: 'none'`) and navigate to `/`: refetching the detail first would hit the new 404 while the page is still mounted. The household layout's loader awaits the detail (a 404 becomes `notFound()`) and warms the list for the switcher; components read the detail with `useSuspenseQuery`, which never suspends there because the loader filled the cache.
 
 ## 11. Web: forms
@@ -530,7 +541,7 @@ API specifics:
 
 Web specifics:
 
-- MSW runs with `onUnhandledFrame: 'error'` (MSW 3's name for unhandled requests): any request without a handler fails the test. `MotionGlobalConfig.skipAnimations` makes motion animations finish instantly in tests; an element that animates in still starts at opacity 0 and settles a frame later, so assert its visibility inside `waitFor`. NumberFlow is replaced by a plain formatted `<span>` in tests (`test/number-flow-mock.tsx`): its custom element only registers in a real browser, and jsdom has no Web Animations. `test/msw.ts` has one default handler, an empty category list, because the settings page loads it in passing; tests that care override it.
+- MSW runs with `onUnhandledFrame: 'error'` (MSW 3's name for unhandled requests): any request without a handler fails the test. `MotionGlobalConfig.skipAnimations` makes motion animations finish instantly in tests; an element that animates in still starts at opacity 0 and settles a frame later, so assert its visibility inside `waitFor`. NumberFlow is replaced by a plain formatted `<span>` in tests (`test/number-flow-mock.tsx`): its custom element only registers in a real browser, and jsdom has no Web Animations. `test/msw.ts` has default handlers for reads that pages make in passing (an empty category list for settings, no debts and no settlements for the overview); tests that care override them.
 - `test/setup.ts` stubs `window.matchMedia` (jsdom lacks it) and resets the auth store and session-restore cache after each test.
 - `getField(label)` finds inputs by label while ignoring the required asterisk.
 - jsdom has no `navigator.locks` and no CSS animations, so cross-tab locking is not covered, and Base UI popups close after their exit animation (tests use `waitFor`).

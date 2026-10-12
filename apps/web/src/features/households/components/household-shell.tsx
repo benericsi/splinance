@@ -1,5 +1,5 @@
 import type { Household } from '@splinance/shared';
-import { Link } from '@tanstack/react-router';
+import { Link, useMatchRoute } from '@tanstack/react-router';
 import { ArrowLeftRight, House, type LucideIcon, Settings } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/logo';
@@ -13,22 +13,38 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   exact?: boolean;
+  /** Modal routes over this section's page that keep the section highlighted. */
+  alsoActiveOn?: '/h/$householdId/settle';
 }
 
 // New sections (expenses, balances, budgets, ...) are added here as they ship.
 const NAV_ITEMS: NavItem[] = [
-  { to: '/h/$householdId', label: 'Overview', icon: House, exact: true },
+  // Exact, or it would match every section; the settle up dialog sits over the overview.
+  {
+    to: '/h/$householdId',
+    label: 'Overview',
+    icon: House,
+    exact: true,
+    alsoActiveOn: '/h/$householdId/settle',
+  },
   { to: '/h/$householdId/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { to: '/h/$householdId/settings', label: 'Settings', icon: Settings },
 ];
 
 function NavLinks({ householdId, variant }: { householdId: string; variant: 'sidebar' | 'tabs' }) {
-  return NAV_ITEMS.map(({ to, label, icon: Icon, exact }) => (
+  const matchRoute = useMatchRoute();
+  return NAV_ITEMS.map(({ to, label, icon: Icon, exact, alsoActiveOn }) => (
     <Link
       key={to}
       to={to}
       params={{ householdId }}
       activeOptions={{ exact: exact ?? false }}
+      // Same attributes the link sets when it is active itself.
+      inactiveProps={
+        alsoActiveOn && matchRoute({ to: alsoActiveOn, params: { householdId } })
+          ? { 'data-status': 'active', 'aria-current': 'page' }
+          : {}
+      }
       className={cn(
         'focus-visible:ring-ring/50 outline-none focus-visible:ring-[3px]',
         variant === 'sidebar'

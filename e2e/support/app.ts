@@ -79,6 +79,9 @@ export async function createHousehold(
   await expect(page.getByRole('heading', { name: `${name} is ready` })).toBeVisible();
   await page.getByRole('link', { name: `Go to ${name}` }).click();
   await expect(page).toHaveURL(/\/h\/[^/]+$/);
+  // The URL changes before the overview's loaders finish; until then the onboarding page
+  // (with its own account menu) is still on screen.
+  await expect(page.getByRole('heading', { name: 'Balance' })).toBeAttached();
   const householdId = new URL(page.url()).pathname.split('/')[2] ?? '';
   return { householdId, inviteLink };
 }
@@ -151,8 +154,9 @@ export async function fillTransaction(page: Page, transaction: NewTransaction) {
   }
 
   await dialog.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText('Transaction added')).toBeVisible();
   await expect(dialog).toBeHidden();
+  // The toast of an earlier add may still be on screen.
+  await expect(page.getByText('Transaction added').last()).toBeVisible();
 }
 
 /** A row of the transactions list (a link to its edit dialog), by its description. */

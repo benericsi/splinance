@@ -5,6 +5,7 @@ import { Lock, Trash2 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { firstError } from '@/components/form/first-error';
 import { FormError } from '@/components/form/form-error';
 import { TextField } from '@/components/form/text-field';
 import { RouteDialog } from '@/components/route-dialog';
@@ -35,16 +36,6 @@ import { parseAmount } from '../money';
 import { transactionQueries } from '../queries';
 import { HeroAmountInput } from './amount-inputs';
 import { SplitEditor } from './split-editor';
-
-/** Validators may report strings or Standard Schema issues ({ message }). */
-function firstError(errors: readonly unknown[]): string | undefined {
-  for (const error of errors) {
-    if (typeof error === 'string') return error;
-    if (typeof error === 'object' && error !== null && 'message' in error)
-      return String(error.message);
-  }
-  return undefined;
-}
 
 interface TransactionDialogProps {
   household: HouseholdDetail;
