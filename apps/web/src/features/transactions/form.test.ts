@@ -23,6 +23,8 @@ describe('split rows', () => {
       occurredOn: '2026-10-10',
       description: 'Dinner',
       categoryId: null,
+      counterparty: null,
+      importBatchId: null,
       paidBy: cili,
       createdBy: bela,
       split: {

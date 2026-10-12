@@ -13,6 +13,7 @@ import { Router } from 'express';
 import { getAuth, requireAuth } from '../../middleware/require-auth';
 import { createBalancesRouter } from '../balances/balances.routes';
 import { createCategoriesRouter } from '../categories/categories.routes';
+import { createImportsRouter } from '../imports/imports.routes';
 import { createSettlementsRouter } from '../settlements/settlements.routes';
 import { createTransactionsRouter } from '../transactions/transactions.routes';
 import {
@@ -111,6 +112,7 @@ export function createHouseholdsRouter() {
   router.use('/:id/transactions', createTransactionsRouter());
   router.use('/:id/settlements', createSettlementsRouter());
   router.use('/:id/balances', createBalancesRouter());
+  router.use('/:id/imports', createImportsRouter());
 
   return router;
 }

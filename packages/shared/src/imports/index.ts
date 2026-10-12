@@ -5,6 +5,7 @@ import { type ParsedStatement, type ParseOptions, StatementError } from './types
 
 export { decimalToMinor } from './amounts';
 export { isOneOf, nameKey } from './names';
+export * from './schemas';
 export * from './types';
 
 /**

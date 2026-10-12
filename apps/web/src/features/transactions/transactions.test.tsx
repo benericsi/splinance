@@ -50,6 +50,8 @@ const pizza: Transaction = {
   occurredOn: '2026-10-10',
   description: 'Pizza night',
   categoryId: eatingOut.id,
+  counterparty: null,
+  importBatchId: null,
   paidBy: anna,
   createdBy: anna,
   split: {
