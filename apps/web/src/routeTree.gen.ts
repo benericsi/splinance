@@ -29,6 +29,7 @@ import { Route as AuthenticatedHHouseholdIdOverviewSettleRouteImport } from './r
 import { Route as AuthenticatedHHouseholdIdSettingsInviteRouteImport } from './routes/_authenticated/h/$householdId/settings.invite'
 import { Route as AuthenticatedHHouseholdIdTransactionsTransactionIdRouteImport } from './routes/_authenticated/h/$householdId/transactions.$transactionId'
 import { Route as AuthenticatedHHouseholdIdTransactionsNewRouteImport } from './routes/_authenticated/h/$householdId/transactions.new'
+import { Route as AuthenticatedHHouseholdIdTransactionsImportRouteImport } from './routes/_authenticated/h/$householdId/transactions_.import'
 import { Route as AuthenticatedHHouseholdIdSettingsCategoriesCategoryIdRouteImport } from './routes/_authenticated/h/$householdId/settings.categories.$categoryId'
 import { Route as AuthenticatedHHouseholdIdSettingsCategoriesNewRouteImport } from './routes/_authenticated/h/$householdId/settings.categories.new'
 
@@ -143,6 +144,12 @@ const AuthenticatedHHouseholdIdTransactionsNewRoute =
     path: '/new',
     getParentRoute: () => AuthenticatedHHouseholdIdTransactionsRoute,
   } as any)
+const AuthenticatedHHouseholdIdTransactionsImportRoute =
+  AuthenticatedHHouseholdIdTransactionsImportRouteImport.update({
+    id: '/transactions_/import',
+    path: '/transactions/import',
+    getParentRoute: () => AuthenticatedHHouseholdIdRoute,
+  } as any)
 const AuthenticatedHHouseholdIdSettingsCategoriesCategoryIdRoute =
   AuthenticatedHHouseholdIdSettingsCategoriesCategoryIdRouteImport.update({
     id: '/categories/$categoryId',
@@ -173,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
   '/h/$householdId/transactions/$transactionId': typeof AuthenticatedHHouseholdIdTransactionsTransactionIdRoute
   '/h/$householdId/transactions/new': typeof AuthenticatedHHouseholdIdTransactionsNewRoute
+  '/h/$householdId/transactions/import': typeof AuthenticatedHHouseholdIdTransactionsImportRoute
   '/h/$householdId/': typeof AuthenticatedHHouseholdIdOverviewIndexRoute
   '/h/$householdId/settings/categories/$categoryId': typeof AuthenticatedHHouseholdIdSettingsCategoriesCategoryIdRoute
   '/h/$householdId/settings/categories/new': typeof AuthenticatedHHouseholdIdSettingsCategoriesNewRoute
@@ -194,6 +202,7 @@ export interface FileRoutesByTo {
   '/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
   '/h/$householdId/transactions/$transactionId': typeof AuthenticatedHHouseholdIdTransactionsTransactionIdRoute
   '/h/$householdId/transactions/new': typeof AuthenticatedHHouseholdIdTransactionsNewRoute
+  '/h/$householdId/transactions/import': typeof AuthenticatedHHouseholdIdTransactionsImportRoute
   '/h/$householdId/settings/categories/$categoryId': typeof AuthenticatedHHouseholdIdSettingsCategoriesCategoryIdRoute
   '/h/$householdId/settings/categories/new': typeof AuthenticatedHHouseholdIdSettingsCategoriesNewRoute
 }
@@ -218,6 +227,7 @@ export interface FileRoutesById {
   '/_authenticated/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
   '/_authenticated/h/$householdId/transactions/$transactionId': typeof AuthenticatedHHouseholdIdTransactionsTransactionIdRoute
   '/_authenticated/h/$householdId/transactions/new': typeof AuthenticatedHHouseholdIdTransactionsNewRoute
+  '/_authenticated/h/$householdId/transactions_/import': typeof AuthenticatedHHouseholdIdTransactionsImportRoute
   '/_authenticated/h/$householdId/_overview/': typeof AuthenticatedHHouseholdIdOverviewIndexRoute
   '/_authenticated/h/$householdId/settings/categories/$categoryId': typeof AuthenticatedHHouseholdIdSettingsCategoriesCategoryIdRoute
   '/_authenticated/h/$householdId/settings/categories/new': typeof AuthenticatedHHouseholdIdSettingsCategoriesNewRoute
@@ -241,6 +251,7 @@ export interface FileRouteTypes {
     | '/h/$householdId/settings/invite'
     | '/h/$householdId/transactions/$transactionId'
     | '/h/$householdId/transactions/new'
+    | '/h/$householdId/transactions/import'
     | '/h/$householdId/'
     | '/h/$householdId/settings/categories/$categoryId'
     | '/h/$householdId/settings/categories/new'
@@ -262,6 +273,7 @@ export interface FileRouteTypes {
     | '/h/$householdId/settings/invite'
     | '/h/$householdId/transactions/$transactionId'
     | '/h/$householdId/transactions/new'
+    | '/h/$householdId/transactions/import'
     | '/h/$householdId/settings/categories/$categoryId'
     | '/h/$householdId/settings/categories/new'
   id:
@@ -285,6 +297,7 @@ export interface FileRouteTypes {
     | '/_authenticated/h/$householdId/settings/invite'
     | '/_authenticated/h/$householdId/transactions/$transactionId'
     | '/_authenticated/h/$householdId/transactions/new'
+    | '/_authenticated/h/$householdId/transactions_/import'
     | '/_authenticated/h/$householdId/_overview/'
     | '/_authenticated/h/$householdId/settings/categories/$categoryId'
     | '/_authenticated/h/$householdId/settings/categories/new'
@@ -438,6 +451,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHHouseholdIdTransactionsNewRouteImport
       parentRoute: typeof AuthenticatedHHouseholdIdTransactionsRoute
     }
+    '/_authenticated/h/$householdId/transactions_/import': {
+      id: '/_authenticated/h/$householdId/transactions_/import'
+      path: '/transactions/import'
+      fullPath: '/h/$householdId/transactions/import'
+      preLoaderRoute: typeof AuthenticatedHHouseholdIdTransactionsImportRouteImport
+      parentRoute: typeof AuthenticatedHHouseholdIdRoute
+    }
     '/_authenticated/h/$householdId/settings/categories/$categoryId': {
       id: '/_authenticated/h/$householdId/settings/categories/$categoryId'
       path: '/categories/$categoryId'
@@ -528,6 +548,7 @@ interface AuthenticatedHHouseholdIdRouteChildren {
   AuthenticatedHHouseholdIdOverviewRoute: typeof AuthenticatedHHouseholdIdOverviewRouteWithChildren
   AuthenticatedHHouseholdIdSettingsRoute: typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
   AuthenticatedHHouseholdIdTransactionsRoute: typeof AuthenticatedHHouseholdIdTransactionsRouteWithChildren
+  AuthenticatedHHouseholdIdTransactionsImportRoute: typeof AuthenticatedHHouseholdIdTransactionsImportRoute
 }
 
 const AuthenticatedHHouseholdIdRouteChildren: AuthenticatedHHouseholdIdRouteChildren =
@@ -538,6 +559,8 @@ const AuthenticatedHHouseholdIdRouteChildren: AuthenticatedHHouseholdIdRouteChil
       AuthenticatedHHouseholdIdSettingsRouteWithChildren,
     AuthenticatedHHouseholdIdTransactionsRoute:
       AuthenticatedHHouseholdIdTransactionsRouteWithChildren,
+    AuthenticatedHHouseholdIdTransactionsImportRoute:
+      AuthenticatedHHouseholdIdTransactionsImportRoute,
   }
 
 const AuthenticatedHHouseholdIdRouteWithChildren =

@@ -1,7 +1,7 @@
 import { monthSchema } from '@splinance/shared';
 import { useSuspenseInfiniteQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
-import { Plus } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
 import { z } from 'zod';
 import { PageHeader } from '@/components/page-header';
 import { PageTitle } from '@/components/page-title';
@@ -45,7 +45,19 @@ function TransactionsPage() {
       <PageTitle title={`Transactions · ${household.name}`} />
       <PageHeader
         title="Transactions"
-        actions={<AddLink householdId={householdId} className="max-md:hidden" />}
+        actions={
+          <>
+            <Link
+              to="/h/$householdId/transactions/import"
+              params={{ householdId }}
+              className={buttonVariants({ variant: 'outline', size: 'lg' })}
+            >
+              <Upload aria-hidden />
+              Import
+            </Link>
+            <AddLink householdId={householdId} className="max-md:hidden" />
+          </>
+        }
       />
       <MonthHeader month={month} summary={summary} />
 
