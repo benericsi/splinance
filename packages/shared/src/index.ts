@@ -1,6 +1,7 @@
 export * from './api-error';
 export * from './auth';
 export * from './balances';
+export * from './budgets';
 export * from './brand';
 export * from './categories';
 export * from './health';

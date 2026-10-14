@@ -51,6 +51,7 @@ Key files by concern:
 | Balances and settlements      | `apps/api/src/modules/balances/*` (`ledger.ts` derives debts), `apps/api/src/modules/settlements/*`                      |
 | Bank imports                  | `packages/shared/src/imports/*` (parsers, contract), `apps/api/src/modules/imports/*`, `apps/web/src/features/imports/*` |
 | Category rules                | `packages/shared/src/rules.ts` (matching), `apps/api/src/modules/rules/*`, `apps/web/src/features/rules/*`               |
+| Budgets                       | `packages/shared/src/budgets.ts`, `apps/api/src/modules/budgets/*`                                                       |
 | Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`, `packages/shared/src/balances.ts`                       |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts`         |
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                                  |
@@ -219,6 +220,16 @@ Category rules. Also under a household; every member manages them, like categori
 - A rule matches when its text appears in the transaction's counterparty or description, accent and case insensitive (`matchKey`), and the kinds agree. No regular expressions: they are easy to get wrong and can be slow.
 - Applying categorizes the earlier transactions the caller can see that have no category, each as an audited update with a new version (an edit form opened before gets the usual conflict). It never changes who a transaction is for: that would move balances. Matching runs in TypeScript with the same function the web uses, so preview and result agree.
 
+Budgets. Also under a household; every member sees and sets them. Household budgets only for now (shared spending).
+
+| Method and path                               | Who    | Request                                     | Success                                         | Errors (besides the above)                                      |
+| --------------------------------------------- | ------ | ------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------- |
+| `GET /api/households/:id/budgets`             | member | query: `month` (required)                   | 200 `{ budgets: { month, currency, budgets } }` | 400                                                             |
+| `PUT /api/households/:id/budgets/:categoryId` | member | `{ amount, from }` (`amount: null` removes) | 204                                             | 400 `INVALID_CATEGORY` (income, archived, other household), 404 |
+
+- A budget in the list is `{ categoryId, amount, since, spent }`: the amount in force that month, the month it was set from, and the month's shared expenses in the category (whole amounts). Archived categories drop out.
+- Setting an amount from a month keeps earlier months as they were; a later change made before (say from December) still wins from its own month.
+
 Imports. Also under a household. They are personal: a person sees and undoes only their own, and fingerprints are per person (the same bank row imported by someone else is theirs).
 
 | Method and path                                | Who          | Request                                                                    | Success                                                   | Errors (besides the above)                                                        |
@@ -360,6 +371,7 @@ Reads `Authorization: Bearer`, verifies the JWT (algorithm pinned to HS256, issu
 | `categories.ts`     | `CATEGORY_KINDS` (Postgres enum), `CATEGORY_ICONS` (lucide names), colors (brand keys), schemas, `DEFAULT_CATEGORIES`                | API routes and seeding, web pickers                         |
 | `balances.ts`       | `netDebts()` (pairwise netting), balance and settlement schemas                                                                      | API ledger and routes, web (next PR)                        |
 | `rules.ts`          | `matchKey()`, `ruleMatches()`, `firstMatchingRule()`, rule schemas                                                                   | API (uniqueness, applying), web import review (next PR)     |
+| `budgets.ts`        | budget schemas, `budgetUsage()`, `BUDGET_WARNING_RATIO`                                                                              | API, web budgets (next PR)                                  |
 | `imports/`          | `parseStatement()` (Revolut CSV, K&H transaction history CSV), `StatementRow`, flags, fingerprints, `nameKey()`                      | web import page (next PRs), parser tests                    |
 
 Split math: `allocate(total, weights)` gives everyone the floor of their exact share, then hands the units lost to rounding to the largest fractional parts, earlier positions first on ties. Shares therefore always sum to the total and never differ from the exact share by a whole unit. It computes `total * weight` with BigInt, because 10^12 minor units times 10 000 basis points passes 2^53. Equal splits are weights of 1, percentages are basis points (100% = 10 000), fixed splits must already sum to the total. The order of people decides who gets a leftover unit, so callers pass a stable order.

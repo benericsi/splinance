@@ -1,4 +1,5 @@
 export * from './audit-log';
+export * from './budgets';
 export * from './categories';
 export * from './category-rules';
 export * from './enums';
