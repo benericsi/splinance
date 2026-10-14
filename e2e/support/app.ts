@@ -119,15 +119,17 @@ export interface NewTransaction {
   /** As typed, e.g. '10001'. */
   amount: string;
   description: string;
+  /** `YYYY-MM-DD`; today if not given. */
+  occurredOn?: string;
   /** "Just me" instead of the default shared, equal split. */
   private?: boolean;
   /** Percent per person, by the name the split editor shows ('You', 'Ben'). */
   percentages?: Record<string, string>;
 }
 
-/** The household's transactions page for the current month. */
-export async function openTransactions(page: Page, householdId: string) {
-  await page.goto(`/h/${householdId}/transactions`);
+/** The household's transactions page, for the current month unless one is given. */
+export async function openTransactions(page: Page, householdId: string, month?: string) {
+  await page.goto(`/h/${householdId}/transactions${month ? `?month=${month}` : ''}`);
   await expect(page.getByRole('heading', { name: 'Transactions', level: 1 })).toBeVisible();
 }
 
@@ -142,6 +144,7 @@ export async function fillTransaction(page: Page, transaction: NewTransaction) {
   const dialog = page.getByRole('dialog', { name: 'Add transaction' });
   await field(dialog, 'Amount').fill(transaction.amount);
   await field(dialog, 'Description').fill(transaction.description);
+  if (transaction.occurredOn) await field(dialog, 'Date').fill(transaction.occurredOn);
 
   if (transaction.private) {
     await dialog.getByRole('button', { name: 'Just me' }).click();
