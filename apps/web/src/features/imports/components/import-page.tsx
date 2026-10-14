@@ -2,6 +2,7 @@ import {
   type Category,
   type HouseholdDetail,
   type ImportResponse,
+  type Rule,
   parseStatement,
   STATEMENT_SOURCE_LABELS,
   StatementError,
@@ -22,9 +23,11 @@ import { readBankNames, rememberBankName } from '../bank-names';
 import { useCheckImport, useCreateImport, useUndoImport } from '../hooks';
 import { readExport } from '../read-file';
 import { buildReview, type ReviewRow, rowsToCheck, toImportInput, updatePicked } from '../review';
+import { suggestRules } from '../suggestions';
 import { FileDrop } from './file-drop';
 import { ImportHistory } from './import-history';
 import { ReviewList } from './review-list';
+import { RuleSuggestions } from './rule-suggestions';
 
 interface Review {
   fileName: string;
@@ -36,7 +39,9 @@ interface Review {
 }
 
 type Stage =
-  { step: 'pick' } | ({ step: 'review' } & Review) | { step: 'done'; result: ImportResponse };
+  | { step: 'pick' }
+  | ({ step: 'review' } & Review)
+  | { step: 'done'; result: ImportResponse; imported: ReviewRow[] };
 
 const dayLabel = (value: string | undefined) =>
   value
@@ -51,12 +56,18 @@ const dayLabel = (value: string | undefined) =>
 export function ImportPage({
   household,
   categories,
+  rules,
   viewerId,
 }: {
   household: HouseholdDetail;
   categories: Category[];
+  rules: Rule[];
   viewerId: string;
 }) {
+  // Rules whose category was archived since stay listed in settings but do nothing.
+  const activeRules = rules.filter((rule) =>
+    categories.some((category) => category.id === rule.categoryId && category.archivedAt === null),
+  );
   const currency = household.baseCurrency;
   const nameId = useId();
   const [stage, setStage] = useState<Stage>({ step: 'pick' });
@@ -104,7 +115,7 @@ export function ImportPage({
       source: parsed.source,
       firstDay: days[0],
       lastDay: days.at(-1),
-      rows: buildReview(parsed.rows, results, currency),
+      rows: buildReview(parsed.rows, results, currency, activeRules),
     });
   };
 
@@ -119,6 +130,7 @@ export function ImportPage({
 
   if (stage.step === 'done') {
     const { batch, skipped } = stage.result;
+    const suggestions = suggestRules(stage.imported, rules);
     return (
       <div className="space-y-6">
         <Card>
@@ -135,6 +147,11 @@ export function ImportPage({
                 {skipped === 1 ? 'was' : 'were'} skipped.
               </p>
             )}
+            <RuleSuggestions
+              householdId={household.id}
+              suggestions={suggestions}
+              categories={categories}
+            />
             <div className="flex flex-wrap gap-2">
               <Link
                 to="/h/$householdId/transactions"
@@ -202,7 +219,11 @@ export function ImportPage({
           memberIds: household.members.map((member) => member.userId),
         }),
       });
-      setStage({ step: 'done', result });
+      setStage({
+        step: 'done',
+        result,
+        imported: review.rows.filter((row) => row.included && row.group !== 'left-out'),
+      });
     } catch {
       // Shown next to the button.
     }

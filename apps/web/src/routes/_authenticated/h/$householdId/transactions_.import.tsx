@@ -8,6 +8,7 @@ import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
 import { ImportPage } from '@/features/imports/components/import-page';
 import { importQueries } from '@/features/imports/queries';
+import { ruleQueries } from '@/features/rules/queries';
 import { useAuth } from '@/lib/auth-store';
 
 /**
@@ -19,6 +20,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/transaction
     await Promise.all([
       queryClient.query(categoryQueries.list(householdId)),
       queryClient.query(importQueries.list(householdId)),
+      queryClient.query(ruleQueries.list(householdId)),
     ]);
   },
   component: ImportRoute,
@@ -29,6 +31,7 @@ function ImportRoute() {
   const { user } = useAuth();
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
+  const { data: rules } = useSuspenseQuery(ruleQueries.list(householdId));
 
   return (
     <>
@@ -42,7 +45,12 @@ function ImportRoute() {
         Transactions
       </Link>
       <PageHeader title="Import from your bank" />
-      <ImportPage household={household} categories={categories} viewerId={user?.id ?? ''} />
+      <ImportPage
+        household={household}
+        categories={categories}
+        rules={rules}
+        viewerId={user?.id ?? ''}
+      />
     </>
   );
 }

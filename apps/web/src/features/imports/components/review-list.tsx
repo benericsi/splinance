@@ -5,7 +5,7 @@ import {
   type StatementRow,
   type TransactionVisibility,
 } from '@splinance/shared';
-import { ChevronDown, Lock, Tags, Users } from 'lucide-react';
+import { ChevronDown, Lock, Tags, Users, WandSparkles } from 'lucide-react';
 import { useState } from 'react';
 import { Collapse } from '@/components/collapse';
 import { SegmentedControl } from '@/components/segmented-control';
@@ -176,6 +176,12 @@ function ReviewItem({
           <p className="text-muted-foreground truncate">{review.description}</p>
         )}
         {review.reason && <p className="text-muted-foreground mt-0.5 text-xs">{review.reason}</p>}
+        {review.included && review.rule && review.rule.categoryId === review.categoryId && (
+          <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
+            <WandSparkles className="size-3" aria-hidden />
+            By rule "{review.rule.pattern}"
+          </p>
+        )}
       </div>
       {review.included && (
         <>
