@@ -1,4 +1,10 @@
-import type { ImportBatch, ImportCheckResult, ImportInput } from '@splinance/shared';
+import type {
+  Category,
+  ImportBatch,
+  ImportCheckResult,
+  ImportInput,
+  Rule,
+} from '@splinance/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { http as mock, HttpResponse } from 'msw';
@@ -273,6 +279,88 @@ describe('importing a bank export', () => {
     expect(api.undone).toEqual([batch.id]);
     await waitFor(() => {
       expect(within(history).getByText(/· undone/)).toBeVisible();
+    });
+  });
+});
+
+describe('rules while importing', () => {
+  const groceries: Category = {
+    id: '01a12509-0f61-75bc-b406-130108780436',
+    name: 'Groceries',
+    kind: 'expense',
+    icon: 'shopping-cart',
+    color: 'green',
+    archivedAt: null,
+  };
+  const subscriptions: Category = {
+    ...groceries,
+    id: '01a12509-0f61-790b-b827-659280707924',
+    name: 'Subscriptions',
+    icon: 'music',
+    color: 'pink',
+  };
+  const tescoRule: Rule = {
+    id: '01a12509-0f61-790b-b827-6592807079a1',
+    pattern: 'tesco',
+    categoryId: groceries.id,
+    kind: 'expense',
+    markShared: true,
+    position: 0,
+  };
+
+  it('fills rows in by rule and offers rules for what was picked by hand', async () => {
+    fakeApi();
+    const createdRules: unknown[] = [];
+    server.use(
+      mock.get(`${base}/categories`, () =>
+        HttpResponse.json({ categories: [groceries, subscriptions] }),
+      ),
+      mock.get(`${base}/rules`, () => HttpResponse.json({ rules: [tescoRule] })),
+      mock.post(`${base}/rules`, async ({ request }) => {
+        const input = (await request.json()) as Pick<Rule, 'pattern' | 'categoryId' | 'markShared'>;
+        createdRules.push(input);
+        return HttpResponse.json(
+          { rule: { ...tescoRule, ...input, id: '01a12509-0f61-790b-b827-6592807079a2' } },
+          { status: 201 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderRoute(page);
+
+    await screen.findByRole('heading', { name: 'Import from your bank' });
+    await user.upload(fileInput(), new File([KH.replace('MSV-4', 'MSV-5')], 'export.csv'));
+
+    // The "tesco" rule picked the category and shared for the Tesco row.
+    const ready = await screen.findByRole('region', { name: 'Ready to import' });
+    const tescoRow = within(ready).getByLabelText('Description of TESCO 44049').closest('li');
+    if (!(tescoRow instanceof HTMLElement)) throw new Error('No row');
+    expect(within(tescoRow).getByText('By rule "tesco"')).toBeVisible();
+    expect(within(tescoRow).getByLabelText('Category of TESCO 44049')).toHaveTextContent(
+      'Groceries',
+    );
+    expect(within(tescoRow).getByRole('button', { name: 'Shared' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    // Pick a category for the subscription by hand.
+    await user.click(within(ready).getByLabelText('Category of APPLE.COM/BILL'));
+    await user.click(await screen.findByRole('option', { name: 'Subscriptions' }));
+    await user.click(screen.getByRole('button', { name: 'Import 2 transactions' }));
+
+    // Only the hand-picked one is suggested; the rule's row needs no new rule.
+    const suggestions = await screen.findByRole('region', { name: 'Rule suggestions' });
+    expect(within(suggestions).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(suggestions).getByText('apple.com/bill')).toBeVisible();
+    await user.click(within(suggestions).getByRole('button', { name: 'Create 1 rule' }));
+
+    expect(await screen.findByText('1 rule created')).toBeVisible();
+    expect(createdRules).toEqual([
+      { pattern: 'apple.com/bill', categoryId: subscriptions.id, markShared: false },
+    ]);
+    await waitFor(() => {
+      expect(screen.queryByRole('region', { name: 'Rule suggestions' })).not.toBeInTheDocument();
     });
   });
 });

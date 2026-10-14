@@ -1,11 +1,13 @@
-import type {
-  Category,
-  ImportCheckInput,
-  ImportCheckResult,
-  ImportInput,
-  StatementRow,
-  StatementSource,
-  TransactionVisibility,
+import {
+  type Category,
+  firstMatchingRule,
+  type ImportCheckInput,
+  type ImportCheckResult,
+  type ImportInput,
+  type Rule,
+  type StatementRow,
+  type StatementSource,
+  type TransactionVisibility,
 } from '@splinance/shared';
 import { formatDayHeading } from '@/features/transactions/dates';
 
@@ -25,6 +27,8 @@ export interface ReviewRow {
   /** '' for no category. */
   categoryId: string;
   visibility: TransactionVisibility;
+  /** The rule that filled in the category (and maybe shared), if one matched. */
+  rule: Pick<Rule, 'id' | 'pattern' | 'categoryId'> | null;
 }
 
 /** Rows worth asking the API about: identifiable and importable at all. */
@@ -76,12 +80,14 @@ function classify(
 
 /**
  * The review screen's rows: ready ones are picked, private and without a category; the
- * ones that need a look are not picked; the rest cannot be.
+ * ones that need a look are not picked; the rest cannot be. The first matching rule (only
+ * pass rules whose category is active) fills in the category, and shared if it says so.
  */
 export function buildReview(
   rows: StatementRow[],
   results: ImportCheckResult[],
   currency: string,
+  rules: Rule[] = [],
 ): ReviewRow[] {
   const byFingerprint = new Map(results.map((result) => [result.fingerprint, result]));
   return rows.map((row) => {
@@ -90,6 +96,7 @@ export function buildReview(
       row.fingerprint ? byFingerprint.get(row.fingerprint) : undefined,
       currency,
     );
+    const rule = group === 'left-out' ? undefined : firstMatchingRule(rules, row);
     return {
       key: row.fingerprint ?? `line:${String(row.line)}`,
       row,
@@ -97,8 +104,9 @@ export function buildReview(
       reason,
       included: group === 'ready',
       description: row.description,
-      categoryId: '',
-      visibility: 'private',
+      categoryId: rule?.categoryId ?? '',
+      visibility: rule?.markShared ? 'shared' : 'private',
+      rule: rule ? { id: rule.id, pattern: rule.pattern, categoryId: rule.categoryId } : null,
     };
   });
 }

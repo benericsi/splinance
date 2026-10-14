@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { firstMatchingRule, matchKey, ruleInputSchema, ruleMatches } from './rules';
+import {
+  firstMatchingRule,
+  matchKey,
+  ruleInputSchema,
+  ruleMatches,
+  suggestRulePattern,
+} from './rules';
 
 const rule = (pattern: string, position = 0, kind: 'expense' | 'income' = 'expense') => ({
   pattern,
@@ -53,5 +59,19 @@ describe('ruleInputSchema', () => {
     expect(ruleInputSchema.parse({ ...base, pattern: '  tesco ' }).pattern).toBe('tesco');
     expect(ruleInputSchema.safeParse({ ...base, pattern: 'a' }).success).toBe(false);
     expect(ruleInputSchema.safeParse({ ...base, pattern: 'x'.repeat(61) }).success).toBe(false);
+  });
+});
+
+describe('suggestRulePattern', () => {
+  it('keeps the merchant, drops branch and card numbers', () => {
+    expect(suggestRulePattern('TESCO 44049 O NKISZOLG')).toBe('tesco');
+    expect(suggestRulePattern('Spotify P46ED88101')).toBe('spotify');
+    expect(suggestRulePattern('Revolut**4344*')).toBe('revolut');
+    expect(suggestRulePattern('APPLE.COM/BILL')).toBe('apple.com/bill');
+    expect(suggestRulePattern('Moto Pizza Madach')).toBe('moto pizza madach');
+  });
+
+  it('falls back to the whole name when too little is left', () => {
+    expect(suggestRulePattern('7 ELEVEN')).toBe('7 eleven');
   });
 });

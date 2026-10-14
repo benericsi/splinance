@@ -90,3 +90,21 @@ export function firstMatchingRule<T extends Pick<Rule, 'pattern' | 'kind' | 'pos
     .sort((a, b) => a.position - b.position)
     .find((rule) => ruleMatches(rule, subject));
 }
+
+/**
+ * The text to suggest for a rule from a bank's counterparty: the words before the first
+ * one with digits or card stars, lowercased. "TESCO 44049 O NKISZOLG" -> "tesco",
+ * "Spotify P46ED88101" -> "spotify", "Revolut**4344*" -> "revolut". Branch and card numbers
+ * differ between purchases at the same merchant, so they would make the rule too narrow.
+ */
+export function suggestRulePattern(counterparty: string): string {
+  const words = counterparty.trim().split(/\s+/).filter(Boolean);
+  const kept: string[] = [];
+  for (const word of words) {
+    if (/[\d*]/.test(word)) break;
+    kept.push(word);
+  }
+  const text = kept.length > 0 ? kept.join(' ') : (words[0] ?? '').replace(/[\d*]+/g, '');
+  const pattern = text.toLowerCase().slice(0, 60).trim();
+  return pattern.length >= 2 ? pattern : counterparty.trim().toLowerCase().slice(0, 60);
+}
