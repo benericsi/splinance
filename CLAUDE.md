@@ -77,11 +77,12 @@ Splinance is a household expense web app for tracking personal spending and shar
 0. Foundation: monorepo, Docker, CI, config
 1. Auth and households
 2. Transactions and splits
-3. Balances and settle-up (first deploy)
+3. Balances and settle-up
 4. CSV import
 5. Rules and budgets
 6. Recurring detection and background jobs
 7. Polish: PWA, i18n, multi-currency, real-time, demo mode
+8. First deploy (kept deployable all along: e2e runs against production builds)
 
 ## Working rules
 

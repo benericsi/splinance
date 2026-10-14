@@ -77,7 +77,7 @@ export interface TransactionScope extends HouseholdScope {
 const anyOf = (...conditions: SQL[]): SQL => or(...conditions) ?? sql`false`;
 
 /** Shared transactions are visible to every member, private ones only to their author. */
-const visibleTo = (userId: string) =>
+export const visibleTo = (userId: string) =>
   anyOf(eq(transactions.visibility, 'shared'), eq(transactions.createdBy, userId));
 
 // ---------------------------------------------------------------------------------------------
@@ -547,6 +547,27 @@ export async function updateTransaction(
     await recordAudit(tx, scope, 'update', row.id, before, after);
     return after;
   });
+}
+
+/**
+ * Sets the category of a locked row and audits it as an update, inside a write
+ * transaction (rules categorizing earlier transactions). The version moves on, so an edit
+ * form opened before gets the usual conflict instead of undoing it.
+ */
+export async function setTransactionCategory(
+  tx: Db,
+  scope: HouseholdScope,
+  existing: TransactionRow,
+  categoryId: string,
+): Promise<void> {
+  const before = await toTransaction(tx, existing);
+  const [row] = await tx
+    .update(transactions)
+    .set({ categoryId, version: existing.version + 1 })
+    .where(eq(transactions.id, existing.id))
+    .returning();
+  if (!row) throw transactionNotFound();
+  await recordAudit(tx, scope, 'update', row.id, before, await toTransaction(tx, row));
 }
 
 /** Soft deletes a locked row and audits it, inside a write transaction. */

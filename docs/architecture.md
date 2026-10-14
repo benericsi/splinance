@@ -50,6 +50,7 @@ Key files by concern:
 | Transactions (API)            | `apps/api/src/modules/transactions/*`, trigger in `apps/api/drizzle/0006_transaction_split_sum_trigger.sql`              |
 | Balances and settlements      | `apps/api/src/modules/balances/*` (`ledger.ts` derives debts), `apps/api/src/modules/settlements/*`                      |
 | Bank imports                  | `packages/shared/src/imports/*` (parsers, contract), `apps/api/src/modules/imports/*`, `apps/web/src/features/imports/*` |
+| Category rules                | `packages/shared/src/rules.ts` (matching), `apps/api/src/modules/rules/*`                                                |
 | Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`, `packages/shared/src/balances.ts`                       |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts`         |
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                                  |
@@ -203,6 +204,21 @@ Write rules (all in `transactions.service.ts`):
 - The summary is `{ month, currency, expenses, income, yourExpenses }` over what the caller can see: `yourExpenses` adds their shares of shared expenses and their private expenses. The list is paged, so the client could not total a month itself.
 - The list is keyset-paginated: newest `occurred_on` first, then id descending. `nextCursor` encodes the last row's `(occurred_on, id)` and the next page asks for rows strictly before it, so inserts never shift pages (unlike `OFFSET`). `q` is a case-insensitive substring match with `%` and `_` escaped.
 
+Category rules. Also under a household; every member manages them, like categories.
+
+| Method and path                                 | Who    | Request                                | Success                                  | Errors (besides the above)                                                   |
+| ----------------------------------------------- | ------ | -------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `GET /api/households/:id/rules`                 | member |                                        | 200 `{ rules }`, in the order they apply |                                                                              |
+| `POST /api/households/:id/rules`                | member | `{ pattern, categoryId, markShared }`  | 201 `{ rule }`, placed last              | 400 `INVALID_CATEGORY` (archived, other household), 409 `RULE_PATTERN_TAKEN` |
+| `PATCH /api/households/:id/rules/:ruleId`       | member | any of the above                       | 200 `{ rule }`                           | 404 `RULE_NOT_FOUND`, 400, 409                                               |
+| `DELETE /api/households/:id/rules/:ruleId`      | member |                                        | 204 (hard delete)                        | 404                                                                          |
+| `PUT /api/households/:id/rules/order`           | member | `{ ruleIds }`, every rule exactly once | 200 `{ rules }`                          | 400 `RULE_ORDER_MISMATCH`                                                    |
+| `GET /api/households/:id/rules/:ruleId/matches` | member |                                        | 200 `{ count }`                          | 404                                                                          |
+| `POST /api/households/:id/rules/:ruleId/apply`  | member |                                        | 200 `{ updated }`                        | 404, 400 `INVALID_CATEGORY` (archived since)                                 |
+
+- A rule matches when its text appears in the transaction's counterparty or description, accent and case insensitive (`matchKey`), and the kinds agree. No regular expressions: they are easy to get wrong and can be slow.
+- Applying categorizes the earlier transactions the caller can see that have no category, each as an audited update with a new version (an edit form opened before gets the usual conflict). It never changes who a transaction is for: that would move balances. Matching runs in TypeScript with the same function the web uses, so preview and result agree.
+
 Imports. Also under a household. They are personal: a person sees and undoes only their own, and fingerprints are per person (the same bank row imported by someone else is theirs).
 
 | Method and path                                | Who          | Request                                                                    | Success                                                   | Errors (besides the above)                                                        |
@@ -343,6 +359,7 @@ Reads `Authorization: Bearer`, verifies the JWT (algorithm pinned to HS256, issu
 | `splits.ts`         | `SPLIT_METHODS`, `allocate()` (largest remainder), `computeSplits()`, `splitProblem()`, `splitRemainder()`                           | API (authoritative shares), web (live preview in the form)  |
 | `categories.ts`     | `CATEGORY_KINDS` (Postgres enum), `CATEGORY_ICONS` (lucide names), colors (brand keys), schemas, `DEFAULT_CATEGORIES`                | API routes and seeding, web pickers                         |
 | `balances.ts`       | `netDebts()` (pairwise netting), balance and settlement schemas                                                                      | API ledger and routes, web (next PR)                        |
+| `rules.ts`          | `matchKey()`, `ruleMatches()`, `firstMatchingRule()`, rule schemas                                                                   | API (uniqueness, applying), web import review (next PR)     |
 | `imports/`          | `parseStatement()` (Revolut CSV, K&H transaction history CSV), `StatementRow`, flags, fingerprints, `nameKey()`                      | web import page (next PRs), parser tests                    |
 
 Split math: `allocate(total, weights)` gives everyone the floor of their exact share, then hands the units lost to rounding to the largest fractional parts, earlier positions first on ties. Shares therefore always sum to the total and never differ from the exact share by a whole unit. It computes `total * weight` with BigInt, because 10^12 minor units times 10 000 basis points passes 2^53. Equal splits are weights of 1, percentages are basis points (100% = 10 000), fixed splits must already sum to the total. The order of people decides who gets a leftover unit, so callers pass a stable order.
