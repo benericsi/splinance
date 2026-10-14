@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { balanceQueries } from '@/features/balances/queries';
+import { budgetQueries } from '@/features/budgets/queries';
 import { transactionQueries } from '@/features/transactions/queries';
 import { importsApi } from './api';
 import { importQueries } from './queries';
@@ -11,6 +12,7 @@ function useInvalidateAfterImport() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: transactionQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: balanceQueries.household(householdId) }),
+      queryClient.invalidateQueries({ queryKey: budgetQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: importQueries.household(householdId) }),
     ]);
 }
