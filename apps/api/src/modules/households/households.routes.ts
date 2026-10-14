@@ -14,6 +14,7 @@ import { getAuth, requireAuth } from '../../middleware/require-auth';
 import { createBalancesRouter } from '../balances/balances.routes';
 import { createCategoriesRouter } from '../categories/categories.routes';
 import { createImportsRouter } from '../imports/imports.routes';
+import { createRulesRouter } from '../rules/rules.routes';
 import { createSettlementsRouter } from '../settlements/settlements.routes';
 import { createTransactionsRouter } from '../transactions/transactions.routes';
 import {
@@ -113,6 +114,7 @@ export function createHouseholdsRouter() {
   router.use('/:id/settlements', createSettlementsRouter());
   router.use('/:id/balances', createBalancesRouter());
   router.use('/:id/imports', createImportsRouter());
+  router.use('/:id/rules', createRulesRouter());
 
   return router;
 }

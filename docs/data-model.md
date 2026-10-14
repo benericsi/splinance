@@ -148,6 +148,26 @@ A user can belong to any number of households.
 - Partial unique index `transactions_import_fingerprint_unique` on `(household_id, created_by, import_fingerprint) WHERE import_fingerprint IS NOT NULL AND deleted_at IS NULL`: a bank row is imported once per person. Deleted rows do not count, so an undone import can be imported again; restoring a deleted row whose bank row was imported again since is refused (409 `ALREADY_IMPORTED`).
 - `counterparty` stays as the bank wrote it while `description` is edited, so later rules and recurring detection can match on it. Account numbers are never stored.
 
+### `category_rules`
+
+"When the merchant or description contains this text, use this category", per household.
+
+| Column                 | Type                 | Notes                                                                             |
+| ---------------------- | -------------------- | --------------------------------------------------------------------------------- |
+| id                     | uuid PK              | uuidv7                                                                            |
+| household_id           | uuid                 | Part of the composite FKs                                                         |
+| pattern                | text                 | As typed, 2-60 characters (`category_rules_pattern_length`)                       |
+| pattern_key            | text                 | `matchKey(pattern)`: accents and case dropped, spaces collapsed                   |
+| category_id            | uuid                 | Composite FK `(household_id, category_id, kind)` -> categories, like transactions |
+| kind                   | enum `category_kind` | The category's kind: a rule only matches transactions of that kind                |
+| mark_shared            | boolean              | Imported rows it matches start as shared                                          |
+| position               | integer              | First match wins, lowest first; new rules go last                                 |
+| created_by             | uuid                 | Composite FK -> members                                                           |
+| created_at, updated_at | timestamptz          |                                                                                   |
+
+- Unique `(household_id, kind, pattern_key)` (`category_rules_household_kind_pattern_unique`): two rules with the same text could only contradict each other.
+- Rules are settings, not money records, so deleting one removes the row. Transactions it categorized keep their category; applying a rule to earlier transactions is an audited update of each.
+
 ### `import_batches`
 
 One bank export imported by one person. The file itself is never uploaded: the browser parses it and sends normalized rows.
@@ -232,7 +252,7 @@ Private and deleted rows never count. Debts are netted within each pair (`netDeb
 
 ## Planned (not created yet)
 
-- Later: category rules (no user regex), budgets (month as `date`), recurring series, notifications
+- Later: budgets (month as `date`), recurring series, notifications
 
 Business rules already agreed:
 
