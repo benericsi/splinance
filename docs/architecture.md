@@ -51,7 +51,7 @@ Key files by concern:
 | Balances and settlements      | `apps/api/src/modules/balances/*` (`ledger.ts` derives debts), `apps/api/src/modules/settlements/*`                      |
 | Bank imports                  | `packages/shared/src/imports/*` (parsers, contract), `apps/api/src/modules/imports/*`, `apps/web/src/features/imports/*` |
 | Category rules                | `packages/shared/src/rules.ts` (matching), `apps/api/src/modules/rules/*`, `apps/web/src/features/rules/*`               |
-| Budgets                       | `packages/shared/src/budgets.ts`, `apps/api/src/modules/budgets/*`                                                       |
+| Budgets                       | `packages/shared/src/budgets.ts`, `apps/api/src/modules/budgets/*`, `apps/web/src/features/budgets/*`                    |
 | Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`, `packages/shared/src/balances.ts`                       |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts`         |
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                                  |
@@ -433,6 +433,8 @@ _authenticated.tsx         pathless layout: if not authenticated -> redirect /lo
     _authenticated/h/$householdId/transactions.tsx /h/:id/transactions?month=YYYY-MM  list; <Outlet /> for modals
       _authenticated/h/$householdId/transactions.new.tsx            /h/:id/transactions/new   add dialog
       _authenticated/h/$householdId/transactions.$transactionId.tsx /h/:id/transactions/:tid  edit dialog
+    _authenticated/h/$householdId/budgets.tsx        /h/:id/budgets?month=YYYY-MM  budgets of a month; <Outlet /> for the dialog
+      _authenticated/h/$householdId/budgets.set.tsx  /h/:id/budgets/set?category=  set, change or remove a budget
     _authenticated/h/$householdId/transactions_.import.tsx  /h/:id/transactions/import  import page (own page, not nested)
 invite.tsx                 /invite#<token>  public invite landing page (logged in or out)
 ```
@@ -492,6 +494,13 @@ invitee: opens /invite#<token>
 - `CategoryPicker` takes `label` (no visible label in a row) and `compact` (an 8-unit trigger).
 - Rules pre-fill the review: the first matching rule (`firstMatchingRule`, only rules whose category is active) sets the category, and shared if it says so; the row shows "By rule" while the category is still the rule's. After importing, `suggestRules` offers "Do the same next time?": one rule per merchant whose rows got a hand-picked category (the merchant without branch or card numbers, `suggestRulePattern`), skipped when a rule covers it already or the rows went to different categories; shared when all of them were. They are created one by one, all checked by default.
 - Settings has a Rules card (order, edit, move up and down, delete with a confirmation) and add and edit dialogs as child routes. Editing shows how many earlier uncategorized transactions match, with "Apply to them"; a new rule's toast offers the same. The apply result toast lives in `useApplyRule`, since the button that started it may be gone by then.
+
+### Budgets
+
+- A section of its own (sidebar and phone tabs: Overview, Transactions, Budgets, Settings) with the month in `?month=` like transactions; the switcher is the shared `MonthNav`.
+- Totals (budgeted, spent, left or over) and one row per budget, sorted by category name, with a bar: neutral below 80%, mustard from 80% (`BUDGET_WARNING_RATIO`), red when over; the line under it says the same in words ("3000 Ft left · 90%", "Over by 4000 Ft"), so the bar is decorative. Only shared expenses count.
+- The dialog (`/budgets/set`, with `?category=` when opened from a row) sets the amount from the month on screen; picking a category that has a budget prefills it. "Remove budget" sends a null amount from that month.
+- The overview shows `BudgetAlertsCard`: only this month's budgets at 80% or more, most used first, hidden when there are none.
 
 ### Overview and settling up
 
@@ -566,6 +575,7 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 - `useLogout` clears `authStore` and the whole query cache in `onSettled`, even if the request fails, so no data of the previous user stays in memory.
 - Transactions: everything of a household lives under `['transactions', householdId]` (list per month as an infinite query, summary per month, detail per id); every write invalidates that prefix and `['balances', householdId]`, because transactions change who owes whom.
 - Balances: debts and the settlement list live under `['balances', householdId]`; settlement writes invalidate it.
+- Budgets: under `['budgets', householdId, month]`; setting one invalidates the household's budgets, and so does every write that changes spending (transactions, imports, applying a rule).
 - Rules: under `['rules', householdId]` (the list, and match counts with `staleTime: 0`); applying one also invalidates the household's transactions and balances.
 - Imports: the history lives under `['imports', householdId]`; an import or its undo invalidates it, the household's transactions and its balances. The check is a mutation (a POST with a body), not a query. Delete marks the deleted detail stale without refetching it, for the same reason as leaving a household (below).
 - Households: `householdQueries.list()` and `.detail(id)` under the `['households']` key; mutations invalidate the whole key. Leaving and archiving only mark it stale (`refetchType: 'none'`) and navigate to `/`: refetching the detail first would hit the new 404 while the page is still mounted. The household layout's loader awaits the detail (a 404 becomes `notFound()`) and warms the list for the switcher; components read the detail with `useSuspenseQuery`, which never suspends there because the loader filled the cache.
@@ -614,7 +624,7 @@ API specifics:
 
 Web specifics:
 
-- MSW runs with `onUnhandledFrame: 'error'` (MSW 3's name for unhandled requests): any request without a handler fails the test. `MotionGlobalConfig.skipAnimations` makes motion animations finish instantly in tests; an element that animates in still starts at opacity 0 and settles a frame later, so assert its visibility inside `waitFor`. NumberFlow is replaced by a plain formatted `<span>` in tests (`test/number-flow-mock.tsx`): its custom element only registers in a real browser, and jsdom has no Web Animations. `test/msw.ts` has default handlers for reads that pages make in passing (empty category and rule lists for settings and the import page, no debts and no settlements for the overview); tests that care override them.
+- MSW runs with `onUnhandledFrame: 'error'` (MSW 3's name for unhandled requests): any request without a handler fails the test. `MotionGlobalConfig.skipAnimations` makes motion animations finish instantly in tests; an element that animates in still starts at opacity 0 and settles a frame later, so assert its visibility inside `waitFor`. NumberFlow is replaced by a plain formatted `<span>` in tests (`test/number-flow-mock.tsx`): its custom element only registers in a real browser, and jsdom has no Web Animations. `test/msw.ts` has default handlers for reads that pages make in passing (empty category and rule lists for settings and the import page, no debts, no budgets and no settlements for the overview); tests that care override them.
 - `test/setup.ts` stubs `window.matchMedia` (jsdom lacks it) and resets the auth store and session-restore cache after each test.
 - `getField(label)` finds inputs by label while ignoring the required asterisk.
 - jsdom has no `navigator.locks` and no CSS animations, so cross-tab locking is not covered, and Base UI popups close after their exit animation (tests use `waitFor`).

@@ -7,7 +7,11 @@ import { UserAvatar } from '@/components/user-avatar';
 import { BalanceOverview } from '@/features/balances/components/balance-overview';
 import { SettlementList } from '@/features/balances/components/settlement-list';
 import { balanceQueries } from '@/features/balances/queries';
+import { BudgetAlertsCard } from '@/features/budgets/components/budget-alerts-card';
+import { budgetQueries } from '@/features/budgets/queries';
+import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
+import { currentMonth } from '@/features/transactions/dates';
 import { useAuth } from '@/lib/auth-store';
 
 /**
@@ -19,6 +23,8 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/_overview')
     await Promise.all([
       queryClient.query(balanceQueries.debts(householdId)),
       queryClient.infiniteQuery(balanceQueries.settlements(householdId)),
+      queryClient.query(budgetQueries.month(householdId, currentMonth())),
+      queryClient.query(categoryQueries.list(householdId)),
     ]);
   },
   component: OverviewPage,
@@ -34,6 +40,8 @@ function OverviewPage() {
   const { householdId } = Route.useParams();
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: balances } = useSuspenseQuery(balanceQueries.debts(householdId));
+  const { data: budgets } = useSuspenseQuery(budgetQueries.month(householdId, currentMonth()));
+  const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
   const { user } = useAuth();
   const viewerId = user?.id ?? '';
 
@@ -43,6 +51,7 @@ function OverviewPage() {
       <PageHeader title={`${greeting(new Date().getHours())}, ${user?.displayName ?? ''}`} />
       <div className="space-y-6">
         <BalanceOverview household={household} balances={balances} viewerId={viewerId} />
+        <BudgetAlertsCard householdId={householdId} data={budgets} categories={categories} />
         <SettlementList household={household} viewerId={viewerId} />
         <Card>
           <CardHeader>

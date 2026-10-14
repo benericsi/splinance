@@ -12,9 +12,18 @@ export const server = setupServer(
   http.get('/api/households/:id/categories', () => HttpResponse.json({ categories: [] })),
   // Settings and the import page list the household's rules.
   http.get('/api/households/:id/rules', () => HttpResponse.json({ rules: [] })),
-  // The overview, where most household tests land, shows balances and settlements.
+  // The overview, where most household tests land, shows balances, budgets and settlements.
   http.get('/api/households/:id/balances', () =>
     HttpResponse.json({ balances: { currency: 'HUF', debts: [] } }),
+  ),
+  http.get('/api/households/:id/budgets', ({ request }) =>
+    HttpResponse.json({
+      budgets: {
+        month: new URL(request.url).searchParams.get('month') ?? '',
+        currency: 'HUF',
+        budgets: [],
+      },
+    }),
   ),
   http.get('/api/households/:id/settlements', () =>
     HttpResponse.json({ settlements: [], nextCursor: null }),

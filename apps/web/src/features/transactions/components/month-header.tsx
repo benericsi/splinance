@@ -1,44 +1,14 @@
 import type { TransactionSummary } from '@splinance/shared';
-import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { buttonVariants } from '@/components/ui/button';
+import { MonthNav } from '@/components/month-nav';
 import { cn } from '@/lib/utils';
-import { addMonths, currentMonth, formatMonth } from '../dates';
 import { MoneyFlow } from './money-flow';
 
-/** Previous / next month links (the month lives in the URL) and the month's totals. */
+/** The month switcher (the month lives in the URL) and the month's totals. */
 export function MonthHeader({ month, summary }: { month: string; summary: TransactionSummary }) {
-  const isCurrent = month === currentMonth();
-  const stepLink = (delta: number, label: string, Icon: typeof ChevronLeft) => (
-    <Link
-      from="/h/$householdId/transactions"
-      search={(prev) => ({ ...prev, month: addMonths(month, delta) })}
-      aria-label={label}
-      className={buttonVariants({ variant: 'ghost', size: 'icon' })}
-    >
-      <Icon aria-hidden />
-    </Link>
-  );
-
   return (
     <div className="mb-6 space-y-4">
-      <div className="flex items-center gap-1">
-        {stepLink(-1, 'Previous month', ChevronLeft)}
-        <h2 className="font-heading min-w-36 text-center text-lg font-semibold">
-          {formatMonth(month)}
-        </h2>
-        {stepLink(1, 'Next month', ChevronRight)}
-        {!isCurrent && (
-          <Link
-            from="/h/$householdId/transactions"
-            search={(prev) => ({ ...prev, month: undefined })}
-            className={buttonVariants({ variant: 'outline', size: 'sm', className: 'ml-2' })}
-          >
-            This month
-          </Link>
-        )}
-      </div>
+      <MonthNav month={month} page="/h/$householdId/transactions" />
       <dl className="grid grid-cols-3 gap-3">
         <Stat
           label="Spent"
