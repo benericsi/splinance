@@ -168,6 +168,26 @@ A user can belong to any number of households.
 - Unique `(household_id, kind, pattern_key)` (`category_rules_household_kind_pattern_unique`): two rules with the same text could only contradict each other.
 - Rules are settings, not money records, so deleting one removes the row. Transactions it categorized keep their category; applying a rule to earlier transactions is an audited update of each.
 
+### `budgets`
+
+Monthly budgets per expense category, effective-dated: a row sets the amount from its month until a later row for the same category.
+
+| Column                 | Type                 | Notes                                                                                   |
+| ---------------------- | -------------------- | --------------------------------------------------------------------------------------- |
+| id                     | uuid PK              | uuidv7                                                                                  |
+| household_id           | uuid                 | Part of the composite FKs                                                               |
+| category_id            | uuid                 | Composite FK `(household_id, category_id, kind)` -> categories                          |
+| kind                   | enum `category_kind` | Always `expense` (`budgets_expense_only`), kept so the FK can check the category's kind |
+| user_id                | uuid, nullable       | Null for household budgets (over shared spending); reserved for personal budgets later  |
+| starts_on              | date                 | The first of a month (`budgets_month_start`)                                            |
+| amount                 | bigint, nullable     | Minor units, 1 to 10^12; null ends the budget from this month on                        |
+| created_by             | uuid                 | Composite FK -> members                                                                 |
+| created_at, updated_at | timestamptz          |                                                                                         |
+
+- Unique `(household_id, category_id, user_id, starts_on)` with `NULLS NOT DISTINCT` (Postgres 15+), so two household rows (both `user_id` null) for one month collide; setting a month again is an upsert on it.
+- The amount in force for a month is the category's latest row starting on or before it. Storing effective-dated rows instead of one amount per month keeps "80 000 every month" one row, and changing it later never rewrites the past.
+- Spending is not stored: it is the sum of the month's shared, non-deleted expenses in the category.
+
 ### `import_batches`
 
 One bank export imported by one person. The file itself is never uploaded: the browser parses it and sends normalized rows.
@@ -252,7 +272,7 @@ Private and deleted rows never count. Debts are netted within each pair (`netDeb
 
 ## Planned (not created yet)
 
-- Later: budgets (month as `date`), recurring series, notifications
+- Later: recurring series, notifications
 
 Business rules already agreed:
 

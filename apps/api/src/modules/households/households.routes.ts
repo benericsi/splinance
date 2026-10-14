@@ -12,6 +12,7 @@ import {
 import { Router } from 'express';
 import { getAuth, requireAuth } from '../../middleware/require-auth';
 import { createBalancesRouter } from '../balances/balances.routes';
+import { createBudgetsRouter } from '../budgets/budgets.routes';
 import { createCategoriesRouter } from '../categories/categories.routes';
 import { createImportsRouter } from '../imports/imports.routes';
 import { createRulesRouter } from '../rules/rules.routes';
@@ -115,6 +116,7 @@ export function createHouseholdsRouter() {
   router.use('/:id/balances', createBalancesRouter());
   router.use('/:id/imports', createImportsRouter());
   router.use('/:id/rules', createRulesRouter());
+  router.use('/:id/budgets', createBudgetsRouter());
 
   return router;
 }
