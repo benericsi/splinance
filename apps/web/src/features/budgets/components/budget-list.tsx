@@ -44,7 +44,10 @@ export function BudgetList({
         />
       </dl>
 
-      <ul className="divide-y rounded-xl border px-4">
+      {/* Rows fill the list edge to edge (hover included) and the list clips them to its
+          rounded corners: no negative margins, which an animating row (overflow hidden while
+          it moves) would cut off. */}
+      <ul className="divide-y overflow-hidden rounded-xl border">
         <AnimatePresence initial={false}>
           {rows.map(({ budget, category }) => {
             const status = budgetStatus(budget);
@@ -56,7 +59,7 @@ export function BudgetList({
                   params={{ householdId }}
                   search={(prev) => ({ ...prev, category: budget.categoryId })}
                   state={OPEN_MODAL_STATE}
-                  className="hover:bg-muted/40 focus-visible:ring-ring/50 -mx-2 block rounded-lg px-2 py-3 outline-none focus-visible:ring-[3px]"
+                  className="hover:bg-muted/40 focus-visible:ring-ring/50 block px-4 py-3 outline-none focus-visible:ring-[3px] focus-visible:ring-inset"
                 >
                   <div className="flex items-center gap-3">
                     <CategoryTile category={category} />
