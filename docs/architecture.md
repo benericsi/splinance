@@ -708,7 +708,7 @@ Reviewed 2026-10-27 (dependencies, auth, authorization, input handling, web clie
 - Abuse: per-IP limits on register (5), failed logins (10), refresh (100), invite preview (60) and accept (30), a ceiling of 1000 per IP for the whole API, and 30 import checks or imports per user, all per 15 minutes.
 - Secrets in URLs and logs: invite tokens live in the URL fragment on the web and are redacted from API request logs; logs drop authorization headers and cookies. The example `JWT_ACCESS_SECRET` is refused in production.
 - Web: no `dangerouslySetInnerHTML`; React escapes everything else. Redirect targets after login go through `safeRedirect` (same origin only, no backslashes or control characters, which URL parsing would turn into `//host`). Devtools load only in development.
-- Dependencies: CI runs `pnpm audit:prod` (high and critical advisories in what ships fail the build). Dev tooling is audited by hand (`pnpm audit`). `undici@8` (jsdom, tests only) is pinned to 8.11.2 in `pnpm-workspace.yaml` while machines run Node < 22.19, which the patched versions need.
+- Dependencies: CI runs `pnpm audit:prod` (high and critical advisories in what ships fail the build). Dev tooling is audited by hand (`pnpm audit`). Node 22.19 or newer is required (`engines`): patched `undici` (jsdom) needs zlib zstd support.
 
 Accepted by design (a household trusts its members; the audit log and transaction history show who changed what):
 
