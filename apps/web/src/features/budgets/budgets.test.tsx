@@ -1,7 +1,7 @@
 import type { Budget, Category } from '@splinance/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { http as mock, HttpResponse } from 'msw';
+import { delay, http as mock, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
@@ -94,6 +94,25 @@ describe('budgets page', () => {
       expect.stringMatching(/^Groceries.*17\s600\sFt left$/),
       expect.stringMatching(/^Transport.*Over by 4000\sFt$/),
     ]);
+  });
+
+  it('shows a skeleton while the month loads, then the budgets', async () => {
+    fakeApi();
+    server.use(
+      mock.get(`${base}/budgets`, async () => {
+        await delay(200);
+        return HttpResponse.json({
+          budgets: { month: '2026-10', currency: 'HUF', budgets: october },
+        });
+      }),
+    );
+    renderRoute(`/h/${testHousehold.id}/budgets?month=2026-10`, { pendingMs: 0 });
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading…');
+    expect(screen.getByRole('heading', { name: 'Budgets', level: 1 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'October 2026' })).toBeVisible();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
 
   it('invites to set a budget when a month has none', async () => {

@@ -20,3 +20,23 @@ export const COLLAPSE = {
   animate: { height: 'auto', opacity: 1, transitionEnd: { overflow: 'visible' } },
   exit: { height: 0, opacity: 0, overflow: 'hidden' },
 } as const;
+
+/**
+ * Entrance for content that replaces a skeleton: fades in and rises 6px. Sections follow
+ * each other by `REVEAL_STAGGER`, list rows by `REVEAL_ROW_STAGGER` (only the first
+ * `REVEAL_MAX_ROWS`, so long lists do not trickle in).
+ */
+export const REVEAL = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0 },
+} as const;
+
+export const REVEAL_STAGGER = 0.04;
+export const REVEAL_ROW_STAGGER = 0.025;
+export const REVEAL_MAX_ROWS = 8;
+
+/** Bars grow a little slower than things fade, so the growth reads as movement. */
+export const TRANSITION_GROW: Transition = { duration: 0.45, ease: EASE_OUT };
+
+/** How long after a page mounts rows still count as revealed rather than added. */
+export const REVEAL_WINDOW_MS = 600;
