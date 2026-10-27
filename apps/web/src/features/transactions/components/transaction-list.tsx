@@ -5,6 +5,7 @@ import { AnimatePresence, m } from 'motion/react';
 import { CategoryTile } from '@/features/categories/components/category-tile';
 import { useAuth } from '@/lib/auth-store';
 import { COLLAPSE } from '@/lib/motion';
+import { useRevealRows } from '@/lib/reveal';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
 import { formatDayHeading } from '../dates';
@@ -43,14 +44,20 @@ export function TransactionList({
   categories: Category[];
 }) {
   const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const reveal = useRevealRows();
 
   // Within a month, rows and days animate in and out (add, delete, undo). The route keys
-  // this list by month, so switching months swaps it without animating every row.
+  // this list by month, so switching months swaps it without animating every row. After a
+  // skeleton, the days come in one after another.
   return (
     <div>
-      <AnimatePresence initial={false}>
-        {groupByDay(transactions).map((group) => (
-          <m.section key={group.day} aria-label={formatDayHeading(group.day)} {...COLLAPSE}>
+      <AnimatePresence initial={reveal.active}>
+        {groupByDay(transactions).map((group, index) => (
+          <m.section
+            key={group.day}
+            aria-label={formatDayHeading(group.day)}
+            {...reveal.rowProps(index)}
+          >
             {/* Spacing inside the animated element, so a collapsing day leaves no gap. */}
             <div className="pb-6">
               <div className="text-muted-foreground flex items-baseline justify-between border-b px-1 pb-2 text-xs font-medium">

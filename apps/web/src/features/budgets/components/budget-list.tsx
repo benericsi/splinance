@@ -4,7 +4,7 @@ import { AnimatePresence, m } from 'motion/react';
 import { CategoryTile } from '@/features/categories/components/category-tile';
 import { MoneyFlow } from '@/features/transactions/components/money-flow';
 import { formatMoney } from '@/features/transactions/money';
-import { COLLAPSE } from '@/lib/motion';
+import { useRevealRows } from '@/lib/reveal';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
 import { budgetNote, budgetStatus } from '../status';
@@ -30,6 +30,7 @@ export function BudgetList({
   const budgeted = data.budgets.reduce((sum, b) => sum + b.amount, 0);
   const spent = data.budgets.reduce((sum, b) => sum + b.spent, 0);
   const left = budgeted - spent;
+  const reveal = useRevealRows();
 
   return (
     <div className="space-y-4">
@@ -48,11 +49,11 @@ export function BudgetList({
           rounded corners: no negative margins, which an animating row (overflow hidden while
           it moves) would cut off. */}
       <ul className="divide-y overflow-hidden rounded-xl border">
-        <AnimatePresence initial={false}>
-          {rows.map(({ budget, category }) => {
+        <AnimatePresence initial={reveal.active}>
+          {rows.map(({ budget, category }, index) => {
             const status = budgetStatus(budget);
             return (
-              <m.li key={budget.categoryId} {...COLLAPSE}>
+              <m.li key={budget.categoryId} {...reveal.rowProps(index)}>
                 <Link
                   from="/h/$householdId/budgets"
                   to="/h/$householdId/budgets/set"

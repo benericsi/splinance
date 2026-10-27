@@ -17,6 +17,10 @@ const router = createRouter({
   defaultPreload: 'intent',
   // Loaders only warm the Query cache; Query owns freshness, so the router never caches.
   defaultPreloadStaleTime: 0,
+  // A page that takes a moment shows its skeleton (pendingComponent), and keeps it long
+  // enough not to flash; quicker ones (most, thanks to preloading on intent) never do.
+  defaultPendingMs: 150,
+  defaultPendingMinMs: 300,
   scrollRestoration: true,
   // Inside layouts (e.g. a missing household later); the root shows full-page versions.
   defaultNotFoundComponent: () => <NotFoundPage />,

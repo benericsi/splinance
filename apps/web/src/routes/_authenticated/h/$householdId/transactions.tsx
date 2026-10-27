@@ -5,6 +5,8 @@ import { Plus, Upload } from 'lucide-react';
 import { z } from 'zod';
 import { PageHeader } from '@/components/page-header';
 import { PageTitle } from '@/components/page-title';
+import { PageSkeleton, Reveal, RevealPage } from '@/components/reveal';
+import { SkeletonActions, SkeletonLine, SkeletonRow, SkeletonStats } from '@/components/skeletons';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
@@ -29,6 +31,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/transaction
     ]);
   },
   component: TransactionsPage,
+  pendingComponent: TransactionsSkeleton,
 });
 
 function TransactionsPage() {
@@ -41,7 +44,7 @@ function TransactionsPage() {
   const transactions = list.data.pages.flatMap((page) => page.transactions);
 
   return (
-    <>
+    <RevealPage>
       <PageTitle title={`Transactions · ${household.name}`} />
       <PageHeader
         title="Transactions"
@@ -59,25 +62,29 @@ function TransactionsPage() {
           </>
         }
       />
-      <MonthHeader month={month} summary={summary} />
+      <Reveal index={0}>
+        <MonthHeader month={month} summary={summary} />
+      </Reveal>
 
-      {transactions.length === 0 ? (
-        <div className="rounded-xl border border-dashed px-6 py-12 text-center">
-          <h2 className="font-heading text-lg font-semibold">Add your first transaction</h2>
-          <p className="text-muted-foreground mx-auto mt-1 mb-5 max-w-sm">
-            Expenses and income you add for {formatMonth(month)} show up here.
-          </p>
-          <AddLink householdId={householdId} label="Add transaction" />
-        </div>
-      ) : (
-        <TransactionList
-          // A new month is a new list: no row-by-row exit and enter animations.
-          key={month}
-          householdId={householdId}
-          transactions={transactions}
-          categories={categories}
-        />
-      )}
+      <Reveal index={1}>
+        {transactions.length === 0 ? (
+          <div className="rounded-xl border border-dashed px-6 py-12 text-center">
+            <h2 className="font-heading text-lg font-semibold">Add your first transaction</h2>
+            <p className="text-muted-foreground mx-auto mt-1 mb-5 max-w-sm">
+              Expenses and income you add for {formatMonth(month)} show up here.
+            </p>
+            <AddLink householdId={householdId} label="Add transaction" />
+          </div>
+        ) : (
+          <TransactionList
+            // A new month is a new list: no row-by-row exit and enter animations.
+            key={month}
+            householdId={householdId}
+            transactions={transactions}
+            categories={categories}
+          />
+        )}
+      </Reveal>
 
       {list.hasNextPage && (
         <div className="mt-6 flex justify-center">
@@ -108,7 +115,31 @@ function TransactionsPage() {
 
       {/* Add and edit dialogs render over the list. */}
       <Outlet />
-    </>
+    </RevealPage>
+  );
+}
+
+/** Month switcher, the three totals and a day of rows. */
+function TransactionsSkeleton() {
+  return (
+    <PageSkeleton>
+      <PageHeader
+        title="Transactions"
+        actions={<SkeletonActions widths={['w-24', 'w-20 max-md:hidden']} />}
+      />
+      <div className="mb-6 space-y-4">
+        <div className="flex h-8 items-center gap-2">
+          <SkeletonLine line="h-7" className="w-48" />
+        </div>
+        <SkeletonStats count={3} />
+      </div>
+      <div className="border-b px-1 pb-2">
+        <SkeletonLine className="w-24" />
+      </div>
+      {Array.from({ length: 6 }, (_, index) => (
+        <SkeletonRow key={index} />
+      ))}
+    </PageSkeleton>
   );
 }
 

@@ -6,13 +6,19 @@ import { rerunGuardsOnSessionEnd } from '@/lib/session-watch';
 import { routeTree } from '@/routeTree.gen';
 import { onTestFinished } from 'vitest';
 
-/** Renders the real route tree at `path` with a fresh QueryClient and memory history. */
-export function renderRoute(path: string) {
+/**
+ * Renders the real route tree at `path` with a fresh QueryClient and memory history.
+ * Loading skeletons are off unless `pendingMs` is given: they show a page's real heading,
+ * so a test waiting for it could otherwise race the data.
+ */
+export function renderRoute(path: string, { pendingMs = Infinity }: { pendingMs?: number } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const router = createRouter({
     routeTree,
     context: { queryClient, auth: authStore },
     history: createMemoryHistory({ initialEntries: [path] }),
+    defaultPendingMs: pendingMs,
+    defaultPendingMinMs: 0,
   });
   // Same wiring as main.tsx: logout and expired sessions re-run the route guards.
   onTestFinished(rerunGuardsOnSessionEnd(authStore, router));
