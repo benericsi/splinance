@@ -54,6 +54,10 @@ afterEach(() => {
   resetSessionRestore();
 });
 
-afterAll(() => {
+afterAll(async () => {
   server.close();
+  // Sonner removes a closed toast 200 ms later with a timer it never clears. Let it run
+  // while jsdom still exists; once the file's environment is gone it would throw
+  // "window is not defined", which fails the run although every test passed.
+  await new Promise((resolve) => setTimeout(resolve, 300));
 });
