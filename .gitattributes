@@ -5,3 +5,6 @@
 *.jpg binary
 *.ico binary
 *.woff2 binary
+
+# Recorded API responses and bank exports: kept byte for byte, like the raw layer
+data/tests/fixtures/** -text

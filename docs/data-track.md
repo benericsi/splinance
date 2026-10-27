@@ -13,6 +13,7 @@ The pipeline only **reads** from the app. Nothing it does changes the app's data
 5. [Local development](#5-local-development)
 6. [Infrastructure (Terraform)](#6-infrastructure-terraform)
 7. [Security and privacy](#7-security-and-privacy)
+8. [Pipelines](#8-pipelines)
 
 ---
 
@@ -38,7 +39,7 @@ The pipeline only **reads** from the app. Nothing it does changes the app's data
 | --- | ------------------------------------------------------------------------------------------- | ------- |
 | D1  | `data/` scaffold (uv, ruff, mypy, pytest), CI job, this document                            | done    |
 | D2  | Terraform: state bucket, lake bucket, Airflow IAM user and policy, budgets                  | done    |
-| D3  | ECB rates: extract, validate, write Parquet                                                 | planned |
+| D3  | ECB rates: extract, validate, write Parquet                                                 | done    |
 | D4  | Airflow 3 in Docker Compose, `ecb_rates` DAG, backfills                                     | planned |
 | D5  | Postgres extract: incremental by `updated_at`, month partitions rewritten (needs demo mode) | planned |
 | D6  | Bank files: Python parsers, fingerprint contract test, raw by hash, quarantine              | planned |
@@ -53,7 +54,8 @@ Built only by `splinance_data.lake.paths`, so the layout lives in one place:
 
 ```
 landing/<source>/<file>                                     uploads waiting to be processed (expire after 7 days)
-raw/source=<source>/ingest_date=YYYY-MM-DD/<sha256>.<ext>   exact bytes, named by content hash
+raw/source=<source>/ingest_date=YYYY-MM-DD/<sha256>.<ext>   files: exact bytes, named by content hash
+raw/source=<source>/date=YYYY-MM-DD/<name>.<ext>            API pulls: exact response, one per day, replaced on rerun
 quarantine/source=<source>/<sha256>.<ext>                   failed validation, reason stored next to it
 clean/<dataset>/month=YYYY-MM/part.parquet                  one file per month, rewritten whole
 ```
@@ -84,6 +86,15 @@ uv run pytest        # tests
 From the repository root, `pnpm check:data` runs the same steps as the CI job: `ruff format --check`, `ruff check`, `mypy` (strict) and `pytest`.
 
 Add a dependency with `uv add <package>` (or `uv add --dev <package>`); commit `pyproject.toml` and `uv.lock` together.
+
+Pipeline steps also run by hand with the CLI (`uv run splinance-data --help`). `--lake` takes `s3://<bucket>` or a local folder; the default is `.lake` (gitignored), so experiments need no AWS access:
+
+```bash
+uv run splinance-data ecb-rates 2026-10-01 --until 2026-10-27                                  # local .lake
+uv run splinance-data --lake s3://splinance-lake-bener ecb-rates 2026-10-01 --until 2026-10-27  # after aws login
+```
+
+boto3 reads `aws login` credentials only with `botocore[crt]`, a dev dependency; Airflow uses an access key and does not need it.
 
 ## 6. Infrastructure (Terraform)
 
@@ -127,3 +138,21 @@ It goes into `data/.env` (gitignored) and nowhere else. Rotate by creating a sec
 - No credentials in code, logs, DAG files or Terraform state; local secrets live in gitignored `.env` files.
 - The lake bucket blocks public access, requires TLS, is encrypted (SSE-S3) and versioned; the Airflow user cannot delete object versions, so `raw/` cannot lose history.
 - The Postgres extract uses a read-only role with `SELECT` on `analytics` views only (no emails, no password hashes).
+
+## 8. Pipelines
+
+Code layout in `data/src/splinance_data/`: `extract/` (talks to a source), `parse/` (bytes to typed, validated Polars frames), `pipelines/` (the steps a DAG task calls), `lake/` (keys and storage), `cli.py`. Every step takes a `Lake` (`LocalLake` in tests, `S3Lake` in real runs) and is a plain function, so it is tested without Airflow.
+
+### ECB rates (`pipelines/ecb_rates.py`)
+
+| Step          | Does                                                                                                | Output                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `ingest_day`  | One API request for one day; stores the response unchanged and unvalidated                          | `raw/source=ecb/date=YYYY-MM-DD/huf.csv`, or nothing if no rate that day |
+| `build_month` | Parses and validates every raw day of the month, checks the month as a whole, writes it as one file | `clean/fx_rates/month=YYYY-MM/part.parquet`                              |
+
+- **Source behavior (checked, not assumed):** a day without a rate (weekend, TARGET holiday, not published yet; rates appear around 16:00 CET) is `200` with an empty body; an unknown series is `404`. Empty means "no rate", any HTTP error fails the step.
+- **Raw before validation.** `raw/` keeps what the ECB sent even if it is broken; validation runs in `build_month`. After a parser fix only the month is rebuilt, the API is not called again. A failed build leaves the previous clean file in place.
+- **Schema:** `rate_date` (Date), `currency` (String), `rate` (Decimal(18,6), units per 1 EUR). Decimal, not float: `366.43` has no exact binary float and rates feed money conversion. The CSV is read as text and cast explicitly, so nothing is guessed.
+- **Checks:** required columns; daily (`FREQ=D`) spot (`SP00`) rates against EUR; readable dates; positive rates; ISO currency codes; no duplicate day and currency, within a file and across the month; no rows outside the month.
+- **Idempotent:** a rerun rewrites the same keys; rebuilding a month gives a byte-identical file (tested).
+- Weekend and holiday gaps are filled later in dbt (forward fill over a date spine), not here: clean data records what was published.

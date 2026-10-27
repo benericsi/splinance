@@ -161,6 +161,8 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+# Local lake folder used by `splinance-data` without --lake
+.lake/
 
 # Terraform (infra/): state holds resource ids and can hold secrets; tfvars hold personal values
 .terraform/
