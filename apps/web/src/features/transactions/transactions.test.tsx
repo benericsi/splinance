@@ -458,6 +458,9 @@ describe('editing a transaction', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Undo' }));
     await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
       expect(writes(api).map((r) => `${r.method} ${r.path}`)).toEqual([
         `DELETE ${base}/${pizza.id}`,
         `POST ${base}/${pizza.id}/restore`,
