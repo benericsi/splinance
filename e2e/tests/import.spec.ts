@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   addTransaction,
   balance,
@@ -8,95 +8,52 @@ import {
   openTransactions,
   transactionRow,
 } from '../support/app';
+import { chooseExport, khExport, khPurchase } from '../support/bank';
 
-/**
- * A made-up K&H transaction history export (tab separated, like the real one) for an
- * account holder called Kovács Anna. Every value is invented.
- */
-const KH_EXPORT = [
-  [
-    'könyvelés dátuma',
-    'tranzakció azonosító ',
-    'típus',
-    'könyvelési számla',
-    'könyvelési számla elnevezése',
-    'partner számla',
-    'partner elnevezése',
-    'összeg',
-    'összeg devizaneme',
-    'közlemény',
-  ],
-  [
-    '2026.10.12',
-    'MSV-E2E-1',
-    'Vásárlás belföldi kereskedőnél',
-    '104',
-    'KOVÁCS ANNA',
-    '',
-    'Pizza Place',
-    '-9550',
-    'HUF',
-    'Ref.: MSV-E2E-1 2026/10/10 Pizza Place,HUN',
-  ],
-  [
-    '2026.10.12',
-    '544537******0',
-    'bankkártya tranzakció foglalás',
-    '104',
-    'KOVÁCS ANNA',
-    '',
-    'Selecta SAS    Le Bourget   FR',
-    '-773.00',
-    '',
-    '',
-  ],
-  [
-    '2026.10.08',
-    'MSV-E2E-2',
-    'Vásárlás külföldi kereskedőnél',
-    '104',
-    'KOVÁCS ANNA',
-    '',
-    'APPLE.COM/BILL',
-    '-15000',
-    'HUF',
-    'Ref.: MSV-E2E-2 2026/10/08 APPLE.COM/BILL,IRL',
-  ],
-  [
-    '2026.10.07',
-    'MSV-E2E-3',
-    'Vásárlás külföldi kereskedőnél',
-    '104',
-    'KOVÁCS ANNA',
-    '',
-    'Revolut 1234',
-    '-12320',
-    'HUF',
-    'Ref.: MSV-E2E-3 2026/10/06 Revolut 1234,IRL',
-  ],
-  [
-    '2026.10.05',
-    'MSV-E2E-4',
-    'Vásárlás belföldi kereskedőnél',
-    '104',
-    'KOVÁCS ANNA',
-    '',
-    'TESCO 44049',
-    '-6000',
-    'HUF',
-    'Ref.: MSV-E2E-4 2026/10/04 TESCO 44049,HUN',
-  ],
-]
-  .map((cells) => cells.join('\t'))
-  .join('\r\n');
-
-async function chooseExport(page: Page) {
-  await page.locator('input[type=file]').setInputFiles({
-    name: 'kh-export.csv',
-    mimeType: 'text/csv',
-    buffer: Buffer.from(KH_EXPORT, 'utf8'),
-  });
-}
+/** Five rows: a duplicate of a hand-entered one, a card hold, a subscription, a top-up, groceries. */
+const KH_EXPORT = khExport([
+  khPurchase({
+    booked: '2026.10.12',
+    paid: '2026/10/10',
+    id: 'MSV-E2E-1',
+    partner: 'Pizza Place',
+    amount: 9550,
+  }),
+  {
+    booked: '2026.10.12',
+    id: '544537******0',
+    type: 'bankkártya tranzakció foglalás',
+    partner: 'Selecta SAS    Le Bourget   FR',
+    amount: '-773.00',
+    currency: '',
+    note: '',
+  },
+  {
+    booked: '2026.10.08',
+    id: 'MSV-E2E-2',
+    type: 'Vásárlás külföldi kereskedőnél',
+    partner: 'APPLE.COM/BILL',
+    amount: '-15000',
+    currency: 'HUF',
+    note: 'Ref.: MSV-E2E-2 2026/10/08 APPLE.COM/BILL,IRL',
+  },
+  {
+    booked: '2026.10.07',
+    id: 'MSV-E2E-3',
+    type: 'Vásárlás külföldi kereskedőnél',
+    partner: 'Revolut 1234',
+    amount: '-12320',
+    currency: 'HUF',
+    note: 'Ref.: MSV-E2E-3 2026/10/06 Revolut 1234,IRL',
+  },
+  khPurchase({
+    booked: '2026.10.05',
+    paid: '2026/10/04',
+    id: 'MSV-E2E-4',
+    partner: 'TESCO 44049',
+    amount: 6000,
+  }),
+]);
 
 test('a bank export is reviewed, imported, recognized again and undone', async ({
   page,
@@ -115,7 +72,7 @@ test('a bank export is reviewed, imported, recognized again and undone', async (
 
   await page.getByRole('link', { name: 'Import' }).click();
   await expect(page.getByRole('heading', { name: 'Import from your bank' })).toBeVisible();
-  await chooseExport(page);
+  await chooseExport(page, KH_EXPORT);
 
   // Grouped by decision: the hand-entered pizza and the Revolut top-up need a look.
   const needsLook = page.getByRole('region', { name: 'Needs a look' });
@@ -147,7 +104,7 @@ test('a bank export is reviewed, imported, recognized again and undone', async (
 
   // The same file again: what was imported is recognized and left out.
   await page.goto(`/h/${householdId}/transactions/import`);
-  await chooseExport(page);
+  await chooseExport(page, KH_EXPORT);
   await expect(page.getByText('Left out: 1 not booked yet, 2 already imported')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Ready to import' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Import 0 transactions' })).toBeDisabled();

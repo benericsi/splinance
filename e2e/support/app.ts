@@ -121,6 +121,8 @@ export interface NewTransaction {
   description: string;
   /** `YYYY-MM-DD`; today if not given. */
   occurredOn?: string;
+  /** A category name; none if not given. */
+  category?: string;
   /** "Just me" instead of the default shared, equal split. */
   private?: boolean;
   /** Percent per person, by the name the split editor shows ('You', 'Ben'). */
@@ -145,6 +147,7 @@ export async function fillTransaction(page: Page, transaction: NewTransaction) {
   await field(dialog, 'Amount').fill(transaction.amount);
   await field(dialog, 'Description').fill(transaction.description);
   if (transaction.occurredOn) await field(dialog, 'Date').fill(transaction.occurredOn);
+  if (transaction.category) await pickCategory(dialog, 'Category', transaction.category);
 
   if (transaction.private) {
     await dialog.getByRole('button', { name: 'Just me' }).click();
@@ -161,6 +164,19 @@ export async function fillTransaction(page: Page, transaction: NewTransaction) {
   await expect(dialog).toBeHidden();
   // The toast of an earlier add may still be on screen.
   await expect(page.getByText('Transaction added').last()).toBeVisible();
+}
+
+/**
+ * Picks a category in a category picker (a combobox with a search box), by the picker's
+ * label and the category's name.
+ */
+export async function pickCategory(scope: Page | Locator, label: string, name: string) {
+  const trigger = scope.getByRole('combobox', { name: label });
+  await trigger.click();
+  // The popup renders outside the dialog, at the end of the page.
+  const page = 'page' in scope ? scope.page() : scope;
+  await page.getByRole('option', { name, exact: true }).click();
+  await expect(trigger).toContainText(name);
 }
 
 /** A row of the transactions list (a link to its edit dialog), by its description. */
@@ -209,4 +225,54 @@ export async function recordPayment(
   await dialog.getByRole('button', { name: 'Record payment' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText('Payment recorded').last()).toBeVisible();
+}
+
+/** The household settings page. */
+export async function openSettings(page: Page, householdId: string) {
+  await page.goto(`/h/${householdId}/settings`);
+  await expect(page.getByRole('heading', { name: 'Household settings', level: 1 })).toBeVisible();
+  // The heading is also on the loading skeleton; the rules card comes with the data.
+  await expect(page.getByRole('heading', { name: 'Rules' })).toBeVisible();
+}
+
+/** The budgets page, for the current month unless one is given (`YYYY-MM`). */
+export async function openBudgets(page: Page, householdId: string, month?: string) {
+  await page.goto(`/h/${householdId}/budgets${month ? `?month=${month}` : ''}`);
+  await expect(page.getByRole('heading', { name: 'Budgets', level: 1 })).toBeVisible();
+  await expect(page.locator('[aria-busy]')).toHaveCount(0);
+}
+
+/**
+ * Sets a budget from the budgets page: a new one for `category`, or, without it, the one
+ * whose row was opened. Saves and waits for the dialog to close.
+ */
+export async function setBudget(
+  page: Page,
+  { category, amount }: { category?: string; amount: string },
+) {
+  if (category) {
+    await page
+      .getByRole('link', { name: /Set (a )?budget/ })
+      .first()
+      .click();
+  }
+  const dialog = page.getByRole('dialog', { name: /(Set|Change) budget/ });
+  if (category) await pickCategory(dialog, 'Category', category);
+  await dialog.getByLabel('Every month').fill(amount);
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Budget saved').last()).toBeVisible();
+}
+
+/** A row of the budgets list (a link to its dialog), by category name. */
+export function budgetRow(page: Page, category: string) {
+  return page.getByRole('listitem').filter({ hasText: category });
+}
+
+/** `YYYY-MM` of today, or of a month before or after it. */
+export function monthOf(offset = 0): string {
+  const date = new Date();
+  date.setDate(1);
+  date.setMonth(date.getMonth() + offset);
+  return `${String(date.getFullYear())}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
