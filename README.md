@@ -14,12 +14,14 @@ Household expense tracker for personal spending and shared expenses with a partn
 
 - [Architecture](docs/architecture.md): how the code works, auth flow, data layer, testing, and the tricky parts
 - [Data model](docs/data-model.md): tables and database conventions
+- [Data track](docs/data-track.md): Python pipelines into an S3 data lake, dbt reports, and the decisions behind them
 
 ## Tech stack
 
 - **API:** Node.js, Express 5, TypeScript, PostgreSQL, Drizzle ORM, Zod, pino
 - **Web:** React 19, Vite, TanStack Router and Query, shadcn/ui (Base UI), Tailwind CSS v4
 - **Shared:** Zod schemas and types used by both apps
+- **Data track:** Python, uv, ruff, mypy, pytest (Polars, Airflow, dbt, Terraform and AWS S3 to come)
 - **Tooling:** pnpm workspaces, Docker Compose, Vitest, Supertest, Testing Library, Playwright, ESLint, Prettier, GitHub Actions
 
 ## Repository layout
@@ -28,6 +30,7 @@ Household expense tracker for personal spending and shared expenses with a partn
 apps/api         Express REST API
 apps/web         React SPA (Vite)
 packages/shared  Zod schemas and types shared by api and web
+data             Python data track (see docs/data-track.md)
 ```
 
 ## Getting started

@@ -154,6 +154,14 @@ playwright-report/
 blob-report/
 playwright/.cache/
 
+# Python (data/)
+.venv/
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
 # OS / editor
 .DS_Store
 Thumbs.db

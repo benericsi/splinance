@@ -13,6 +13,8 @@ export default tseslint.config(
       '**/routeTree.gen.ts',
       '**/playwright-report/**',
       '**/test-results/**',
+      // Python virtual environment of the data track; may contain vendored JS.
+      'data/.venv/**',
     ],
   },
   js.configs.recommended,

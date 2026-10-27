@@ -1,0 +1,44 @@
+[project]
+name = "splinance-data"
+version = "0.1.0"
+description = "Splinance data track: pipelines from the app, the ECB rates API and bank files into an S3 data lake"
+requires-python = ">=3.13,<3.14"
+dependencies = []
+
+[dependency-groups]
+dev = ["mypy", "pytest", "ruff"]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "W",   # pycodestyle warnings
+  "F",   # pyflakes
+  "I",   # import order
+  "B",   # bugbear: likely bugs
+  "UP",  # pyupgrade: modern syntax
+  "SIM", # simplifications
+  "N",   # naming
+  "PT",  # pytest style
+  "S",   # bandit: security
+  "RUF", # ruff's own rules
+]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is how pytest checks things.
+"tests/**" = ["S101"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config"]

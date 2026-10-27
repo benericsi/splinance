@@ -73,6 +73,31 @@ jobs:
       # What ships (dependencies, not devDependencies): a high or critical advisory fails.
       - run: pnpm audit:prod
 
+  data:
+    name: Data track (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: data
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Installs uv; uv then fetches the Python version pinned in data/.python-version.
+      - uses: astral-sh/setup-uv@v7
+        with:
+          working-directory: data
+          enable-cache: true
+
+      # --locked fails if uv.lock is out of date with pyproject.toml.
+      - run: uv sync --locked
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run mypy
+      - run: uv run pytest
+
   e2e:
     name: End-to-end (Playwright)
     runs-on: ubuntu-latest
