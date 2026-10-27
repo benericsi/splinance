@@ -114,8 +114,21 @@ describe('reports page', () => {
     expect(october).toHaveTextContent(money('20 000 Ft'));
     expect(october).toHaveTextContent(money('40 000 Ft'));
     expect(within(table).getAllByRole('row')).toHaveLength(7);
-    expect([...api.ranges]).toEqual(['2026-05..2026-10']);
+    expect([...api.ranges]).toEqual(['2026-04..2026-10']);
 
+    const card = (name: string) => screen.getByRole('region', { name });
+    expect(card('Spent')).toHaveTextContent(money('20 000 Ft'));
+    // 20 000 against September's 2000: ten times as much.
+    expect(card('Spent')).toHaveTextContent(/up 900%/);
+    expect(card('Spent')).toHaveTextContent(money('vs Sept: 2000 Ft'));
+    expect(card('Income')).toHaveTextContent(money('40 000 Ft'));
+    // September had spending but no income: compared, without a percentage.
+    expect(card('Income')).toHaveTextContent(money('vs Sept: 0 Ft'));
+    expect(card('Income')).not.toHaveTextContent(/%/);
+    expect(card('Left over')).toHaveTextContent(money('20 000 Ft'));
+    expect(card('Left over')).toHaveTextContent('50% of income saved');
+    expect(card('Top category')).toHaveTextContent(/^Top categoryGroceries65% · /);
+    expect(card('Top category')).toHaveTextContent(money('65% · 13 000 Ft in October 2026'));
     expect(screen.getByRole('heading', { name: 'By category · October 2026' })).toBeVisible();
     expect(await categoryRows()).toEqual([
       expect.stringMatching(/^Groceries13\s000\sFt · 65%$/),
@@ -158,7 +171,7 @@ describe('reports page', () => {
     ).toBeVisible();
     expect(await categoryRows()).toEqual([expect.stringMatching(/^Groceries2000\sFt · 100%$/)]);
     // Same six months: no other range.
-    expect([...api.ranges]).toEqual(['2026-05..2026-10']);
+    expect([...api.ranges]).toEqual(['2026-04..2026-10']);
 
     await user.click(screen.getByRole('link', { name: 'Previous month' }));
     expect(await screen.findByText('No spending in August 2026.')).toBeVisible();
@@ -200,7 +213,7 @@ describe('reports page', () => {
 
     await user.click(screen.getByRole('link', { name: 'Previous year' }));
     expect(await screen.findByText('No spending in 2025.')).toBeVisible();
-    expect([...api.ranges]).toEqual(['2026-05..2026-10', '2026-01..2026-12', '2025-01..2025-12']);
+    expect([...api.ranges]).toEqual(['2026-04..2026-10', '2025-01..2026-12', '2024-01..2025-12']);
   });
 
   it('moves to the six months before', async () => {
@@ -211,7 +224,7 @@ describe('reports page', () => {
 
     await user.click(screen.getByRole('link', { name: 'Earlier months' }));
     await waitFor(() => {
-      expect([...api.ranges]).toEqual(['2026-05..2026-10', '2025-11..2026-04']);
+      expect([...api.ranges]).toEqual(['2026-04..2026-10', '2025-10..2026-04']);
     });
   });
 });

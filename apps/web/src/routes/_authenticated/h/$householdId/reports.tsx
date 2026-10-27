@@ -14,10 +14,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
 import { CategoryBreakdown } from '@/features/reports/components/category-breakdown';
+import { ReportSummaryCards } from '@/features/reports/components/report-summary';
 import { type ReportView, TrendChart } from '@/features/reports/components/trend-chart';
 import { formatMonthRange } from '@/features/reports/format';
 import { reportQueries } from '@/features/reports/queries';
-import { REPORT_WINDOW_MONTHS, reportRange } from '@/features/reports/window';
+import { summarize } from '@/features/reports/summary';
+import { fetchRange, REPORT_WINDOW_MONTHS, reportRange } from '@/features/reports/window';
 import { currentMonth, formatMonth } from '@/features/transactions/dates';
 
 /**
@@ -37,8 +39,7 @@ const searchSchema = z.object({
 export const Route = createFileRoute('/_authenticated/h/$householdId/reports')({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => {
-    const { from, to } = reportRange(toRangeSearch(search), currentMonth());
-    return { from, to };
+    return fetchRange(reportRange(toRangeSearch(search), currentMonth()));
   },
   loader: async ({ context: { queryClient }, params: { householdId }, deps: { from, to } }) => {
     await Promise.all([
@@ -89,7 +90,13 @@ function ReportsPage() {
   const view: ReportView = search.view ?? 'household';
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
-  const { data: report } = useSuspenseQuery(reportQueries.range(householdId, range.from, range.to));
+  const fetched = fetchRange(range);
+  // Reaches one period further back for the cards' comparisons; the charts show `range`.
+  const { data: report } = useSuspenseQuery(
+    reportQueries.range(householdId, fetched.from, fetched.to),
+  );
+  const inRange = (month: string) => month >= range.from && month <= range.to;
+  const summary = summarize(report, range, view, now);
 
   const go = (patch: SearchPatch) => {
     void navigate({ search: (prev) => ({ ...prev, ...patch }), resetScroll: false });
@@ -134,7 +141,7 @@ function ReportsPage() {
       title: `By category · ${range.year}${range.year === thisYear ? ' so far' : ''}`,
       label: range.year,
       key: range.year,
-      rows: sumByCategory(report.categories),
+      rows: sumByCategory(report.categories.filter((row) => inRange(row.month))),
     };
   } else {
     const { from, to, month } = range;
@@ -196,6 +203,15 @@ function ReportsPage() {
           />
         </Reveal>
         <Reveal index={1}>
+          <ReportSummaryCards
+            summary={summary}
+            categories={categories}
+            currency={report.currency}
+            view={view}
+            periodLabel={breakdown.label}
+          />
+        </Reveal>
+        <Reveal index={2}>
           <Card>
             <CardHeader>
               <CardTitle>{trendTitle}</CardTitle>
@@ -206,7 +222,7 @@ function ReportsPage() {
             </CardHeader>
             <CardContent>
               <TrendChart
-                months={report.months}
+                months={report.months.filter((m) => inRange(m.month))}
                 currency={report.currency}
                 view={view}
                 selected={range.period === 'month' ? range.month : undefined}
@@ -221,7 +237,7 @@ function ReportsPage() {
             </CardContent>
           </Card>
         </Reveal>
-        <Reveal index={2}>
+        <Reveal index={3}>
           <Card>
             <CardHeader>
               <CardTitle>{breakdown.title}</CardTitle>
@@ -250,7 +266,7 @@ function ReportsPage() {
   );
 }
 
-/** The switches, the trend card (legend, bars) and the category card (rows with bars). */
+/** The switches, the four cards, the trend card and the category card. */
 function ReportsSkeleton() {
   return (
     <PageSkeleton>
@@ -259,6 +275,16 @@ function ReportsSkeleton() {
         <div className="flex gap-2">
           <Skeleton className="h-9 flex-[3] rounded-lg sm:w-52 sm:flex-none" />
           <Skeleton className="h-9 flex-[2] rounded-lg sm:w-40 sm:flex-none" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="ring-foreground/10 rounded-xl px-4 py-3.5 ring-1">
+              <SkeletonLine className="w-16" />
+              <SkeletonLine line="mt-1.5 h-7" className="w-28" />
+              <SkeletonLine line="mt-0.5 h-4" className="w-24" />
+              <Skeleton className="mt-2 h-7" />
+            </div>
+          ))}
         </div>
         <Card>
           <CardHeader>

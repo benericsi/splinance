@@ -30,6 +30,9 @@ test('reports show the month by category, for the household or one person', asyn
     /Groceries.*14\s000\sFt · 70%/,
     /Eating out.*6000\sFt · 30%/,
   ]);
+  // The cards above sum up the month; nothing to compare with in a new household.
+  await expect(page.getByRole('region', { name: 'Spent' })).toContainText(money('20 000 Ft'));
+  await expect(page.getByRole('region', { name: 'Top category' })).toContainText('Groceries');
   const months = page.getByRole('table', { name: 'Spent and income per month' });
   await expect(months.getByRole('row')).toHaveCount(7);
   await expect(months.getByRole('row').last()).toContainText(money('20 000 Ft'));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reportRange, reportWindow } from './window';
+import { fetchRange, reportRange, reportWindow } from './window';
 
 describe('reportWindow', () => {
   it('ends at the current month and selects it by default', () => {
@@ -47,5 +47,18 @@ describe('reportRange', () => {
     });
     expect(reportRange({ period: 'year' }, '2026-10')).toMatchObject({ year: '2026' });
     expect(reportRange({ period: 'year', year: '2024' }, '2026-10').from).toBe('2024-01');
+  });
+});
+
+describe('fetchRange', () => {
+  it('reaches one month back for months and a year back for a year', () => {
+    expect(fetchRange(reportRange({ to: '2026-10' }, '2026-10'))).toEqual({
+      from: '2026-04',
+      to: '2026-10',
+    });
+    expect(fetchRange(reportRange({ period: 'year', year: '2026' }, '2026-10'))).toEqual({
+      from: '2025-01',
+      to: '2026-12',
+    });
   });
 });

@@ -46,3 +46,13 @@ export function reportRange(
   const year = search.year ?? (search.month ?? search.to ?? current).slice(0, 4);
   return { period: 'year', from: `${year}-01`, to: `${year}-12`, year };
 }
+
+/**
+ * What to fetch for a range: one month more for a month's "vs last month", the whole
+ * year before for a year's "vs last year". Charts show only `range` itself.
+ */
+export function fetchRange(range: ReportRange): { from: string; to: string } {
+  const from =
+    range.period === 'year' ? `${String(Number(range.year) - 1)}-01` : addMonths(range.from, -1);
+  return { from, to: range.to };
+}
