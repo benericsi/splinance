@@ -11,7 +11,8 @@ The pipeline only **reads** from the app. Nothing it does changes the app's data
 3. [Lake layout](#3-lake-layout)
 4. [Decisions](#4-decisions)
 5. [Local development](#5-local-development)
-6. [Security and privacy](#6-security-and-privacy)
+6. [Infrastructure (Terraform)](#6-infrastructure-terraform)
+7. [Security and privacy](#7-security-and-privacy)
 
 ---
 
@@ -36,7 +37,7 @@ The pipeline only **reads** from the app. Nothing it does changes the app's data
 | PR  | Scope                                                                                       | State   |
 | --- | ------------------------------------------------------------------------------------------- | ------- |
 | D1  | `data/` scaffold (uv, ruff, mypy, pytest), CI job, this document                            | done    |
-| D2  | Terraform: state bucket, lake bucket, Airflow IAM user and policy, budgets                  | planned |
+| D2  | Terraform: state bucket, lake bucket, Airflow IAM user and policy, budgets                  | done    |
 | D3  | ECB rates: extract, validate, write Parquet                                                 | planned |
 | D4  | Airflow 3 in Docker Compose, `ecb_rates` DAG, backfills                                     | planned |
 | D5  | Postgres extract: incremental by `updated_at`, month partitions rewritten (needs demo mode) | planned |
@@ -84,7 +85,43 @@ From the repository root, `pnpm check:data` runs the same steps as the CI job: `
 
 Add a dependency with `uv add <package>` (or `uv add --dev <package>`); commit `pyproject.toml` and `uv.lock` together.
 
-## 6. Security and privacy
+## 6. Infrastructure (Terraform)
+
+AWS account on the Free plan, region `eu-central-1` (Frankfurt). Two stacks in `infra/`, plus a module both use:
+
+| Path                           | What                                                                                         | State                                       |
+| ------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `infra/modules/private-bucket` | A bucket with versioning, SSE-S3, public access blocked, TLS required, `prevent_destroy`     | -                                           |
+| `infra/bootstrap`              | `bener-tfstate`: holds Terraform state for every stack in the account                        | local file (gitignored)                     |
+| `infra/main`                   | Lake bucket `splinance-lake-bener`, IAM user `splinance-airflow` and its policy, two budgets | `s3://bener-tfstate/splinance/main.tfstate` |
+
+- **Bootstrap first.** The state bucket cannot hold its own state, so `infra/bootstrap` keeps a local state file. It was applied once; if that file is lost, `terraform import` brings the bucket back under Terraform.
+- **Locking:** `use_lockfile = true` writes a lock object next to the state while a plan or apply runs (Terraform 1.10+, no DynamoDB table).
+- **Tags:** `default_tags` puts `project=splinance`, `env=dev` and `managed-by=terraform` on every resource of the main stack.
+- **Budgets:** `zero-spend` (anything above one cent) was created in the console and imported; `monthly-5usd` alerts at 85% and 100% actual and 100% forecast. Both exclude credits (`include_credit = false`): with credits counted, the Free plan's credits would hide every cost and the alerts would never fire.
+- **Airflow's permissions:** list, get and put in `landing/`, `raw/`, `clean/`, `quarantine/`; delete only in `landing/`; no `s3:DeleteObjectVersion`, so versioning keeps `raw/` history even if a file is overwritten. Checked with `aws iam simulate-principal-policy`.
+
+Workflow (credentials from `aws login`, never stored keys):
+
+```bash
+cd infra/main
+cp terraform.tfvars.example terraform.tfvars   # once; personal values, gitignored
+terraform init
+terraform plan -out=main.tfplan
+terraform apply main.tfplan                    # applies exactly what was reviewed
+```
+
+CI only checks formatting and validates both stacks (`init -backend=false`, no credentials); plan and apply run locally.
+
+**The Airflow access key** is created by hand when Airflow first needs it (D4), never in Terraform (state would hold the secret in plain text):
+
+```bash
+aws iam create-access-key --user-name splinance-airflow
+```
+
+It goes into `data/.env` (gitignored) and nowhere else. Rotate by creating a second key, switching Airflow over, then deleting the old one.
+
+## 7. Security and privacy
 
 - No real bank files or personal data in the repository, test fixtures or docs: fixtures are synthetic.
 - No credentials in code, logs, DAG files or Terraform state; local secrets live in gitignored `.env` files.

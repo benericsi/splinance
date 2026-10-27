@@ -98,6 +98,26 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest
 
+  infra:
+    name: Infrastructure (Terraform)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    # Formatting and validation only: -backend=false needs no AWS credentials or state.
+    # plan and apply run locally (see docs/data-track.md).
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.16.6
+
+      - run: terraform fmt -check -recursive infra
+      - run: terraform -chdir=infra/bootstrap init -backend=false -input=false
+      - run: terraform -chdir=infra/bootstrap validate
+      - run: terraform -chdir=infra/main init -backend=false -input=false
+      - run: terraform -chdir=infra/main validate
+
   e2e:
     name: End-to-end (Playwright)
     runs-on: ubuntu-latest
