@@ -12,7 +12,7 @@
     "gen:common-passwords": "node scripts/generate-common-passwords.mjs"
   },
   "dependencies": {
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@zxcvbn-ts/language-common": "^4.1.3",

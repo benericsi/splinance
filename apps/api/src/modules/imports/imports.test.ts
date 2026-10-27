@@ -286,6 +286,18 @@ describe('POST /imports/check', () => {
   });
 });
 
+describe('import rate limit', () => {
+  it('allows 30 checks and imports per person in 15 minutes, counted per user', async () => {
+    for (let i = 0; i < 30; i++) await check(anna, [checkRow(`kh:${String(i)}`)]);
+    const res = await postImport(anna, [row('kh:99')]);
+    expect(res.status).toBe(429);
+    expect(errorCode(res)).toBe('RATE_LIMITED');
+
+    // Someone else in the household is not affected.
+    expect(await check(ben, [checkRow('kh:1')])).toHaveLength(1);
+  });
+});
+
 describe('GET /imports and DELETE /imports/:id', () => {
   it('lists the caller’s own imports, newest first', async () => {
     const first = await importRows(anna, [row('kh:1')]);

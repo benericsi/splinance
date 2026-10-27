@@ -54,4 +54,13 @@ describe('parseEnv', () => {
       parseEnv({ ...required, NODE_ENV: 'production', RATE_LIMIT_DISABLED: 'true' }),
     ).toThrow(/RATE_LIMIT_DISABLED/);
   });
+
+  it('refuses the example JWT secret in production', () => {
+    const example = {
+      ...required,
+      JWT_ACCESS_SECRET: 'change-me-to-a-random-string-of-at-least-32-chars',
+    };
+    expect(parseEnv(example).JWT_ACCESS_SECRET).toBe(example.JWT_ACCESS_SECRET);
+    expect(() => parseEnv({ ...example, NODE_ENV: 'production' })).toThrow(/JWT_ACCESS_SECRET/);
+  });
 });

@@ -21,6 +21,7 @@ Status: Phases 0 to 3 (foundation; auth, households, invites, onboarding; transa
 13. [Testing](#13-testing)
 14. [The hard parts](#14-the-hard-parts)
 15. [Known limitations](#15-known-limitations)
+16. [Security](#16-security)
 
 ---
 
@@ -109,10 +110,12 @@ Middleware order:
 helmet()                 security headers (CSP, HSTS, nosniff, ...)
 pinoHttp()               request id, req.log, one log line per request (method, url, status only;
                          invite tokens in the url are redacted)
-express.json             body parsing with a size cap: 100kb, 1mb for bank imports (a thousand rows)
+express.json             body parsing with a size cap: 100kb, 1mb for bank imports (a thousand rows);
+                         no compressed bodies (inflate: false), so the cap bounds memory
 cookieParser()           req.cookies (needed for the refresh token)
 /api router
   /health                live + ready
+  rateLimiter(1000)      ceiling per IP and 15 minutes for everything below
   /auth                  register, login, refresh, logout (rate limited)
   GET /me                requireAuth -> getMe
   /households            requireAuth for every route; membership checked in the services
@@ -123,11 +126,12 @@ errorHandler             every error -> shared JSON error shape
 
 Error handling: route handlers just `throw`. Express 5 forwards rejected promises to the error middleware, so there is no `try/catch` or async wrapper in routes. The error handler maps:
 
-| Thrown                                     | Response                                                              |
-| ------------------------------------------ | --------------------------------------------------------------------- |
-| `ZodError` (from `schema.parse(req.body)`) | 400 `VALIDATION_ERROR` with `details` (Zod tree)                      |
-| `HttpError(status, message, code)`         | that status and code                                                  |
-| anything else                              | logged with stack, client gets 500 `INTERNAL_ERROR` without internals |
+| Thrown                                     | Response                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------- |
+| `ZodError` (from `schema.parse(req.body)`) | 400 `VALIDATION_ERROR` with `details` (Zod tree)                          |
+| `HttpError(status, message, code)`         | that status and code                                                      |
+| body-parser errors (`expose`, `type`)      | 400 `INVALID_JSON`, 413 `PAYLOAD_TOO_LARGE`, 415 `UNSUPPORTED_MEDIA_TYPE` |
+| anything else                              | logged with stack, client gets 500 `INTERNAL_ERROR` without internals     |
 
 Every error body matches `apiErrorResponseSchema` from the shared package: `{ "error": { "code": string, "message": string, "details"?: unknown } }`.
 
@@ -695,3 +699,29 @@ Things that took real debugging or are easy to break. Read these before changing
 - The inline theme script in `index.html` needs a CSP hash if a Content Security Policy is added to the frontend.
 - Cross-tab refresh locking is covered by reasoning and the server grace window, not by automated tests (jsdom has no Web Locks, and the e2e suite does not open two tabs of one user).
 - The e2e suite runs Chromium only (desktop and Pixel 7 emulation), not Firefox or WebKit/Safari.
+
+## 16. Security
+
+Reviewed 2026-10-27 (dependencies, auth, authorization, input handling, web client, CI). Where each defense lives:
+
+- Authentication: section 6 (Argon2id with a timing equalizer, refresh rotation with reuse detection, `SameSite=Strict` httpOnly cookie on `/api/auth`, access token in memory only).
+- Authorization: `requireMembership` in every household-scoped service (404 for non-members, 403 for owner-only actions); private transactions through `visibleTo` (lists, details, history, summaries); composite foreign keys keep references inside one household. The duplicate check of an import only looks at transactions the importer paid.
+- Input: shared Zod schemas on every body, query and param; malformed ids are 404; SQL only through Drizzle or parameterized `sql` templates (`escapeLike` for search); body size caps and no compressed bodies.
+- Abuse: per-IP limits on register (5), failed logins (10), refresh (100), invite preview (60) and accept (30), a ceiling of 1000 per IP for the whole API, and 30 import checks or imports per user, all per 15 minutes.
+- Secrets in URLs and logs: invite tokens live in the URL fragment on the web and are redacted from API request logs; logs drop authorization headers and cookies. The example `JWT_ACCESS_SECRET` is refused in production.
+- Web: no `dangerouslySetInnerHTML`; React escapes everything else. Redirect targets after login go through `safeRedirect` (same origin only, no backslashes or control characters, which URL parsing would turn into `//host`). Devtools load only in development.
+- Dependencies: CI runs `pnpm audit:prod` (high and critical advisories in what ships fail the build). Dev tooling is audited by hand (`pnpm audit`). Node 22.19 or newer is required (`engines`): patched `undici` (jsdom) needs zlib zstd support.
+
+Accepted by design (a household trusts its members; the audit log and transaction history show who changed what):
+
+- Any member can edit or delete any shared transaction, including who paid and the split.
+- Either person involved (or an owner) can record a payment without the other confirming; they can delete it if it is wrong.
+- Owners can remove members and change roles; the last owner cannot leave or step down while others remain.
+
+Before the first deploy:
+
+- `app.set('trust proxy', ...)` for the reverse proxy, so rate limits and logs see client IPs.
+- The web server sends HSTS, `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` and a CSP (`script-src 'self'` plus the hash of the inline theme script in `index.html`; fonts and styles are self-hosted).
+- `NODE_ENV=production` (secure cookies by default; keep `COOKIE_SECURE` unset or true), a random `JWT_ACCESS_SECRET` from a secret store, the database user without superuser rights.
+- GitHub Actions pinned to commit SHAs, Dependabot for npm and actions, a deploy key that can only deploy.
+- A job that deletes expired sessions and invites (Phase 6), and database backups.

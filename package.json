@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.30.0",
   "engines": {
-    "node": ">=22.12"
+    "node": ">=22.19"
   },
   "scripts": {
     "dev": "pnpm -r --parallel --if-present dev",
@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "e2e": "pnpm build && pnpm --filter @splinance/e2e e2e"
+    "e2e": "pnpm build && pnpm --filter @splinance/e2e e2e",
+    "audit:prod": "pnpm audit --prod --audit-level=high"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

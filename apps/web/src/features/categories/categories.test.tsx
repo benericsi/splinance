@@ -233,7 +233,11 @@ describe('categories in household settings', () => {
         `POST ${base}/${groceries.id}/restore`,
       ]);
     });
-    expect(await categories.findByRole('link', { name: 'Groceries' })).toBeVisible();
+    // The restored row animates in: it starts at opacity 0 and settles a frame later.
+    const restored = await categories.findByRole('link', { name: 'Groceries' });
+    await waitFor(() => {
+      expect(restored).toBeVisible();
+    });
   });
 
   it('does not open an archived category for editing', async () => {

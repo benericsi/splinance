@@ -6,6 +6,7 @@ import { pingDatabase } from './db/client';
 import { logger } from './lib/logger';
 import { redactUrl } from './lib/redact-url';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
+import { rateLimiter } from './middleware/rate-limit';
 import { requireAuth } from './middleware/require-auth';
 import { createAuthRouter, getMe } from './modules/auth/auth.routes';
 import { createHouseholdsRouter } from './modules/households/households.routes';
@@ -38,8 +39,9 @@ export function createApp(deps: AppDeps = defaultDeps) {
     }),
   );
   // Small bodies everywhere, except bank imports: up to a thousand rows of about 500 bytes.
-  const smallJson = express.json({ limit: '100kb' });
-  const importJson = express.json({ limit: '1mb' });
+  // No compressed bodies (the web never sends them): the limit then bounds memory directly.
+  const smallJson = express.json({ limit: '100kb', inflate: false });
+  const importJson = express.json({ limit: '1mb', inflate: false });
   app.use((req, res, next) => {
     (IMPORT_PATH.test(req.path) ? importJson : smallJson)(req, res, next);
   });
@@ -48,6 +50,9 @@ export function createApp(deps: AppDeps = defaultDeps) {
   // All API routes live under /api, so they never collide with frontend paths.
   const api = express.Router();
   api.use('/health', createHealthRouter(deps));
+  // A ceiling for everything else (health checks stay out of it); the auth, invite and import
+  // routes have tighter limits of their own.
+  api.use(rateLimiter(1000));
   api.use('/auth', createAuthRouter());
   api.get('/me', requireAuth, getMe);
   api.use('/households', createHouseholdsRouter());
