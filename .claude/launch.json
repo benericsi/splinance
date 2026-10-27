@@ -12,6 +12,11 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@splinance/web", "dev"],
       "port": 5173
+    },
+    {
+      "name": "web-running",
+      "url": "http://check.localhost:5173",
+      "port": 5173
     }
   ]
 }
