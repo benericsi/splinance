@@ -34,6 +34,17 @@ function ruleRows(page: Page) {
   return page.getByRole('link', { name: /^Contains / });
 }
 
+/**
+ * Picks an item from a rule's actions menu and waits until the menu has closed. A menu
+ * that is still closing hands focus back to its trigger, which would close the next one
+ * opened right after it.
+ */
+async function ruleAction(page: Page, pattern: string, item: string) {
+  await page.getByRole('button', { name: `Actions for rule ${pattern}` }).click();
+  await page.getByRole('menuitem', { name: item }).click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+}
+
 test('a rule suggested after an import categorizes the next one', async ({ page, browser }) => {
   const { householdId, partner, partnerContext } = await householdWithPartner(page, browser);
 
@@ -142,12 +153,10 @@ test('a rule added in settings categorizes earlier transactions and can be reord
   await expect(dialog).toBeHidden();
   await expect(ruleRows(page)).toHaveText([/netflix/, /spotify/]);
 
-  await page.getByRole('button', { name: 'Actions for rule spotify' }).click();
-  await page.getByRole('menuitem', { name: 'Move up' }).click();
+  await ruleAction(page, 'spotify', 'Move up');
   await expect(ruleRows(page)).toHaveText([/spotify/, /netflix/]);
 
-  await page.getByRole('button', { name: 'Actions for rule netflix' }).click();
-  await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await ruleAction(page, 'netflix', 'Delete');
   const confirm = page.getByRole('alertdialog', { name: 'Delete the rule "netflix"?' });
   await confirm.getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByText('Rule deleted')).toBeVisible();
