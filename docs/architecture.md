@@ -34,7 +34,8 @@ apps/api          Express 5 REST API (Node 22, TypeScript, Drizzle, Postgres)
 apps/web          React 19 SPA (Vite 8, TanStack Router/Query/Form, shadcn/ui on Base UI, Tailwind v4)
 packages/shared   Zod schemas, password rules, brand palette: the contract between api and web
 e2e               Playwright end-to-end suite against the production builds
-docs/             data-model.md, architecture.md (this file)
+data/             Python data track (uv project, not a pnpm package): see data-track.md
+docs/             data-model.md, data-track.md, architecture.md (this file)
 docker/           Postgres init script (creates the test database)
 ```
 
@@ -86,10 +87,12 @@ Open http://localhost:5173. Vite proxies `/api/*` to the API, so the browser see
 
 `pnpm e2e` builds everything and runs the Playwright suite (see [Testing](#13-testing)). It uses its own ports and database, so it can run next to `pnpm dev`. First time only: `pnpm --filter @splinance/e2e exec playwright install chromium`.
 
+`pnpm check:data` runs what the `Data track (Python)` CI job runs: ruff format and lint, mypy (strict) and pytest in `data/`. It needs [uv](https://docs.astral.sh/uv/); see [data-track.md](data-track.md).
+
 ### Branches and pull requests
 
 - One branch per change (`feat/...`, `chore/...`, `ci/...`, `docs/...`), merged via pull request. `main` has a GitHub ruleset: PR required, the CI check `Lint, typecheck, test, build` must pass and be up to date, no force push, no deletion.
-- CI (`.github/workflows/ci.yml`) runs on Ubuntu with a Postgres 18 service container using the same credentials as Docker Compose, so the default test database URL works unchanged. A second job, `End-to-end (Playwright)`, runs `pnpm e2e` with its own Postgres service and uploads the HTML report and traces when it fails. It is not a required check (yet).
+- CI (`.github/workflows/ci.yml`) runs on Ubuntu with a Postgres 18 service container using the same credentials as Docker Compose, so the default test database URL works unchanged. A second job, `End-to-end (Playwright)`, runs `pnpm e2e` with its own Postgres service and uploads the HTML report and traces when it fails. It is not a required check (yet). Another job, `Data track (Python)`, installs uv and runs the `data/` checks; it needs no database or AWS credentials.
 - `gh` is not installed locally; PRs are opened from the GitHub compare page.
 
 ### Generators
