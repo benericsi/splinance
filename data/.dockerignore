@@ -1,0 +1,7 @@
+# Only pyproject.toml, README.md and src/ are copied; keep everything else, above all .env,
+# out of the build context so it can never end up in an image layer.
+*
+!pyproject.toml
+!README.md
+!src/
+**/__pycache__

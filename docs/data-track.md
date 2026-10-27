@@ -14,6 +14,7 @@ The pipeline only **reads** from the app. Nothing it does changes the app's data
 6. [Infrastructure (Terraform)](#6-infrastructure-terraform)
 7. [Security and privacy](#7-security-and-privacy)
 8. [Pipelines](#8-pipelines)
+9. [Airflow](#9-airflow)
 
 ---
 
@@ -40,7 +41,7 @@ The pipeline only **reads** from the app. Nothing it does changes the app's data
 | D1  | `data/` scaffold (uv, ruff, mypy, pytest), CI job, this document                            | done    |
 | D2  | Terraform: state bucket, lake bucket, Airflow IAM user and policy, budgets                  | done    |
 | D3  | ECB rates: extract, validate, write Parquet                                                 | done    |
-| D4  | Airflow 3 in Docker Compose, `ecb_rates` DAG, backfills                                     | planned |
+| D4  | Airflow 3 in Docker Compose, `ecb_rates` DAG, backfills                                     | done    |
 | D5  | Postgres extract: incremental by `updated_at`, month partitions rewritten (needs demo mode) | planned |
 | D6  | Bank files: Python parsers, fingerprint contract test, raw by hash, quarantine              | planned |
 | D7  | dbt: staging, intermediate, marts, tests, source freshness, data-triggered DAG              | planned |
@@ -67,7 +68,7 @@ clean/<dataset>/month=YYYY-MM/part.parquet                  one file per month, 
 
 1. **Read from the app, never write back.** An earlier draft sent files into the app through a new import API. That is mostly TypeScript work, adds long-lived tokens, and would upload bank files the app deliberately never stores. Writing back stays a stretch goal.
 2. **S3 only, no Dropbox.** The API source is covered by the ECB rates; Dropbox OAuth would add secrets without teaching anything new.
-3. **Airflow 3 locally, not MWAA.** Managed Airflow costs hundreds a month. The DAG code is the same either way; locally, `catchup` fills the days the laptop was off.
+3. **Airflow 3 locally, not MWAA.** Managed Airflow costs hundreds a month. The DAG code is the same either way; locally, `catchup` fills the days the laptop was off. LocalExecutor: one machine needs no task queue (Celery, Redis, workers).
 4. **dbt on DuckDB.** Free, runs in CI without AWS credentials, and reads Parquet straight from S3. Athena is a later option.
 5. **Polars, not Pandas.** Money is integer minor units; classic Pandas turns an integer column with a missing value into floats, Polars keeps `Int64` with nulls and refuses mixed types.
 6. **Demo data only.** Production and the demo are separate instances; the lake reads only the demo database, so no real person's data reaches it.
@@ -124,13 +125,13 @@ terraform apply main.tfplan                    # applies exactly what was review
 
 CI only checks formatting and validates both stacks (`init -backend=false`, no credentials); plan and apply run locally.
 
-**The Airflow access key** is created by hand when Airflow first needs it (D4), never in Terraform (state would hold the secret in plain text):
+**The Airflow access key** is created by hand, never in Terraform (state would hold the secret in plain text). This PowerShell line (repository root, after `aws login`) writes it straight into `data/.env` (gitignored) without printing the secret; `WriteAllLines` avoids the byte-order mark that `Set-Content` adds in Windows PowerShell, which Docker would read as part of the first variable name:
 
-```bash
-aws iam create-access-key --user-name splinance-airflow
+```powershell
+$k = aws iam create-access-key --user-name splinance-airflow --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text; $id, $secret = $k -split '\s+'; [IO.File]::WriteAllLines("$PWD\data\.env", @("AWS_ACCESS_KEY_ID=$id", "AWS_SECRET_ACCESS_KEY=$secret", "AWS_DEFAULT_REGION=eu-central-1")); Remove-Variable k, secret
 ```
 
-It goes into `data/.env` (gitignored) and nowhere else. Rotate by creating a second key, switching Airflow over, then deleting the old one.
+The key exists only there and in the Airflow scheduler container. Rotate by creating a second key, switching `.env` over, then deleting the old one (`aws iam delete-access-key`).
 
 ## 7. Security and privacy
 
@@ -156,3 +157,63 @@ Code layout in `data/src/splinance_data/`: `extract/` (talks to a source), `pars
 - **Checks:** required columns; daily (`FREQ=D`) spot (`SP00`) rates against EUR; readable dates; positive rates; ISO currency codes; no duplicate day and currency, within a file and across the month; no rows outside the month.
 - **Idempotent:** a rerun rewrites the same keys; rebuilding a month gives a byte-identical file (tested).
 - Weekend and holiday gaps are filled later in dbt (forward fill over a date spine), not here: clean data records what was published.
+
+## 9. Airflow
+
+Airflow 3.3 runs locally in Docker Compose (`data/docker-compose.yml`), based on Airflow's official compose file and trimmed to the LocalExecutor.
+
+```bash
+cd data
+docker compose up -d --build      # first start: migrates the metadata DB, creates user airflow/airflow
+docker compose ps                 # all healthy after about a minute
+docker compose down               # stop; add -v to also drop the metadata DB and logs
+```
+
+UI: http://localhost:8080 (user `airflow`, password `airflow`; the port listens on 127.0.0.1 only).
+
+| Service                 | Role                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| `postgres`              | Airflow's metadata (runs, task states); separate from the app's database, no host port |
+| `airflow-init`          | Migrates the metadata database and creates the admin user, then exits                  |
+| `airflow-apiserver`     | UI and REST API; tasks report their state through it                                   |
+| `airflow-scheduler`     | Schedules runs and, with the LocalExecutor, runs tasks as subprocesses                 |
+| `airflow-dag-processor` | Parses the files in `dags/` every few seconds                                          |
+
+- **Image:** `data/Dockerfile` extends `apache/airflow:3.3.2-python3.13` with `splinance_data`, installed within Airflow's constraints file (the versions Airflow was tested with). That pins Polars to 1.44, so the local environment uses the same version. `src/` is mounted over the editable install: code changes apply without a rebuild; rebuild when dependencies change. `.dockerignore` allows only `pyproject.toml`, `README.md` and `src/` into the build, so `.env` can never end up in an image.
+- **Credentials:** only the scheduler gets `data/.env` (the `splinance-airflow` key), since tasks run there. The UI and the dag-processor never see it.
+- **DAGs are thin:** each task imports and calls a function from `splinance_data` (tested without Airflow). Imports sit inside the tasks, because the dag-processor re-reads every DAG file every few seconds.
+
+### `ecb_rates`
+
+`ingest` (API to `raw/`) then `build` (month to `clean/`), daily since 2024-01-01 with `catchup`, 3 retries with exponential backoff. Unpausing the DAG runs every missed day: that is the backfill. `build` updates the `fx_rates` asset, which the dbt DAG will be scheduled on.
+
+Two decisions that were bugs first (`data/scripts/check_dags.py` now guards both):
+
+- **`CronDataIntervalTimetable`, not `schedule="@daily"`.** In Airflow 3, `@daily` is a `CronTriggerTimetable`: each run is a point in time, so the run for 27 October starts at 27 October 00:00 with no data interval, 16 hours before that day's rate is published. `CronDataIntervalTimetable` gives each run the interval [day, day + 1) and starts it when the day is over (Airflow 2's default behavior; Airflow 3 turned it off with `create_cron_data_intervals = False`).
+- **One month build at a time** (`max_active_tis_per_dag=1` on `build`). During a backfill up to 8 runs go in parallel. Two builds of the same month each read the raw days present when they start, and the one that writes last could drop a day the other had just ingested. Serialized, the last build always sees every day ingested before it; ingests still run in parallel.
+
+### Running and testing by hand
+
+Commands run in `data/` (in the repository root, `docker compose` finds the app's compose file instead):
+
+```bash
+docker compose exec airflow-scheduler airflow dags test ecb_rates             # safe: the previous full day
+docker compose exec airflow-scheduler airflow dags list-runs ecb_rates
+docker compose exec airflow-scheduler airflow backfill create --dag-id ecb_rates --from-date 2025-01-01 --to-date 2025-01-31
+```
+
+- **A manual run covers the interval that ended at its logical date.** `dags test ecb_rates 2026-10-26` fetches 25 October; to test day D, pass D + 1. The code always reads `data_interval_start`, which the log line `DagRun Finished` shows.
+- **A manual run with an explicit logical date blocks the scheduled run of that date.** A DAG cannot have two runs with the same logical date: after `dags test ecb_rates 2026-10-26`, the scheduler logged `run already exists; skipping dagrun creation` every second and daily scheduling stopped. Without a date (`dags test ecb_rates`) the logical date carries the time of day and cannot collide with a midnight run. If an explicit date was used, delete that run afterwards (UI: Dag runs, the `manual` run, delete).
+- **First backfill:** unpausing ran 1,029 days (2024-01-01 to 2026-10-25) in about 45 minutes, 8 runs at a time; `clean/fx_rates` then held 721 business days in 34 monthly files (45 KB, against 395 KB for the same days as raw CSV). The 16 weekdays without a rate were all TARGET holidays.
+
+### Checking DAGs
+
+Airflow is not in the local test environment, so DAGs are loaded inside the image, the way the dag-processor does. The `Airflow DAGs` CI job runs this on every PR; locally:
+
+```bash
+cd data
+docker build -t splinance-airflow:dev .
+docker run --rm -v "$PWD/dags:/opt/airflow/dags:ro" -v "$PWD/scripts:/opt/splinance-scripts:ro" --entrypoint python splinance-airflow:dev /opt/splinance-scripts/check_dags.py
+```
+
+It fails on import errors, tasks without retries, and the two `ecb_rates` regressions above.

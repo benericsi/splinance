@@ -3,10 +3,13 @@ name = "splinance-data"
 version = "0.1.0"
 description = "Splinance data track: pipelines from the app, the ECB rates API and bank files into an S3 data lake"
 requires-python = ">=3.13,<3.14"
+# Lower bounds are what the code needs, not the newest release: inside the Airflow image the
+# versions come from Airflow's constraints file (see Dockerfile).
 dependencies = [
-    "boto3>=1.43.119",
-    "httpx>=0.28.1",
-    "polars>=2.1.0",
+    "boto3>=1.40",
+    "httpx>=0.28",
+    # Airflow 3.3.2's constraints pin polars 1.44.2; tests run on the version Airflow runs.
+    "polars>=1.44,<2",
 ]
 
 [project.scripts]
