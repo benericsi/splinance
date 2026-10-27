@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
+import { toast } from 'sonner';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { resetSessionRestore } from '@/features/auth/session';
 import { resetAuthStore } from '@/lib/auth-store';
@@ -48,6 +49,7 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  toast.dismiss();
   cleanup();
   server.resetHandlers();
   resetAuthStore();
