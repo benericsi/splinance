@@ -1,6 +1,13 @@
 import type { Household } from '@splinance/shared';
 import { Link, useMatchRoute } from '@tanstack/react-router';
-import { ArrowLeftRight, House, type LucideIcon, PiggyBank, Settings } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  ChartColumn,
+  House,
+  type LucideIcon,
+  PiggyBank,
+  Settings,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/logo';
 import { UserMenu } from '@/features/auth/components/user-menu';
@@ -13,6 +20,7 @@ interface NavItem {
     | '/h/$householdId'
     | '/h/$householdId/transactions'
     | '/h/$householdId/budgets'
+    | '/h/$householdId/reports'
     | '/h/$householdId/settings';
   label: string;
   icon: LucideIcon;
@@ -33,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { to: '/h/$householdId/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { to: '/h/$householdId/budgets', label: 'Budgets', icon: PiggyBank },
+  { to: '/h/$householdId/reports', label: 'Reports', icon: ChartColumn },
   { to: '/h/$householdId/settings', label: 'Settings', icon: Settings },
 ];
 

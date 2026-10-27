@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { balanceQueries } from '@/features/balances/queries';
 import { budgetQueries } from '@/features/budgets/queries';
+import { reportQueries } from '@/features/reports/queries';
 import { transactionsApi } from './api';
 import { transactionQueries } from './queries';
 
 /**
  * Any write can move a transaction between months, days and totals, and change who owes
- * whom and budget spending: refresh the household's transactions, balances and budgets.
+ * whom and budget spending: refresh the household's transactions, balances, budgets and reports.
  */
 function useInvalidateHousehold() {
   const queryClient = useQueryClient();
@@ -15,6 +16,7 @@ function useInvalidateHousehold() {
       queryClient.invalidateQueries({ queryKey: transactionQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: balanceQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: budgetQueries.household(householdId) }),
+      queryClient.invalidateQueries({ queryKey: reportQueries.household(householdId) }),
     ]);
 }
 
@@ -55,6 +57,8 @@ export function useDeleteTransaction() {
         }),
         queryClient.invalidateQueries({ queryKey: balanceQueries.household(householdId) }),
         queryClient.invalidateQueries({ queryKey: budgetQueries.household(householdId) }),
+        queryClient.invalidateQueries({ queryKey: reportQueries.household(householdId) }),
+        queryClient.invalidateQueries({ queryKey: reportQueries.household(householdId) }),
       ]);
     },
   });

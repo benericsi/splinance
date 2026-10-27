@@ -10,6 +10,7 @@ export * from './imports';
 export * from './invites';
 export * from './money';
 export * from './password/rules';
+export * from './reports';
 export * from './rules';
 export * from './splits';
 export * from './transactions';
