@@ -1,0 +1,117 @@
+# Airflow 3 for the data track, local only: http://localhost:8080 (user airflow / airflow).
+# Based on Airflow's official docker-compose.yaml for 3.3.2, trimmed to the LocalExecutor:
+# tasks run as subprocesses of the scheduler, so there is no Redis, worker or Flower.
+#
+#   cd data && docker compose up -d --build
+#
+# Needs data/.env with the splinance-airflow access key (see docs/data-track.md).
+
+name: splinance-airflow
+
+x-airflow-common: &airflow-common
+  build: .
+  image: splinance-airflow:dev
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    # New DAGs wait for a manual unpause, so catchup never starts by surprise.
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    # Components sign task tokens with this; it must be the same in every container.
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-local-dev-only}
+    AIRFLOW__API_AUTH__JWT_ISSUER: airflow
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    SPLINANCE_LAKE: ${SPLINANCE_LAKE:-s3://splinance-lake-bener}
+  volumes:
+    - ./dags:/opt/airflow/dags:ro
+    # Over the editable install in the image: code changes apply without a rebuild.
+    - ./src:/opt/splinance-data/src:ro
+    - airflow-logs:/opt/airflow/logs
+  user: '50000:0'
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+
+services:
+  # Airflow's own metadata (runs, task states). Separate from the app's database; no host port.
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'airflow']
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  airflow-apiserver:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      # Localhost only: the UI is never reachable from the network.
+      - '127.0.0.1:8080:8080'
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', 'http://localhost:8080/api/v2/monitor/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    # With the LocalExecutor tasks run here, so only this container gets the AWS key.
+    env_file: .env
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', 'http://localhost:8974/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    healthcheck:
+      test: ['CMD-SHELL', 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Migrates the metadata database and creates the local admin user, then exits.
+  airflow-init:
+    <<: *airflow-common
+    command: version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: airflow
+      _AIRFLOW_WWW_USER_PASSWORD: airflow
+
+volumes:
+  airflow-postgres:
+  airflow-logs:

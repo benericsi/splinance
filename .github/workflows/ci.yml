@@ -98,6 +98,24 @@ jobs:
       - run: uv run mypy
       - run: uv run pytest
 
+  airflow:
+    name: Airflow DAGs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Airflow is not in the local test environment, so DAGs are loaded inside the same image
+    # docker-compose runs: import errors, retries, and the ecb_rates regressions.
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: docker build -t splinance-airflow:ci data
+
+      - run: >-
+          docker run --rm
+          -v "$PWD/data/dags:/opt/airflow/dags:ro"
+          -v "$PWD/data/scripts:/opt/splinance-scripts:ro"
+          --entrypoint python splinance-airflow:ci /opt/splinance-scripts/check_dags.py
+
   infra:
     name: Infrastructure (Terraform)
     runs-on: ubuntu-latest
