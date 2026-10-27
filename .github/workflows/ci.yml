@@ -66,9 +66,9 @@ jobs:
       - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7
+        # No cache: this job installs nothing, so there is no pnpm store to save.
         with:
           node-version-file: .nvmrc
-          cache: pnpm
 
       # What ships (dependencies, not devDependencies): a high or critical advisory fails.
       - run: pnpm audit:prod
