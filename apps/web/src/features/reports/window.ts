@@ -24,3 +24,25 @@ export function reportWindow(
   if (selected > end || selected < addMonths(end, 1 - REPORT_WINDOW_MONTHS)) end = selected;
   return { from: addMonths(end, 1 - REPORT_WINDOW_MONTHS), to: end, month: selected };
 }
+
+export type ReportRange =
+  ({ period: 'month' } & ReportWindow) | { period: 'year'; from: string; to: string; year: string };
+
+/**
+ * What the reports page shows: six months around a selected one (`reportWindow`), or a
+ * whole calendar year (`?period=year&year=YYYY`, default the selected month's year) whose
+ * twelve months the trend shows and whose categories are added up.
+ */
+export function reportRange(
+  search: {
+    period?: 'month' | 'year' | undefined;
+    year?: string | undefined;
+    to?: string | undefined;
+    month?: string | undefined;
+  },
+  current: string,
+): ReportRange {
+  if (search.period !== 'year') return { period: 'month', ...reportWindow(search, current) };
+  const year = search.year ?? (search.month ?? search.to ?? current).slice(0, 4);
+  return { period: 'year', from: `${year}-01`, to: `${year}-12`, year };
+}

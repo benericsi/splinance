@@ -28,7 +28,7 @@ const config = {
 
 /**
  * Spent and income per month, side by side. The selected month is solid, the others
- * faded; clicking a month selects it. The visible chart is decorative for screen readers:
+ * faded (all solid without one); clicking a month selects it. The visible chart is decorative for screen readers:
  * a table below it holds the same numbers.
  */
 export function TrendChart({
@@ -41,7 +41,8 @@ export function TrendChart({
   months: ReportMonth[];
   currency: Currency;
   view: ReportView;
-  selected: string;
+  /** Solid; the others faded. None: all solid (a year). */
+  selected?: string | undefined;
   onSelect: (month: string) => void;
 }) {
   const data = months.map((m) => ({
@@ -105,7 +106,10 @@ export function TrendChart({
               className="cursor-pointer"
               onClick={select}
               shape={(props: RectangleProps & { payload?: { month?: string } }) => (
-                <Rectangle {...props} fillOpacity={props.payload?.month === selected ? 1 : 0.45} />
+                <Rectangle
+                  {...props}
+                  fillOpacity={!selected || props.payload?.month === selected ? 1 : 0.45}
+                />
               )}
             />
           ))}

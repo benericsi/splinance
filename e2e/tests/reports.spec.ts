@@ -44,5 +44,15 @@ test('reports show the month by category, for the household or one person', asyn
     /Eating out.*3000\sFt · 27%/,
   ]);
 
+  // The year so far adds up the same purchases (all made this month).
+  await page.getByRole('group', { name: 'Period' }).getByRole('button', { name: 'Year' }).click();
+  const year = String(new Date().getFullYear());
+  await expect(page.getByRole('heading', { name: `By category · ${year} so far` })).toBeVisible();
+  await expect(months.getByRole('row')).toHaveCount(13);
+  await expect(list.getByRole('listitem')).toHaveText([
+    /Groceries.*8000\sFt · 73%/,
+    /Eating out.*3000\sFt · 27%/,
+  ]);
+
   await partnerContext.close();
 });

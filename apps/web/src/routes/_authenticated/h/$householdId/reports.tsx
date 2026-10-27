@@ -1,4 +1,4 @@
-import { addMonths, monthSchema } from '@splinance/shared';
+import { addMonths, monthSchema, type ReportCategory } from '@splinance/shared';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -17,14 +17,18 @@ import { CategoryBreakdown } from '@/features/reports/components/category-breakd
 import { type ReportView, TrendChart } from '@/features/reports/components/trend-chart';
 import { formatMonthRange } from '@/features/reports/format';
 import { reportQueries } from '@/features/reports/queries';
-import { REPORT_WINDOW_MONTHS, reportWindow } from '@/features/reports/window';
+import { REPORT_WINDOW_MONTHS, reportRange } from '@/features/reports/window';
 import { currentMonth, formatMonth } from '@/features/transactions/dates';
 
 /**
- * `to`: the trend's last month (default now); `month`: the month the categories show
- * (default `to`); `view`: the whole household's spending or the viewer's share.
+ * `period`: six months (default) or a calendar year. Months: `to` is the trend's last month
+ * (default now), `month` the one the categories show (default `to`). Year: `year` (default
+ * the selected month's). `view`: the whole household's spending or the viewer's share.
  */
 const searchSchema = z.object({
+  period: z.enum(['month', 'year']).optional().catch(undefined),
+  // A number: the router reads search values as JSON, so `year=2026` arrives as one.
+  year: z.number().int().min(1970).max(9999).optional().catch(undefined),
   to: monthSchema.optional().catch(undefined),
   month: monthSchema.optional().catch(undefined),
   view: z.enum(['household', 'mine']).optional().catch(undefined),
@@ -33,7 +37,7 @@ const searchSchema = z.object({
 export const Route = createFileRoute('/_authenticated/h/$householdId/reports')({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => {
-    const { from, to } = reportWindow(search, currentMonth());
+    const { from, to } = reportRange(toRangeSearch(search), currentMonth());
     return { from, to };
   },
   loader: async ({ context: { queryClient }, params: { householdId }, deps: { from, to } }) => {
@@ -51,25 +55,46 @@ const VIEW_OPTIONS = [
   { value: 'mine', label: 'Your share' },
 ] as const;
 
+const PERIOD_OPTIONS = [
+  { value: 'month', label: 'Month' },
+  { value: 'year', label: 'Year' },
+] as const;
+
+type Search = z.infer<typeof searchSchema>;
+type SearchPatch = Partial<Search>;
+
+const toRangeSearch = ({ year, ...search }: Search) => ({
+  ...search,
+  year: year === undefined ? undefined : String(year),
+});
+
+/** A year's rows added up per category. */
+function sumByCategory(rows: ReportCategory[]): Omit<ReportCategory, 'month'>[] {
+  const totals = new Map<string | null, Omit<ReportCategory, 'month'>>();
+  for (const { categoryId, expenses, yourExpenses } of rows) {
+    const total = totals.get(categoryId) ?? { categoryId, expenses: 0, yourExpenses: 0 };
+    total.expenses += expenses;
+    total.yourExpenses += yourExpenses;
+    totals.set(categoryId, total);
+  }
+  return [...totals.values()];
+}
+
 function ReportsPage() {
   const { householdId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const now = currentMonth();
-  const { from, to, month } = reportWindow(search, now);
+  const range = reportRange(toRangeSearch(search), now);
   const view: ReportView = search.view ?? 'household';
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
-  const { data: report } = useSuspenseQuery(reportQueries.range(householdId, from, to));
+  const { data: report } = useSuspenseQuery(reportQueries.range(householdId, range.from, range.to));
 
-  const select = (next: string) => {
-    void navigate({ search: (prev) => ({ ...prev, to, month: next }), resetScroll: false });
+  const go = (patch: SearchPatch) => {
+    void navigate({ search: (prev) => ({ ...prev, ...patch }), resetScroll: false });
   };
-  const stepLink = (
-    label: string,
-    Icon: typeof ChevronLeft,
-    target: { to: string; month: string } | undefined,
-  ) =>
+  const stepLink = (label: string, Icon: typeof ChevronLeft, target: SearchPatch | undefined) =>
     target ? (
       <Link
         from={Route.fullPath}
@@ -84,40 +109,99 @@ function ReportsPage() {
       <span className="size-8" aria-hidden />
     );
 
-  const earlier = addMonths(to, -REPORT_WINDOW_MONTHS);
-  const sixLater = addMonths(to, REPORT_WINDOW_MONTHS);
-  // Never past the current month.
-  const later = sixLater > now ? now : sixLater;
+  // A month clicked in a year opens that month (with the six months up to it, at most now).
+  const openMonth = (month: string) => {
+    go({ period: undefined, year: undefined, to: month > now ? now : month, month });
+  };
+
+  let trendTitle: string;
+  let trendSteps: [SearchPatch | undefined, SearchPatch | undefined];
+  let breakdown: {
+    title: string;
+    label: string;
+    key: string;
+    rows: Omit<ReportCategory, 'month'>[];
+    steps?: [SearchPatch | undefined, SearchPatch | undefined];
+  };
+  if (range.period === 'year') {
+    const thisYear = now.slice(0, 4);
+    trendTitle = range.year;
+    trendSteps = [
+      { year: Number(range.year) - 1 },
+      range.year < thisYear ? { year: Number(range.year) + 1 } : undefined,
+    ];
+    breakdown = {
+      title: `By category · ${range.year}${range.year === thisYear ? ' so far' : ''}`,
+      label: range.year,
+      key: range.year,
+      rows: sumByCategory(report.categories),
+    };
+  } else {
+    const { from, to, month } = range;
+    const earlier = addMonths(to, -REPORT_WINDOW_MONTHS);
+    const sixLater = addMonths(to, REPORT_WINDOW_MONTHS);
+    // Never past the current month.
+    const later = sixLater > now ? now : sixLater;
+    trendTitle = formatMonthRange(from, to);
+    trendSteps = [
+      { to: earlier, month: earlier },
+      to < now ? { to: later, month: later } : undefined,
+    ];
+    breakdown = {
+      title: `By category · ${formatMonth(month)}`,
+      label: formatMonth(month),
+      key: month,
+      rows: report.categories.filter((row) => row.month === month),
+      steps: [
+        { to: month <= from ? addMonths(month, -1) : to, month: addMonths(month, -1) },
+        month < now
+          ? { to: month >= to ? addMonths(month, 1) : to, month: addMonths(month, 1) }
+          : undefined,
+      ],
+    };
+  }
+  const isYear = range.period === 'year';
 
   return (
     <RevealPage>
       <PageTitle title={`Reports · ${household.name}`} />
-      <PageHeader
-        title="Reports"
-        actions={
+      <PageHeader title="Reports" />
+      <div className="space-y-6">
+        {/* Side by side on a phone too: they share the width there. */}
+        <Reveal index={0} className="flex gap-2">
           <SegmentedControl
             label="Whose spending"
-            className="w-52"
+            className="min-w-0 flex-[3] sm:w-52 sm:flex-none"
             value={view}
             onChange={(next) => {
-              void navigate({ search: (prev) => ({ ...prev, view: next }), resetScroll: false });
+              go({ view: next });
             }}
             options={VIEW_OPTIONS}
           />
-        }
-      />
-      <div className="space-y-6">
-        <Reveal index={0}>
+          <SegmentedControl
+            label="Period"
+            className="min-w-0 flex-[2] sm:w-40 sm:flex-none"
+            value={range.period}
+            onChange={(next) => {
+              if (next === 'year') {
+                go({
+                  period: 'year',
+                  year: Number((range.period === 'month' ? range.month : now).slice(0, 4)),
+                });
+              } else {
+                go({ period: undefined, year: undefined });
+              }
+            }}
+            options={PERIOD_OPTIONS}
+          />
+        </Reveal>
+        <Reveal index={1}>
           <Card>
             <CardHeader>
-              <CardTitle>{formatMonthRange(from, to)}</CardTitle>
+              <CardTitle>{trendTitle}</CardTitle>
               <CardAction className="flex items-center">
-                {stepLink('Earlier months', ChevronLeft, { to: earlier, month: earlier })}
-                {stepLink(
-                  'Later months',
-                  ChevronRight,
-                  to < now ? { to: later, month: later } : undefined,
-                )}
+                {stepLink(isYear ? 'Previous year' : 'Earlier months', ChevronLeft, trendSteps[0])}
+                {stepLink(isYear ? 'Next year' : 'Later months', ChevronRight, trendSteps[1])}
               </CardAction>
             </CardHeader>
             <CardContent>
@@ -125,39 +209,38 @@ function ReportsPage() {
                 months={report.months}
                 currency={report.currency}
                 view={view}
-                selected={month}
-                onSelect={select}
+                selected={range.period === 'month' ? range.month : undefined}
+                onSelect={
+                  range.period === 'month'
+                    ? (month) => {
+                        go({ to: range.to, month });
+                      }
+                    : openMonth
+                }
               />
             </CardContent>
           </Card>
         </Reveal>
-        <Reveal index={1}>
+        <Reveal index={2}>
           <Card>
             <CardHeader>
-              <CardTitle>By category · {formatMonth(month)}</CardTitle>
-              <CardAction className="flex items-center">
-                {stepLink('Previous month', ChevronLeft, {
-                  to: month <= from ? addMonths(month, -1) : to,
-                  month: addMonths(month, -1),
-                })}
-                {stepLink(
-                  'Next month',
-                  ChevronRight,
-                  month < now
-                    ? { to: month >= to ? addMonths(month, 1) : to, month: addMonths(month, 1) }
-                    : undefined,
-                )}
-              </CardAction>
+              <CardTitle>{breakdown.title}</CardTitle>
+              {breakdown.steps && (
+                <CardAction className="flex items-center">
+                  {stepLink('Previous month', ChevronLeft, breakdown.steps[0])}
+                  {stepLink('Next month', ChevronRight, breakdown.steps[1])}
+                </CardAction>
+              )}
             </CardHeader>
             <CardContent>
               <CategoryBreakdown
-                // A new month is a new list: its bars grow from the start.
-                key={month}
-                rows={report.categories.filter((row) => row.month === month)}
+                // A new month or year is a new list: its bars grow from the start.
+                key={breakdown.key}
+                rows={breakdown.rows}
                 categories={categories}
                 currency={report.currency}
                 view={view}
-                monthLabel={formatMonth(month)}
+                periodLabel={breakdown.label}
               />
             </CardContent>
           </Card>
@@ -167,12 +250,16 @@ function ReportsPage() {
   );
 }
 
-/** The trend card (legend, bars) and the category card (rows with bars). */
+/** The switches, the trend card (legend, bars) and the category card (rows with bars). */
 function ReportsSkeleton() {
   return (
     <PageSkeleton>
-      <PageHeader title="Reports" actions={<Skeleton className="h-9 w-52 rounded-lg" />} />
+      <PageHeader title="Reports" />
       <div className="space-y-6">
+        <div className="flex gap-2">
+          <Skeleton className="h-9 flex-[3] rounded-lg sm:w-52 sm:flex-none" />
+          <Skeleton className="h-9 flex-[2] rounded-lg sm:w-40 sm:flex-none" />
+        </div>
         <Card>
           <CardHeader>
             <SkeletonLine line="h-5.5" className="w-36" />

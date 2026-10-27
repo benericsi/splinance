@@ -1,4 +1,4 @@
-import type { Category, Report } from '@splinance/shared';
+import { type Category, monthsBetween, type Report } from '@splinance/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { http as mock, HttpResponse } from 'msw';
@@ -66,10 +66,24 @@ function fakeApi() {
     mock.get('/api/households', () => HttpResponse.json({ households: [testHousehold] })),
     mock.get(base, () => HttpResponse.json({ household: householdDetail() })),
     mock.get(`${base}/categories`, () => HttpResponse.json({ categories: [groceries, eatingOut] })),
+    // The fixture's months, for whatever range the page asks for.
     mock.get(`${base}/reports`, ({ request }) => {
       const params = new URL(request.url).searchParams;
-      ranges.add(`${params.get('from') ?? ''}..${params.get('to') ?? ''}`);
-      return HttpResponse.json({ report });
+      const from = params.get('from') ?? '';
+      const to = params.get('to') ?? '';
+      ranges.add(`${from}..${to}`);
+      const inRange = (month: string) => month >= from && month <= to;
+      return HttpResponse.json({
+        report: {
+          from,
+          to,
+          currency: 'HUF',
+          months: monthsBetween(from, to).map(
+            (month) => report.months.find((m) => m.month === month) ?? empty(month),
+          ),
+          categories: report.categories.filter((row) => inRange(row.month)),
+        },
+      });
     }),
   );
   return { ranges };
@@ -163,6 +177,30 @@ describe('reports page', () => {
     expect(await screen.findByText('No transactions in these months.')).toBeVisible();
     expect(screen.getByText('No spending in October 2026.')).toBeVisible();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('adds up a year by category and steps by year', async () => {
+    const api = fakeApi();
+    const user = userEvent.setup();
+    renderRoute(page);
+    await categoryRows();
+
+    const period = screen.getByRole('group', { name: 'Period' });
+    await user.click(within(period).getByRole('button', { name: 'Year' }));
+    expect(await screen.findByRole('heading', { name: /^By category · 2026/ })).toBeVisible();
+    expect(await categoryRows()).toEqual([
+      expect.stringMatching(/^Groceries15\s000\sFt · 68%$/),
+      expect.stringMatching(/^Eating out6000\sFt · 27%$/),
+      expect.stringMatching(/^No category1000\sFt · 5%$/),
+    ]);
+    const table = screen.getByRole('table', { name: 'Spent and income per month' });
+    expect(within(table).getAllByRole('row')).toHaveLength(13);
+    // No month arrows on the category card in a year.
+    expect(screen.queryByRole('link', { name: 'Previous month' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Previous year' }));
+    expect(await screen.findByText('No spending in 2025.')).toBeVisible();
+    expect([...api.ranges]).toEqual(['2026-05..2026-10', '2026-01..2026-12', '2025-01..2025-12']);
   });
 
   it('moves to the six months before', async () => {

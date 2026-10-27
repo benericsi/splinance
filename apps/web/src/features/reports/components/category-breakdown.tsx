@@ -7,7 +7,7 @@ import { useReveal } from '@/lib/reveal';
 import type { ReportView } from './trend-chart';
 
 /**
- * A month's spending per category, largest first: the category's tile and name, a bar in
+ * A month's or a year's spending per category, largest first: the category's tile and name, a bar in
  * its color, the amount and its share. Every bar carries a faint outline, since some brand
  * colors (cream, sky, mustard on light; blue on dark) barely stand out from the card.
  */
@@ -16,14 +16,15 @@ export function CategoryBreakdown({
   categories,
   currency,
   view,
-  monthLabel,
+  periodLabel,
 }: {
-  /** The selected month's rows. */
-  rows: ReportCategory[];
+  /** The selected month's rows, or a year's added up per category. */
+  rows: Omit<ReportCategory, 'month'>[];
   categories: Category[];
   currency: Currency;
   view: ReportView;
-  monthLabel: string;
+  /** "October 2026", or "2026" for a year. */
+  periodLabel: string;
 }) {
   const reveal = useReveal();
   const reducedMotion = useReducedMotion();
@@ -42,7 +43,7 @@ export function CategoryBreakdown({
   const largest = items[0]?.amount ?? 0;
 
   if (items.length === 0) {
-    return <p className="text-muted-foreground py-6 text-center">No spending in {monthLabel}.</p>;
+    return <p className="text-muted-foreground py-6 text-center">No spending in {periodLabel}.</p>;
   }
 
   return (
@@ -53,7 +54,7 @@ export function CategoryBreakdown({
         </span>
         <span className="font-medium tabular-nums">{formatMoney(total, currency)}</span>
       </div>
-      <ul aria-label={`Spending by category in ${monthLabel}`} className="space-y-2.5">
+      <ul aria-label={`Spending by category in ${periodLabel}`} className="space-y-2.5">
         {items.map((item, index) => {
           const name = item.uncategorized
             ? 'No category'
