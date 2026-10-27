@@ -150,6 +150,21 @@ describe('reports page', () => {
     expect(await screen.findByText('No spending in August 2026.')).toBeVisible();
   });
 
+  it('says when the six months have no transactions', async () => {
+    fakeApi();
+    server.use(
+      mock.get(`${base}/reports`, () =>
+        HttpResponse.json({
+          report: { ...report, months: report.months.map((m) => empty(m.month)), categories: [] },
+        }),
+      ),
+    );
+    renderRoute(page);
+    expect(await screen.findByText('No transactions in these months.')).toBeVisible();
+    expect(screen.getByText('No spending in October 2026.')).toBeVisible();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
   it('moves to the six months before', async () => {
     const api = fakeApi();
     const user = userEvent.setup();

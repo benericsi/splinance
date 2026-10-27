@@ -56,6 +56,13 @@ export function TrendChart({
     if (month) onSelect(month);
   };
 
+  // An empty range would get Recharts' default 0-4 axis.
+  if (data.every((d) => d.spent === 0 && d.income === 0)) {
+    return (
+      <p className="text-muted-foreground py-10 text-center">No transactions in these months.</p>
+    );
+  }
+
   return (
     <>
       <div className="text-muted-foreground mb-2 flex gap-4 text-xs" aria-hidden>
@@ -104,25 +111,29 @@ export function TrendChart({
           ))}
         </BarChart>
       </ChartContainer>
-      <table className="sr-only">
-        <caption>Spent and income per month</caption>
-        <thead>
-          <tr>
-            <th scope="col">Month</th>
-            <th scope="col">Spent</th>
-            <th scope="col">Income</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((d) => (
-            <tr key={d.month}>
-              <th scope="row">{formatMonth(d.month)}</th>
-              <td>{money(d.spent)}</td>
-              <td>{money(d.income)}</td>
+      {/* The wrapper hides it: a caption renders outside the table's box, so sr-only on the
+          table itself would leave the caption on screen. */}
+      <div className="sr-only">
+        <table>
+          <caption>Spent and income per month</caption>
+          <thead>
+            <tr>
+              <th scope="col">Month</th>
+              <th scope="col">Spent</th>
+              <th scope="col">Income</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.map((d) => (
+              <tr key={d.month}>
+                <th scope="row">{formatMonth(d.month)}</th>
+                <td>{money(d.spent)}</td>
+                <td>{money(d.income)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }
