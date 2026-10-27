@@ -36,6 +36,14 @@ Element.prototype.setPointerCapture = () => undefined;
 Element.prototype.releasePointerCapture = () => undefined;
 Element.prototype.hasPointerCapture = () => false;
 
+// jsdom has no ResizeObserver; Recharts' ResponsiveContainer observes its size. Charts render
+// at their initial size; tests read the table each chart carries for screen readers.
+globalThis.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 // Motion animations finish instantly, so exits (a deleted row) leave the DOM right away.
 MotionGlobalConfig.skipAnimations = true;
 

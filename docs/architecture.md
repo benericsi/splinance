@@ -2,7 +2,7 @@
 
 How the code works today, why it is built this way, and the parts that are easy to get wrong. For the database tables and their conventions see [data-model.md](data-model.md); for coding rules see [CLAUDE.md](../CLAUDE.md).
 
-Status: Phases 0 to 3 (foundation; auth, households, invites, onboarding; transactions and splits; balances and settle-up) are done, API and web. Phase 4 (bank CSV import: Revolut and K&H, duplicate check, review, undo) is done; OTP follows once a sample export exists. Phase 5 (category rules and monthly household budgets) is done. The first deploy is the last item of the roadmap.
+Status: Phases 0 to 3 (foundation; auth, households, invites, onboarding; transactions and splits; balances and settle-up) are done, API and web. Phase 4 (bank CSV import: Revolut and K&H, duplicate check, review, undo) is done; OTP follows once a sample export exists. Phase 5 (category rules and monthly household budgets) is done, and so is a Reports section with charts. The first deploy is the last item of the roadmap.
 
 ## Contents
 
@@ -53,6 +53,7 @@ Key files by concern:
 | Bank imports                  | `packages/shared/src/imports/*` (parsers, contract), `apps/api/src/modules/imports/*`, `apps/web/src/features/imports/*` |
 | Category rules                | `packages/shared/src/rules.ts` (matching), `apps/api/src/modules/rules/*`, `apps/web/src/features/rules/*`               |
 | Budgets                       | `packages/shared/src/budgets.ts`, `apps/api/src/modules/budgets/*`, `apps/web/src/features/budgets/*`                    |
+| Reports (charts)              | `packages/shared/src/reports.ts`, `apps/api/src/modules/reports/*`, `apps/web/src/features/reports/*`                    |
 | Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`, `packages/shared/src/balances.ts`                       |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts`         |
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                                  |
@@ -232,6 +233,15 @@ Budgets. Also under a household; every member sees and sets them. Household budg
 | `PUT /api/households/:id/budgets/:categoryId` | member | `{ amount, from }` (`amount: null` removes) | 204                                             | 400 `INVALID_CATEGORY` (income, archived, other household), 404 |
 
 - A budget in the list is `{ categoryId, amount, since, spent }`: the amount in force that month, the month it was set from, and the month's shared expenses in the category (whole amounts). Archived categories drop out.
+
+Reports. Totals over a range of months for the charts, as the caller sees them.
+
+| Method and path                   | Who    | Request                                            | Success                                                      | Errors (besides the above) |
+| --------------------------------- | ------ | -------------------------------------------------- | ------------------------------------------------------------ | -------------------------- |
+| `GET /api/households/:id/reports` | member | query: `from`, `to` (`YYYY-MM`, at most 24 months) | 200 `{ report: { from, to, currency, months, categories } }` | 400                        |
+
+- `months` has every month of the range (zeros when empty): `expenses` and `income` count shared transactions and the caller's own private ones (like the month summary); `yourExpenses` and `yourIncome` count the caller's part (all of a private one, their share of a shared one).
+- `categories` has one row per month and category (`categoryId: null` for none) with spending: `expenses` and `yourExpenses` as above. One grouped query; month totals are summed from its rows.
 - Setting an amount from a month keeps earlier months as they were; a later change made before (say from December) still wins from its own month.
 
 Imports. Also under a household. They are personal: a person sees and undoes only their own, and fingerprints are per person (the same bank row imported by someone else is theirs).
@@ -376,6 +386,7 @@ Reads `Authorization: Bearer`, verifies the JWT (algorithm pinned to HS256, issu
 | `balances.ts`       | `netDebts()` (pairwise netting), balance and settlement schemas                                                                      | API ledger and routes, web (next PR)                        |
 | `rules.ts`          | `matchKey()`, `ruleMatches()`, `firstMatchingRule()`, rule schemas                                                                   | API (uniqueness, applying), web import review (next PR)     |
 | `budgets.ts`        | budget schemas, `budgetUsage()`, `BUDGET_WARNING_RATIO`                                                                              | API, web budgets (next PR)                                  |
+| `reports.ts`        | report schemas, `addMonths()`, `monthsBetween()`, `REPORT_MAX_MONTHS`                                                                | API reports, web reports                                    |
 | `imports/`          | `parseStatement()` (Revolut CSV, K&H transaction history CSV), `StatementRow`, flags, fingerprints, `nameKey()`                      | web import page (next PRs), parser tests                    |
 
 Split math: `allocate(total, weights)` gives everyone the floor of their exact share, then hands the units lost to rounding to the largest fractional parts, earlier positions first on ties. Shares therefore always sum to the total and never differ from the exact share by a whole unit. It computes `total * weight` with BigInt, because 10^12 minor units times 10 000 basis points passes 2^53. Equal splits are weights of 1, percentages are basis points (100% = 10 000), fixed splits must already sum to the total. The order of people decides who gets a leftover unit, so callers pass a stable order.
@@ -439,6 +450,7 @@ _authenticated.tsx         pathless layout: if not authenticated -> redirect /lo
       _authenticated/h/$householdId/transactions.$transactionId.tsx /h/:id/transactions/:tid  edit dialog
     _authenticated/h/$householdId/budgets.tsx        /h/:id/budgets?month=YYYY-MM  budgets of a month; <Outlet /> for the dialog
       _authenticated/h/$householdId/budgets.set.tsx  /h/:id/budgets/set?category=  set, change or remove a budget
+    _authenticated/h/$householdId/reports.tsx        /h/:id/reports?to=&month=&view=  trend and spending by category
     _authenticated/h/$householdId/transactions_.import.tsx  /h/:id/transactions/import  import page (own page, not nested)
 invite.tsx                 /invite#<token>  public invite landing page (logged in or out)
 ```
@@ -505,6 +517,14 @@ invitee: opens /invite#<token>
 - Totals (budgeted, spent, left or over) and one row per budget, sorted by category name, with a bar: neutral below 80%, mustard from 80% (`BUDGET_WARNING_RATIO`), red when over; the line under it says the same in words ("3000 Ft left · 90%", "Over by 4000 Ft"), so the bar is decorative. Only shared expenses count.
 - The dialog (`/budgets/set`, with `?category=` when opened from a row) sets the amount from the month on screen; picking a category that has a budget prefills it. "Remove budget" sends a null amount from that month.
 - The overview shows `BudgetAlertsCard`: only this month's budgets at 80% or more, most used first, hidden when there are none.
+
+### Reports
+
+- A section of its own (sidebar and phone tabs). Two cards: the last six months (`?to=`, default now) as grouped bars, spent next to income (shadcn `chart`, Recharts), and the selected month (`?month=`, default `to`) by category as horizontal bars in the category colors, largest first, with amount and share. "Household" or "Your share" (`?view=`) switches both.
+- Clicking a bar or the month arrows selects a month; the window only moves when the selection leaves it (`reportWindow`), so stepping month by month never loses it. The arrows on the trend move six months at a time, never past the current month.
+- Accessibility: each trend chart is `aria-hidden` and carries an sr-only table with the same numbers (tests read it); the category list is text with decorative bars. Every bar has a faint inset outline, since several brand colors barely stand out from the card (cream, sky, mustard on light; blue on dark).
+- Recharts (about 100 kB gzipped) loads with the reports route only (`autoCodeSplitting`). jsdom has no `ResizeObserver`; the test setup stubs it.
+- Every write that changes spending invalidates the household's reports along with budgets.
 
 ### Overview and settling up
 
@@ -606,7 +626,7 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 - Avatars: `UserAvatar` (Facehash with brand colors, seeded by user id, no initial) and `HouseholdAvatar` (`@outpacelabs/avatars` mesh gradient, brand colors minus cream, seeded by household id, rounded square so households never look like people; drawn once at a fixed resolution and detail level and scaled with CSS, because the library otherwise simplifies small sizes and one household would look different in the menu and on the settings page). Pass `decorative` when the name is shown next to it.
 - Motion: amounts that change in place (month totals, day totals, later balances) use `MoneyFlow`, a wrapper around NumberFlow (`@number-flow/react`): each digit rolls to its new value, with the same `Intl` options as `formatMoney` (`moneyFormatOptions`). Growing values drop new digits in from above, shrinking ones bring them up from below (`rollTrend`, the opposite of NumberFlow's default). The first render is static, so page loads do not animate, and the OS "reduce motion" setting turns rolling off. The digits sit in a shadow root, so the element is `aria-hidden` and a visually hidden copy of the formatted value is what screen readers, find-in-page and tests read. Rows that appear or disappear do not roll.
 - Motion for things that appear, disappear or open: `motion` (framer-motion's successor, `m.*` components) inside `MotionProvider` in the root route. `LazyMotion` with `domAnimation` (no layout animations) is loaded as its own chunk after first paint, and `MotionConfig reducedMotion="user"` keeps only opacity fades when the OS asks for reduced motion. Tokens in `lib/motion.ts`: a 0.2 s decelerating curve shared with the drawer, a 0.15 s variant for two-step swaps, and `COLLAPSE` (height and opacity; `overflow` hidden only while animating so focus rings are not clipped). What moves: transaction rows and day groups on add, delete and undo; the split editor opening from its summary line; Shared / Just me swapping the editor and the note; category rows on add, archive and restore; the archived list (`Collapse`). `AnimatePresence initial={false}` everywhere, so first renders are static, and lists are keyed by month (transactions) or kind (categories) so switching swaps them without animating every row. No page transitions; dialogs and drawers keep their Base UI CSS animations.
-- Loading: a household page whose loader takes longer than 150 ms (`defaultPendingMs`) shows its `pendingComponent`, a skeleton of the page: the real static header (h1, greeting) plus `Skeleton` blocks that mirror the real boxes, so nothing moves when the content arrives. Once shown, a skeleton stays at least 300 ms (`defaultPendingMinMs`) so it does not flash. Preloading on intent and the Query cache make most navigations skip it. Skeletons exist for the overview, transactions, budgets, settings and the import page; dialogs over a page, and a household switch (the layout's loader, which has no pendingComponent), keep the previous screen until they are ready, as before. The router picks the first loading match from the top: one without a pendingComponent means no skeleton at all, never a blank area.
+- Loading: a household page whose loader takes longer than 150 ms (`defaultPendingMs`) shows its `pendingComponent`, a skeleton of the page: the real static header (h1, greeting) plus `Skeleton` blocks that mirror the real boxes, so nothing moves when the content arrives. Once shown, a skeleton stays at least 300 ms (`defaultPendingMinMs`) so it does not flash. Preloading on intent and the Query cache make most navigations skip it. Skeletons exist for the overview, transactions, budgets, reports, settings and the import page; dialogs over a page, and a household switch (the layout's loader, which has no pendingComponent), keep the previous screen until they are ready, as before. The router picks the first loading match from the top: one without a pendingComponent means no skeleton at all, never a blank area.
 - Entrance after a skeleton (`components/reveal.tsx`, `lib/reveal.ts`): the page's sections (`Reveal`) fade in and rise 6 px, 40 ms apart; list rows (transaction days, budgets) follow 25 ms apart (the first 8), and budget bars grow from empty. Only a page that replaced a skeleton animates: `PageSkeleton` sets a module flag and `RevealPage` reads it on mount, because the two are never mounted together. A page from the cache appears at once, so this is not a page transition. For 600 ms the rows use the reveal props, then switch back to `COLLAPSE`, so rows added later open by height as before. Reduced motion keeps the fade and skips the rise and the growing bars.
 - Shadcn components in `src/components/ui` are owned code (Base UI primitives underneath). Links styled as buttons use `buttonVariants()` on the `Link`, because Base UI's `Button` must render a real `<button>`.
 
@@ -647,6 +667,7 @@ E2E specifics (`e2e/`):
 - Settling up (`settle-up.spec.ts`): leaving with a debt is refused with the reason in the dialog; a partial payment (with the live hint and a note) leaves the rest open for both people; the prefilled rest squares them up and the partner can leave. Deleting a payment reopens the debt, undo closes it again, for both people.
 - Bank import (`import.spec.ts`): a made-up K&H export (built in the test, never a real file) goes through the real file input; a hand-entered purchase shows up as a possible duplicate and the Revolut top-up as an own transfer; two rows are imported (one renamed, one shared, which reaches the partner's balance); the same file again leaves them out as already imported; undoing the import from the history removes them and the partner's debt. A file that is not an export is explained.
 - Category rules (`rules.spec.ts`): after an import with groceries filed and shared by hand, the summary suggests "Contains tesco" (checked); the created rule shows in Settings, and the next export's Tesco row arrives categorized and shared "by rule", leaving nothing to suggest and reaching the partner's balance. A rule added in Settings offers its earlier match in the toast and categorizes it; rules can be moved up and deleted, and a deleted rule's transactions keep their category. K&H exports for these tests come from `support/bank.ts` (`khExport`, `khPurchase`).
+- Reports (`reports.spec.ts`): shared purchases and a private one appear by category with amounts and shares, the six-month table ends with the current month, and "Your share" switches to the viewer's part.
 - Budgets (`budgets.spec.ts`): a Groceries budget counts shared spending only (a private purchase stays out), shows up on the overview once it is near the limit, goes over with the next purchase, and the partner sees the same budget. A budget set last month holds this month; changing or removing it this month leaves last month's as it was.
 - Amounts are matched with `money('10 001 Ft')`, which accepts any whitespace (the app groups with a no-break space). Month totals are read with `monthStat(page, 'Spent')`; `MoneyFlow`'s visually hidden copy is what the assertion sees.
 - Locators go by role and label, like the web tests. `field(page, label)` matches a label exactly, ignoring the required asterisk, so "Password" does not also match the "Show password" button.
