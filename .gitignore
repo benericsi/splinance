@@ -162,6 +162,16 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 
+# Terraform (infra/): state holds resource ids and can hold secrets; tfvars hold personal values
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+*.tfplan
+crash.log
+*.tfvars
+!*.tfvars.example
+
 # OS / editor
 .DS_Store
 Thumbs.db
