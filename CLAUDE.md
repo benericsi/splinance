@@ -18,7 +18,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Frontend: React, TypeScript, Vite, TanStack Router, TanStack Query, TanStack Form, shadcn/ui, Tailwind CSS, charts (shadcn charts / Recharts), Zod
 - Backend: Node.js, Express 5, TypeScript, PostgreSQL 18, Drizzle ORM (node-postgres driver), Zod validation, Argon2, pino
 - Later: BullMQ + Redis for jobs
-- Data track (`data/`, `infra/`): Python 3.13, uv, ruff, mypy (strict), pytest, Terraform, AWS (S3, IAM, Budgets); later Polars, Airflow 3, dbt (DuckDB)
+- Data track (`data/`, `infra/`): Python 3.13, uv, Polars, httpx, boto3, ruff, mypy (strict), pytest, Terraform, AWS (S3, IAM, Budgets); later Airflow 3, dbt (DuckDB)
 - Tooling: pnpm monorepo (apps/web, apps/api, packages/shared), Vitest, Supertest, Playwright, Docker Compose, GitHub Actions
 
 ## Repo conventions

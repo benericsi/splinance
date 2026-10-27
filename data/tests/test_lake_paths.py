@@ -6,6 +6,8 @@ from splinance_data.lake.paths import (
     clean_key,
     content_sha256,
     quarantine_key,
+    raw_daily_key,
+    raw_daily_month_prefix,
     raw_file_key,
 )
 
@@ -21,6 +23,13 @@ def test_content_sha256_is_stable_and_content_based() -> None:
 def test_raw_file_key() -> None:
     key = raw_file_key("revolut", date(2026, 10, 27), SHA, "csv")
     assert key == f"raw/source=revolut/ingest_date=2026-10-27/{SHA}.csv"
+
+
+def test_raw_daily_key_and_month_prefix() -> None:
+    key = raw_daily_key("ecb", date(2026, 10, 23), "huf", "csv")
+    assert key == "raw/source=ecb/date=2026-10-23/huf.csv"
+    assert key.startswith(raw_daily_month_prefix("ecb", date(2026, 10, 1)))
+    assert not key.startswith(raw_daily_month_prefix("ecb", date(2026, 11, 1)))
 
 
 def test_quarantine_key() -> None:

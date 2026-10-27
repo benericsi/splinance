@@ -39,6 +39,20 @@ def raw_file_key(source: str, ingested_on: date, sha256: str, extension: str) ->
     return f"{Layer.RAW}/source={source}/ingest_date={ingested_on:%Y-%m-%d}/{sha256}.{extension}"
 
 
+def raw_daily_key(source: str, day: date, name: str, extension: str) -> str:
+    """`raw/source=ecb/date=2026-10-23/huf.csv`: one API pull per day, replaced on rerun."""
+    _check_name("source", source)
+    _check_name("name", name)
+    _check_extension(extension)
+    return f"{Layer.RAW}/source={source}/date={day:%Y-%m-%d}/{name}.{extension}"
+
+
+def raw_daily_month_prefix(source: str, month: date) -> str:
+    """`raw/source=ecb/date=2026-10-`: every daily pull of one month."""
+    _check_name("source", source)
+    return f"{Layer.RAW}/source={source}/date={month:%Y-%m}-"
+
+
 def quarantine_key(source: str, sha256: str, extension: str) -> str:
     """`quarantine/source=revolut/<sha256>.csv`; the reason is stored next to it."""
     _check(source, sha256, extension)
@@ -55,6 +69,10 @@ def _check(source: str, sha256: str, extension: str) -> None:
     _check_name("source", source)
     if not _SHA256.fullmatch(sha256):
         raise ValueError(f"sha256 must be 64 lowercase hex characters, got {sha256!r}")
+    _check_extension(extension)
+
+
+def _check_extension(extension: str) -> None:
     if not _EXTENSION.fullmatch(extension):
         raise ValueError(f"extension must be lowercase letters or digits, got {extension!r}")
 
