@@ -26,6 +26,11 @@ const envSchema = z
     message: 'RATE_LIMIT_DISABLED must not be set in production',
     path: ['RATE_LIMIT_DISABLED'],
   })
+  // The example value is long enough to pass the length check; it must never sign real tokens.
+  .refine((e) => !(e.NODE_ENV === 'production' && e.JWT_ACCESS_SECRET.startsWith('change-me')), {
+    message: 'JWT_ACCESS_SECRET still has the example value; generate a random one',
+    path: ['JWT_ACCESS_SECRET'],
+  })
   .transform((e) => ({ ...e, COOKIE_SECURE: e.COOKIE_SECURE ?? e.NODE_ENV === 'production' }));
 
 export type Env = z.output<typeof envSchema>;

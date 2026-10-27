@@ -5,3 +5,8 @@ packages:
 
 onlyBuiltDependencies:
   - esbuild
+
+overrides:
+  # jsdom's undici (tests only). Patched 8.12+ needs Node >= 22.19 (zlib zstd); drop this pin
+  # once every machine runs that.
+  undici@8: 8.11.2

@@ -1,4 +1,4 @@
-import { liveResponseSchema, readyResponseSchema } from '@splinance/shared';
+import { apiErrorResponseSchema, liveResponseSchema, readyResponseSchema } from '@splinance/shared';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from './app';
@@ -43,5 +43,31 @@ describe('unknown routes', () => {
     expect(res.body).toEqual({
       error: { code: 'NOT_FOUND', message: 'Route GET /api/nope not found' },
     });
+  });
+});
+
+describe('request bodies', () => {
+  const login = () => request(app).post('/api/auth/login').set('content-type', 'application/json');
+
+  it('answers malformed JSON with 400, not a server error', async () => {
+    const res = await login().send('{bad').expect(400);
+    expect(res.body).toEqual({
+      error: { code: 'INVALID_JSON', message: 'Request body is not valid JSON' },
+    });
+  });
+
+  it('answers a body over the limit with 413', async () => {
+    const res = await login()
+      .send(JSON.stringify({ email: 'a@example.com', password: 'x'.repeat(200_000) }))
+      .expect(413);
+    expect(apiErrorResponseSchema.parse(res.body).error.code).toBe('PAYLOAD_TOO_LARGE');
+  });
+
+  it('refuses compressed bodies with 415', async () => {
+    const res = await login()
+      .set('content-encoding', 'gzip')
+      .send(Buffer.from([0x1f, 0x8b, 0x08, 0x00]))
+      .expect(415);
+    expect(apiErrorResponseSchema.parse(res.body).error.code).toBe('UNSUPPORTED_MEDIA_TYPE');
   });
 });

@@ -18,14 +18,14 @@
     "@splinance/shared": "workspace:*",
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.3",
-    "express": "^5.2.1",
+    "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
     "jose": "^6.2.12",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

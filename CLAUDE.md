@@ -26,7 +26,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - `packages/shared` is consumed as TypeScript source (no build step); the api bundles it with tsdown
 - TypeScript pinned to 6.0 until typescript-eslint supports TS 7; `@types/node` matches the Node runtime major
 - Module resolution is `Bundler` everywhere, so no `.js` extensions in relative imports
-- Commands: `pnpm check` (same steps as the main CI job), `pnpm e2e` (build + Playwright), `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format`
+- Commands: `pnpm check` (same steps as the main CI job), `pnpm e2e` (build + Playwright), `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format`, `pnpm audit:prod` (separate CI job)
 - Database: schema in `apps/api/src/db/schema/` (one file per table, shared column helpers in `columns.ts`), migrations generated with `db:generate` into `apps/api/drizzle` and committed; never use `drizzle-kit push`. Do not edit or regenerate a migration once merged
 - Data model and its conventions (uuidv7 ids, money, dates, composite FKs, named constraints) are documented in `docs/data-model.md`; update it in the same PR as any schema change. Create tables only when a feature needs them
 - API routes are mounted under `/api`; errors use the shared `apiErrorResponseSchema` shape
@@ -72,6 +72,18 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Soft delete and an audit log for transactions
 - Authorization enforced in the service layer; private data readable only by its creator
 - Auth: short-lived access token plus rotated httpOnly refresh token, rate limiting, Helmet
+
+## Security
+
+Model and pre-deploy checklist: `docs/architecture.md` section 16. Rules for new code:
+
+- Every household-scoped service calls `requireMembership` (404 for non-members, never 403 that reveals the id); owner-only actions pass `role: 'owner'`. Private data goes through `visibleTo` everywhere it can surface (lists, details, history, summaries, matching)
+- Ids from params via `idParam` (malformed means 404), bodies and queries via shared Zod schemas with upper bounds (string lengths, array sizes, amounts)
+- SQL only through Drizzle or parameterized `sql` templates; escape user text in LIKE patterns (`escapeLike`)
+- New public or expensive endpoints get a `rateLimiter` (`perUser: true` for work behind `requireAuth`); keep `RATE_LIMIT_DISABLED` for e2e only
+- Never put tokens or personal data in query strings, logs or error messages; extend `redactUrl` for new token-bearing paths
+- Web: no `dangerouslySetInnerHTML`; post-login navigation only through `safeRedirect`; nothing sensitive in localStorage
+- New dependencies: check `pnpm audit` first; CI fails on high or critical advisories in production dependencies (`pnpm audit:prod`)
 
 ## Roadmap
 
