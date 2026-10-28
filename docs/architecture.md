@@ -75,13 +75,15 @@ Key files by concern:
 
 ```bash
 pnpm install
-docker compose up -d                          # Postgres 18: databases splinance + splinance_test
+docker compose up -d                          # Postgres 18: splinance, splinance_test, splinance_demo
 cp apps/api/.env.example apps/api/.env        # then set a real JWT_ACCESS_SECRET
 pnpm --filter @splinance/api db:migrate
 pnpm dev                                      # api :3000 (tsx watch) + web :5173 (Vite)
 ```
 
 Open http://localhost:5173. Vite proxies `/api/*` to the API, so the browser sees one origin (no CORS, cookies just work).
+
+The scripts in `docker/postgres/init` run only when the volume is empty (first start): `01` creates `splinance_test`, `02` `splinance_demo` (the demo instance's database, the data track's source), `03` the data track's local login `splinance_demo_analytics` (see [data-track.md](data-track.md#postgres-source-the-demo-database)). On an older volume, run the missing ones once by hand, for example `docker compose exec -T db psql -U splinance -d splinance -v ON_ERROR_STOP=1 < docker/postgres/init/03-analytics-login.sql`.
 
 ### Checks
 
