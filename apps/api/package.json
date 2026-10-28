@@ -11,7 +11,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env src/db/migrate.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "demo:bank-files": "tsx src/modules/demo/bank-files.cli.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",
