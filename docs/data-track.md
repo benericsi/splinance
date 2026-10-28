@@ -98,6 +98,25 @@ uv run splinance-data --lake s3://splinance-lake-bener ecb-rates 2026-10-01 --un
 
 boto3 reads `aws login` credentials only with `botocore[crt]`, a dev dependency; Airflow uses an access key and does not need it.
 
+### Postgres source: the demo database
+
+Locally the source is `splinance_demo` in the app's Docker Postgres (created on first start, see architecture.md section 2). Bring its schema up to date and give it a long-lived showcase household (from the repository root):
+
+```bash
+DATABASE_URL=postgres://splinance:splinance@localhost:5432/splinance_demo pnpm --filter @splinance/api db:migrate
+DATABASE_URL=postgres://splinance:splinance@localhost:5432/splinance_demo pnpm --filter @splinance/api demo:create --seed 42 --days 3650
+```
+
+In PowerShell, set the variable first: `$env:DATABASE_URL = 'postgres://splinance:splinance@localhost:5432/splinance_demo'` (and `Remove-Item Env:DATABASE_URL` afterwards); a variable that is already set wins over `apps/api/.env`.
+
+The pipeline connects as `splinance_demo_analytics` (local password `splinance_demo_analytics`, from `docker/postgres/init/03-analytics-login.sql`): it may connect only to `splinance_demo`, every session is read-only with a 5-minute statement timeout, and it can read the `analytics` views and nothing else:
+
+```bash
+docker compose exec db psql "postgres://splinance_demo_analytics:splinance_demo_analytics@localhost/splinance_demo" -c "select origin, count(*) from analytics.transactions group by origin"
+```
+
+On a server the same role gets a random password, created by hand next to the database (never in a migration or in Terraform).
+
 ## 6. Infrastructure (Terraform)
 
 AWS account on the Free plan, region `eu-central-1` (Frankfurt). Two stacks in `infra/`, plus a module both use:
