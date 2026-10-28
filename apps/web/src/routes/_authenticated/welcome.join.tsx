@@ -1,5 +1,5 @@
 import { revalidateLogic, useForm } from '@tanstack/react-form';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
 import { TextField } from '@/components/form/text-field';
 import { Button } from '@/components/ui/button';
 import { stashInviteToken } from '@/features/invites/pending-invite';
@@ -9,6 +9,10 @@ import { joinLinkInputSchema } from '@/features/onboarding/join-link';
 
 /** Join path: paste the link, then the regular invite page takes over. */
 export const Route = createFileRoute('/_authenticated/welcome/join')({
+  // Demo sandboxes never join another household (the API refuses it too).
+  beforeLoad: () => {
+    if (__DEMO_SITE__) throw redirect({ to: '/welcome' });
+  },
   component: JoinStep,
 });
 

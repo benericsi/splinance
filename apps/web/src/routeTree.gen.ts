@@ -9,12 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
-import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedHHouseholdIdRouteImport } from './routes/_authenticated/h/$householdId'
 import { Route as AuthenticatedWelcomeIndexRouteImport } from './routes/_authenticated/welcome.index'
 import { Route as AuthenticatedWelcomeDoneRouteImport } from './routes/_authenticated/welcome.done'
@@ -38,6 +38,11 @@ import { Route as AuthenticatedHHouseholdIdSettingsCategoriesNewRouteImport } fr
 import { Route as AuthenticatedHHouseholdIdSettingsRulesRuleIdRouteImport } from './routes/_authenticated/h/$householdId/settings.rules.$ruleId'
 import { Route as AuthenticatedHHouseholdIdSettingsRulesNewRouteImport } from './routes/_authenticated/h/$householdId/settings.rules.new'
 
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
   getParentRoute: () => rootRouteImport,
@@ -60,11 +65,6 @@ const AuthRegisterRoute = AuthRegisterRouteImport.update({
   id: '/register',
   path: '/register',
   getParentRoute: () => AuthRoute,
-} as any)
-const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedHHouseholdIdRoute =
   AuthenticatedHHouseholdIdRouteImport.update({
@@ -199,7 +199,7 @@ const AuthenticatedHHouseholdIdSettingsRulesNewRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AuthenticatedIndexRoute
+  '/': typeof IndexRoute
   '/invite': typeof InviteRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
@@ -226,7 +226,7 @@ export interface FileRoutesByFullPath {
   '/h/$householdId/settings/rules/new': typeof AuthenticatedHHouseholdIdSettingsRulesNewRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof AuthenticatedIndexRoute
+  '/': typeof IndexRoute
   '/invite': typeof InviteRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
@@ -253,12 +253,12 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_auth': typeof AuthRouteWithChildren
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/invite': typeof InviteRoute
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/register': typeof AuthRegisterRoute
-  '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
   '/_authenticated/welcome/done': typeof AuthenticatedWelcomeDoneRoute
   '/_authenticated/welcome/household': typeof AuthenticatedWelcomeHouseholdRoute
@@ -338,12 +338,12 @@ export interface FileRouteTypes {
     | '/h/$householdId/settings/rules/new'
   id:
     | '__root__'
+    | '/'
     | '/_auth'
     | '/_authenticated'
     | '/invite'
     | '/_auth/login'
     | '/_auth/register'
-    | '/_authenticated/'
     | '/_authenticated/h/$householdId'
     | '/_authenticated/welcome/done'
     | '/_authenticated/welcome/household'
@@ -369,6 +369,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRouteWithChildren
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   InviteRoute: typeof InviteRoute
@@ -376,6 +377,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_auth': {
       id: '/_auth'
       path: ''
@@ -410,13 +418,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/register'
       preLoaderRoute: typeof AuthRegisterRouteImport
       parentRoute: typeof AuthRoute
-    }
-    '/_authenticated/': {
-      id: '/_authenticated/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/h/$householdId': {
       id: '/_authenticated/h/$householdId'
@@ -696,7 +697,6 @@ const AuthenticatedHHouseholdIdRouteWithChildren =
   )
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedHHouseholdIdRoute: typeof AuthenticatedHHouseholdIdRouteWithChildren
   AuthenticatedWelcomeDoneRoute: typeof AuthenticatedWelcomeDoneRoute
   AuthenticatedWelcomeHouseholdRoute: typeof AuthenticatedWelcomeHouseholdRoute
@@ -706,7 +706,6 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedHHouseholdIdRoute: AuthenticatedHHouseholdIdRouteWithChildren,
   AuthenticatedWelcomeDoneRoute: AuthenticatedWelcomeDoneRoute,
   AuthenticatedWelcomeHouseholdRoute: AuthenticatedWelcomeHouseholdRoute,
@@ -720,6 +719,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 )
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   InviteRoute: InviteRoute,

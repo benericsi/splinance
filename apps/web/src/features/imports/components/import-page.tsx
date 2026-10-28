@@ -28,6 +28,7 @@ import { FileDrop } from './file-drop';
 import { ImportHistory } from './import-history';
 import { ReviewList } from './review-list';
 import { RuleSuggestions } from './rule-suggestions';
+import { SampleExportButton } from '@/features/demo/components/sample-export-button';
 
 interface Review {
   fileName: string;
@@ -272,7 +273,15 @@ export function ImportPage({
           </CardContent>
         </Card>
       ) : (
-        <FileDrop onFile={(file) => void onFile(file)} disabled={reading || check.isPending} />
+        <>
+          <FileDrop onFile={(file) => void onFile(file)} disabled={reading || check.isPending} />
+          {__DEMO_SITE__ && (
+            <SampleExportButton
+              onFile={(file) => void onFile(file)}
+              disabled={reading || check.isPending}
+            />
+          )}
+        </>
       )}
 
       <FormError message={problem} />

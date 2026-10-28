@@ -1,5 +1,6 @@
 pnpm-lock.yaml
 dist
+dist-demo
 coverage
 apps/api/drizzle
 **/routeTree.gen.ts

@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/logo';
 import { UserMenu } from '@/features/auth/components/user-menu';
+import { DemoBanner } from '@/features/demo/components/demo-banner';
 import { useAuth } from '@/lib/auth-store';
 import { cn } from '@/lib/utils';
 import { HouseholdSwitcher } from './household-switcher';
@@ -109,6 +110,7 @@ export function HouseholdShell({
         </header>
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-24 md:px-8 md:pt-8 md:pb-12">
+          {__DEMO_SITE__ && <DemoBanner />}
           {children}
         </main>
 
