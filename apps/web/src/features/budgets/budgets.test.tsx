@@ -110,7 +110,12 @@ describe('budgets page', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Loading…');
     expect(screen.getByRole('heading', { name: 'Budgets', level: 1 })).toBeVisible();
-    expect(await screen.findByRole('heading', { name: 'October 2026' })).toBeVisible();
+    const month = await screen.findByRole('heading', { name: 'October 2026' });
+    // The page replaced a skeleton, so its sections fade in from opacity 0 and settle a
+    // frame later (animations are skipped in tests, not the first frame).
+    await waitFor(() => {
+      expect(month).toBeVisible();
+    });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
