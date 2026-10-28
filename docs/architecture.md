@@ -57,6 +57,7 @@ Key files by concern:
 | Budgets                       | `packages/shared/src/budgets.ts`, `apps/api/src/modules/budgets/*`, `apps/web/src/features/budgets/*`                    |
 | Reports (charts)              | `packages/shared/src/reports.ts`, `apps/api/src/modules/reports/*`, `apps/web/src/features/reports/*`                    |
 | Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`, `packages/shared/src/balances.ts`                       |
+| Demo data (story, bank files) | `packages/shared/src/demo/*`, `apps/api/src/modules/demo/bank-files.cli.ts`                                              |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts`         |
 | Web entry, router setup       | `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/routes/*`                                                  |
 | HTTP client, auth store       | `apps/web/src/lib/http.ts`, `apps/web/src/lib/auth-store.ts`                                                             |
@@ -98,12 +99,13 @@ Open http://localhost:5173. Vite proxies `/api/*` to the API, so the browser see
 
 ### Generators
 
-| Command                                                | What it regenerates                                                                                      |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `pnpm --filter @splinance/api db:generate`             | SQL migration from `src/db/schema/` changes                                                              |
-| `pnpm --filter @splinance/shared gen:common-passwords` | `src/password/common-passwords.ts` (top 1000 passwords with 10+ chars from `@zxcvbn-ts/language-common`) |
-| `pnpm --filter @splinance/web gen:icons`               | `public/favicon-32.png`, `public/apple-touch-icon.png` from the SVG logos                                |
-| Vite / TanStack Router plugin (automatic)              | `apps/web/src/routeTree.gen.ts` (committed, not linted)                                                  |
+| Command                                                                                  | What it regenerates                                                                                      |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter @splinance/api db:generate`                                               | SQL migration from `src/db/schema/` changes                                                              |
+| `pnpm --filter @splinance/shared gen:common-passwords`                                   | `src/password/common-passwords.ts` (top 1000 passwords with 10+ chars from `@zxcvbn-ts/language-common`) |
+| `pnpm --filter @splinance/web gen:icons`                                                 | `public/favicon-32.png`, `public/apple-touch-icon.png` from the SVG logos                                |
+| `pnpm --filter @splinance/api demo:bank-files --out <dir> [--seed <n>] [--today <date>]` | The demo story's monthly Revolut and K&H exports (not committed; for the data track)                     |
+| Vite / TanStack Router plugin (automatic)                                                | `apps/web/src/routeTree.gen.ts` (committed, not linted)                                                  |
 
 ## 3. API: request lifecycle
 
@@ -392,6 +394,7 @@ Reads `Authorization: Bearer`, verifies the JWT (algorithm pinned to HS256, issu
 | `budgets.ts`        | budget schemas, `budgetUsage()`, `BUDGET_WARNING_RATIO`                                                                              | API, web budgets (next PR)                                  |
 | `reports.ts`        | report schemas, `addMonths()`, `monthsBetween()`, `REPORT_MAX_MONTHS`                                                                | API reports, web reports                                    |
 | `imports/`          | `parseStatement()` (Revolut CSV, K&H transaction history CSV), `StatementRow`, flags, fingerprints, `nameKey()`                      | web import page (next PRs), parser tests                    |
+| `demo/`             | `buildDemoStory()` (a seeded year of a household), `renderDemoBankFiles()` (its monthly bank exports), `demoBalance()`               | demo seeder (next PR), `demo:bank-files` CLI, data track    |
 
 Split math: `allocate(total, weights)` gives everyone the floor of their exact share, then hands the units lost to rounding to the largest fractional parts, earlier positions first on ties. Shares therefore always sum to the total and never differ from the exact share by a whole unit. It computes `total * weight` with BigInt, because 10^12 minor units times 10 000 basis points passes 2^53. Equal splits are weights of 1, percentages are basis points (100% = 10 000), fixed splits must already sum to the total. The order of people decides who gets a leftover unit, so callers pass a stable order.
 
@@ -407,6 +410,8 @@ Bank imports (`imports/`): the browser reads the export, so the file never leave
 | `rounded`         | HUF with fillér (Revolut), rounded half away from zero                                                                                                                             | imported                                    |
 
 Fingerprints identify a row across exports of the same account: the bank's transaction id for K&H; for Revolut, which has none, the product, start time to the second, amount and description, plus a counter for exact repeats in one file. Amounts are read as text (`decimalToMinor`), never through floats. Revolut fees are added to the amount; cancelled Revolut rows are dropped. The test fixtures are hand-made in the banks' layouts; real exports contain names and account numbers and are never committed.
+
+Demo story (`demo/`): one deterministic source for the demo household and its bank files. `buildDemoStory({ seed, today })` returns the 12 months up to `today` of a couple in Budapest (John Doe, the visitor, banks with Revolut; Jane Doe, the partner, with K&H): rent with a 60/40 split, bills, subscriptions, salaries, groceries and meals on random days, a trip with a fixed split, cash, quarterly settle-ups, plus rules and budgets. People are roles (`you`, `partner`), not user ids. A seeded generator (`createRandom`, mulberry32, one stream per month) varies amounts, days and shops; the storyline stays fixed, and the same seed and day always give the same story. Every bank movement is a `DemoBankRow` that points at what it is in the app: an imported transaction, a settlement (recorded by hand, left out of the import) or nothing (own transfers, cash withdrawals). `renderDemoBankFiles()` writes them as the banks export them, one file per person and month, and a test reads every file back through `parseStatement` and checks dates, amounts, flags and counterparties, so the demo seeder can import the files exactly like a person would and the data track gets the same files. The current month always holds something, never anything after `today`, and its eating-out spending sits between 85% and 93% of the budget, so the overview's budget alert shows on any day.
 
 Password policy: required rules (10+ characters, does not contain the email local part or display name, not in the common list) block registration and are enforced by the API through `registerInputSchema.superRefine`. Composition rules (lowercase, uppercase, number) are only hints in the UI, following NIST SP 800-63B, which advises against mandatory composition rules. The login schema deliberately has no policy, so existing passwords keep working if rules change.
 
