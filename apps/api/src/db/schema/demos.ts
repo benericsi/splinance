@@ -26,6 +26,9 @@ export const demos = pgTable(
     partnerId: uuid().notNull(),
     // Set once the household is seeded; null only while seeding runs.
     householdId: uuid(),
+    // When seeding finished: rows created (and not changed) up to here are the story, later
+    // ones are the visitor's. The analytics views expose free text by it. Null while seeding.
+    seededAt: timestamptz(),
     // With anchor_on, rebuilds the story (and its bank files) exactly.
     seed: integer().notNull(),
     // The day the story ends on: the visitor's "today" when the demo started.

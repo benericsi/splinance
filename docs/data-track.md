@@ -48,7 +48,7 @@ The pipeline only **reads** from the app. Nothing it does changes the app's data
 | D7  | dbt: staging, intermediate, marts, tests, source freshness, data-triggered DAG              | planned |
 | D8  | Portfolio README, dbt docs on GitHub Pages                                                  | planned |
 
-Between D4 and D5 the app gets demo mode, the deploy, and the `analytics` views (separate plans).
+Between D4 and D5 the app gets demo mode (done), the deploy (postponed), and the `analytics` views (done: migration `0013`, described in [data-model.md](data-model.md#analytics-schema-views-for-the-data-track)).
 
 ## 3. Lake layout
 
@@ -140,6 +140,7 @@ The key exists only there and in the Airflow scheduler container. Rotate by crea
 - No credentials in code, logs, DAG files or Terraform state; local secrets live in gitignored `.env` files.
 - The lake bucket blocks public access, requires TLS, is encrypted (SSE-S3) and versioned; the Airflow user cannot delete object versions, so `raw/` cannot lose history.
 - The Postgres extract uses a read-only role with `SELECT` on `analytics` views only (no emails, no password hashes).
+- **Masked at the source, because `raw/` is immutable.** Demo visitors can type anything and import any file, and what reaches `raw/` stays there. So the views decide, not the pipeline: free text only where the demo story wrote it (null for anything a visitor typed or edited), private and visitor-imported transactions only as stubs (ids and timestamps), no file names. Hashing was rejected: short texts are found again from a dictionary, and pseudonymized text is still personal data.
 
 ## 8. Pipelines
 
@@ -158,6 +159,17 @@ Code layout in `data/src/splinance_data/`: `extract/` (talks to a source), `pars
 - **Checks:** required columns; daily (`FREQ=D`) spot (`SP00`) rates against EUR; readable dates; positive rates; ISO currency codes; no duplicate day and currency, within a file and across the month; no rows outside the month.
 - **Idempotent:** a rerun rewrites the same keys; rebuilding a month gives a byte-identical file (tested).
 - Weekend and holiday gaps are filled later in dbt (forward fill over a date spine), not here: clean data records what was published.
+
+### Postgres (D5, planned): how the `analytics` views are meant to be read
+
+The views and their columns are in [data-model.md](data-model.md#analytics-schema-views-for-the-data-track). What the extract has to do with them:
+
+- **One snapshot per run:** every view in one `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY` transaction, so splits always match their transactions.
+- **Full snapshots** of the small tables: households, members, users, demos, categories, budgets.
+- **Incremental** transactions and settlements by `updated_at`, splits by `transaction_updated_at`, import batches by `changed_at`, from the stored watermark minus an overlap (about 10 minutes): the app takes `updated_at` before the commit, from the API's clock, so a row can commit with a slightly older value than one already seen. Duplicates from the overlap are dropped by id (highest `version`, latest timestamp).
+- **Affected months** are the `occurred_on` months of the changed rows plus the months the lake had them in before: an edit can move a row to another month, and a stub (`redacted = true`) has no date. Those months are rewritten whole.
+- **Deleted sandboxes** leave no row behind: household ids missing from the households snapshot are gone, and their rows leave `clean/` with the next rewrite of their months.
+- **Text is null** wherever a visitor typed or edited it (`origin` says who made the row); dbt treats null as "not shown", never as empty.
 
 ## 9. Airflow
 

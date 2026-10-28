@@ -333,6 +333,7 @@ drizzle/*  --(db:migrate)----> applied in a transaction, recorded in drizzle.__d
 - Never `drizzle-kit push` (no history, can drop data).
 - The app has its own migrator (`src/db/migrator.ts`) instead of `drizzle-kit migrate`, because drizzle-kit is a dev dependency. tsdown bundles it to `dist/migrate.mjs` for deploys.
 - Tests call `runMigrations` in Vitest global setup against `splinance_test`.
+- What Drizzle cannot express (triggers, views, roles) goes into a custom migration: `pnpm --filter @splinance/api db:generate --custom --name <name>` writes an empty SQL file and its journal entry; the snapshot does not change, so later generated migrations never try to drop what it made. Examples: `0006` (split-sum triggers), `0013` (the `analytics` views and their read-only role, see [data-model.md](data-model.md#analytics-schema-views-for-the-data-track)).
 
 Table design, conventions (uuidv7 ids, money as integer minor units, `date` for calendar dates, composite foreign keys for household isolation) and planned tables are in [data-model.md](data-model.md).
 
@@ -753,6 +754,8 @@ Things that took real debugging or are easy to break. Read these before changing
 
 26. **Deleting a demo sandbox is the one hard delete.** Every foreign key is `ON DELETE NO ACTION` and the rest of the app only soft deletes, so `deleteDemo` deletes in dependency order inside one transaction (audit log, splits, transactions, imports, settlements, budgets, rules, invites, categories, members, the `demos` row, households, then the users; sessions cascade). It first locks the households `FOR UPDATE`, so a write still running in them finishes first. Deleting splits fires the deferred split-sum trigger, which skips transactions that no longer exist. A test deletes a sandbox (plus a household the visitor made) and checks that only another person's rows remain: a new table that references households or users must be added to `deleteDemo`, or that test fails. Before deleting or creating, `assertDemoDatabase` asks Postgres which database the pool reached (`current_database()` must end in `_demo` or `_test`); it runs per call, not at boot, because the API may start before its database exists (hard part 20).
 
+27. **The analytics views pin the columns they read.** Postgres refuses `ALTER COLUMN ... TYPE` and `DROP COLUMN` on a column a view uses, and `CREATE OR REPLACE VIEW` can only add columns at the end. Such a change needs a custom migration that drops the affected views, changes the table and creates the views again with their grants (`analytics.transaction_splits` reads `analytics.transactions`, so it goes too), plus the contract test and docs. Two more rules there are easy to break: a row must never just drop out of a view (make it a stub, or an extract by `updated_at` keeps the old copy), and free text is shown only by the provenance rule (`demos.seeded_at`); both are in data-model.md.
+
 ## 15. Known limitations
 
 - Access tokens cannot be revoked before they expire (15 minutes).
@@ -779,6 +782,7 @@ Reviewed 2026-10-27 (dependencies, auth, authorization, input handling, web clie
 - Dependencies: CI runs `pnpm audit:prod` (high and critical advisories in what ships fail the build). Dev tooling is audited by hand (`pnpm audit`). Node 22.19 or newer is required (`engines`): patched `undici` (jsdom) needs zlib zstd support.
 
 - Demo instance: `DEMO_MODE` is refused by env validation unless the database name ends in `_demo`, and the demo service checks `current_database()` again before creating or deleting anything. Production never mounts `/api/demo`. Registration and joining are closed on the demo, so its database holds only seeded sandboxes. Demo accounts cannot log in (random, discarded password; `.invalid` emails). `POST /api/demo` is limited per IP and by a global cap of active sandboxes.
+- Data track: the pipeline reads the demo database only through the `analytics` views, as a role that can read nothing else (a test checks every table in `public` and `drizzle`). The views carry no credentials or contact data, show free text only where the demo story wrote it, keep private and visitor-imported transactions as stubs, and are empty outside `_demo` / `_test` databases. The login role exists only on the demo database.
 
 Accepted by design (a household trusts its members; the audit log and transaction history show who changed what):
 
