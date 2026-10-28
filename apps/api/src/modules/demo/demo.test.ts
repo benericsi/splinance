@@ -19,7 +19,8 @@ import { createApp } from '../../app';
 import { db, pool } from '../../db/client';
 import { demos, importBatches, settlements, transactions } from '../../db/schema';
 import { REFRESH_COOKIE } from '../auth/auth.routes';
-import { createDemo, type DemoConfig, deleteDemo } from './demo.service';
+import { CLEANUP_LOCK, deleteExpiredDemos } from './demo.cleanup';
+import { createDemo, createSandbox, type DemoConfig, deleteDemo } from './demo.service';
 import type * as SeedModule from './demo.seed';
 
 // Lets a test make seeding fail after it has written everything.
@@ -234,5 +235,73 @@ describe('demo mode guards', () => {
       .expect(404);
     expect(errorCode(res)).toBe('DEMO_NOT_FOUND');
     await request(app).get('/api/demo').expect(401);
+  });
+});
+
+describe('DELETE /api/demo', { timeout: 30_000 }, () => {
+  it("deletes the caller's sandbox and ends the session", async () => {
+    const created = await request(app).post('/api/demo').expect(201);
+    const { accessToken } = demoCreateResponseSchema.parse(created.body);
+    const cookie = String(created.headers['set-cookie']).split(';')[0] ?? '';
+
+    const res = await request(app)
+      .delete('/api/demo')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(204);
+    expect(String(res.headers['set-cookie'])).toMatch(new RegExp(`^${REFRESH_COOKIE}=;`));
+
+    const counts = await rowCounts();
+    expect(Object.entries(counts).filter(([, n]) => n > 0)).toEqual([]);
+    await request(app).post('/api/auth/refresh').set('Cookie', cookie).expect(401);
+    const status = await request(app)
+      .get('/api/demo')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(404);
+    expect(errorCode(status)).toBe('DEMO_NOT_FOUND');
+  });
+
+  it('answers 404 for an account that is not a demo, 401 without one', async () => {
+    const anna = await createTestUser('Anna');
+    const res = await request(app)
+      .delete('/api/demo')
+      .set('Authorization', await bearer(anna))
+      .expect(404);
+    expect(errorCode(res)).toBe('DEMO_NOT_FOUND');
+    await request(app).delete('/api/demo').expect(401);
+  });
+});
+
+describe('deleteExpiredDemos', { timeout: 30_000 }, () => {
+  it('deletes the sandboxes whose time is up and keeps the rest', async () => {
+    const expiring = await createSandbox(config, { seed: 5, today: TODAY });
+    const staying = await createSandbox(config, { seed: 6, today: TODAY });
+    // No one signs in to a sandbox made this way.
+    expect((await rowCounts()).sessions).toBe(0);
+    await db
+      .update(demos)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(demos.id, expiring.demoId));
+
+    expect(await deleteExpiredDemos()).toBe(1);
+    expect(await deleteExpiredDemos()).toBe(0);
+    expect((await db.select({ id: demos.id }).from(demos)).map((d) => d.id)).toEqual([
+      staying.demoId,
+    ]);
+  });
+
+  it('skips the run while another instance holds the cleanup lock', async () => {
+    const sandbox = await createSandbox(config, { seed: 7, today: TODAY });
+    await db.update(demos).set({ expiresAt: new Date(Date.now() - 1000) });
+
+    const other = await pool.connect();
+    try {
+      await other.query('select pg_advisory_lock(hashtext($1))', [CLEANUP_LOCK]);
+      expect(await deleteExpiredDemos()).toBe(0);
+      await other.query('select pg_advisory_unlock(hashtext($1))', [CLEANUP_LOCK]);
+    } finally {
+      other.release();
+    }
+    expect(await deleteExpiredDemos()).toBe(1);
+    expect(await db.select().from(demos).where(eq(demos.id, sandbox.demoId))).toEqual([]);
   });
 });
