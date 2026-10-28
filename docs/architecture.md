@@ -87,7 +87,7 @@ Open http://localhost:5173. Vite proxies `/api/*` to the API, so the browser see
 
 `pnpm check` runs exactly what the main CI job runs: Prettier check, ESLint (type-aware, `strictTypeChecked`), `tsc` per package, all tests, all builds. Run it before pushing.
 
-`pnpm e2e` builds everything and runs the Playwright suite (see [Testing](#13-testing)). It uses its own ports and database, so it can run next to `pnpm dev`. First time only: `pnpm --filter @splinance/e2e exec playwright install chromium`.
+`pnpm e2e` builds everything and runs the Playwright suite (see [Testing](#13-testing)); `pnpm e2e:demo` does the same for the demo instance. It uses its own ports and database, so it can run next to `pnpm dev`. First time only: `pnpm --filter @splinance/e2e exec playwright install chromium`.
 
 `pnpm check:data` runs what the `Data track (Python)` CI job runs: ruff format and lint, mypy (strict) and pytest in `data/`. It needs [uv](https://docs.astral.sh/uv/); see [data-track.md](data-track.md).
 
@@ -712,6 +712,7 @@ E2E specifics (`e2e/`):
 - Budgets (`budgets.spec.ts`): a Groceries budget counts shared spending only (a private purchase stays out), shows up on the overview once it is near the limit, goes over with the next purchase, and the partner sees the same budget. A budget set last month holds this month; changing or removing it this month leaves last month's as it was.
 - Amounts are matched with `money('10 001 Ft')`, which accepts any whitespace (the app groups with a no-break space). Month totals are read with `monthStat(page, 'Spent')`; `MoneyFlow`'s visually hidden copy is what the assertion sees.
 - Locators go by role and label, like the web tests. `field(page, label)` matches a label exactly, ignoring the required asterisk, so "Password" does not also match the "Show password" button.
+- The demo instance has its own suite (`pnpm e2e:demo`, `e2e/playwright.demo.config.ts`, specs in `e2e/demo/`): the bundled API with `DEMO_MODE` on :3200 against `splinance_e2e_demo` (global setup creates and migrates it like the main one), and the demo build (`build:demo`, `dist-demo`) served by `vite preview` on :4273. Its reports go to `playwright-report/demo` and `test-results/demo`. Flows: "Try the demo" lands on John Doe's household with the banner, a balance with Jane Doe, spending this month, Rent eleven months back, budgets and the monthly Revolut imports; Start over swaps in a fresh household and the old one is gone; End demo returns to the landing page and household pages stay closed; no login or registration; a sample export goes through the import; on a phone the landing page and the demo fit without sideways scrolling. CI runs it in the e2e job after the main suite.
 - Debugging: `pnpm --filter @splinance/e2e e2e:ui` (UI mode) or `e2e:report` (last HTML report with traces of failed tests).
 
 ## 14. The hard parts
