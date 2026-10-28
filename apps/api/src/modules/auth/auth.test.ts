@@ -168,10 +168,11 @@ describe('GET /api/me', () => {
     const { accessToken } = await registerAnna(app);
 
     await request(app).get('/api/me').expect(401);
-    await request(app)
-      .get('/api/me')
-      .set('Authorization', `Bearer ${accessToken.slice(0, -2)}xx`)
-      .expect(401);
+    // Change the signature's first character: the last one carries only 4 bits, so swapping
+    // it can leave the decoded signature (and the token) valid.
+    const [header, payload, signature = ''] = accessToken.split('.');
+    const tampered = `${header ?? ''}.${payload ?? ''}.${signature.startsWith('A') ? 'B' : 'A'}${signature.slice(1)}`;
+    await request(app).get('/api/me').set('Authorization', `Bearer ${tampered}`).expect(401);
 
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.now() + 16 * 60 * 1000);

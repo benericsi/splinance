@@ -17,6 +17,7 @@
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "check:data": "uv run --directory data ruff format --check . && uv run --directory data ruff check . && uv run --directory data mypy && uv run --directory data pytest",
     "e2e": "pnpm build && pnpm --filter @splinance/e2e e2e",
+    "e2e:demo": "pnpm build && pnpm --filter @splinance/web build:demo && pnpm --filter @splinance/e2e e2e:demo",
     "audit:prod": "pnpm audit --prod --audit-level=high"
   },
   "devDependencies": {

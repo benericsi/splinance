@@ -5,15 +5,20 @@ import { E2E_DATABASE_URL } from './env';
 
 const API_DIR = fileURLToPath(new URL('../../apps/api', import.meta.url));
 
-/**
- * Creates the e2e database on first use (the docker init script only runs on an empty
- * volume), applies migrations with the bundled migrate script and empties every table.
- */
 export default async function globalSetup() {
-  const url = new URL(E2E_DATABASE_URL);
+  await prepareDatabase(E2E_DATABASE_URL);
+}
+
+/**
+ * Creates an e2e database on first use (the docker init script only runs on an empty
+ * volume), applies migrations with the bundled migrate script and empties every table.
+ * Only e2e databases: `*_e2e`, or `*_e2e_demo` for the demo instance.
+ */
+export async function prepareDatabase(databaseUrl: string) {
+  const url = new URL(databaseUrl);
   const name = url.pathname.slice(1);
-  if (!name.endsWith('_e2e')) {
-    throw new Error(`E2E_DATABASE_URL must point at a *_e2e database, got "${name}"`);
+  if (!/_e2e(_demo)?$/.test(name)) {
+    throw new Error(`e2e database URLs must point at a *_e2e(_demo) database, got "${name}"`);
   }
 
   await withClient(withDatabase(url, 'postgres'), async (client) => {
@@ -28,13 +33,13 @@ export default async function globalSetup() {
       ...process.env,
       NODE_ENV: 'test',
       LOG_LEVEL: 'warn',
-      DATABASE_URL: E2E_DATABASE_URL,
+      DATABASE_URL: databaseUrl,
       JWT_ACCESS_SECRET: 'e2e-secret-that-is-at-least-32-characters',
     },
     stdio: 'inherit',
   });
 
-  await withClient(E2E_DATABASE_URL, async (client) => {
+  await withClient(databaseUrl, async (client) => {
     const { rows } = await client.query<{ tablename: string }>(
       "select tablename from pg_tables where schemaname = 'public'",
     );
