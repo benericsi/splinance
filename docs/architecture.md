@@ -127,6 +127,7 @@ cookieParser()           req.cookies (needed for the refresh token)
   GET /me                requireAuth -> getMe
   /households            requireAuth for every route; membership checked in the services
   /invites               token-addressed: public preview, accept (rate limited)
+  /demo                  demo instance only (DEMO_MODE): start a sandbox, its status
 notFoundHandler          unknown route -> HttpError 404
 errorHandler             every error -> shared JSON error shape
 ```
@@ -279,23 +280,38 @@ Balances and settlements. Also under a household; every member sees all of them 
 - Leaving, removing a member and archiving call `assertSettled()` after `lockHousehold()` (see hard part 24).
 - Settlement writes take the same shared household lock as transaction writes and are audited (`audit_log.entity = 'settlement'`).
 
+Demo. Mounted only on the demo instance (`DEMO_MODE`); production has no such routes (404). There, registering and accepting an invite answer 403 `DEMO_MODE`: visitors start with "Try the demo", and sandboxes never share a household.
+
+| Method and path  | Who                     | Request | Success                                                              | Errors                                     |
+| ---------------- | ----------------------- | ------- | -------------------------------------------------------------------- | ------------------------------------------ |
+| `POST /api/demo` | anyone, 5 / 15 min / IP |         | 201 `{ accessToken, user, householdId, expiresAt }` + refresh cookie | 429, 503 `DEMO_CAPACITY` (too many active) |
+| `GET /api/demo`  | signed in               |         | 200 `{ demo: { expiresAt } }`                                        | 404 `DEMO_NOT_FOUND` (not a demo account)  |
+
+- A sandbox is two accounts (the visitor, John Doe, and the partner, Jane Doe) with `demo-<uuid>@demo.invalid` emails (a reserved domain) and the hash of a random password that is thrown away: nobody can log in to them; the visitor gets a session directly.
+- `seedDemo` builds the household from the demo story (`packages/shared/src/demo`, seed and day stored in `demos`) only through the services the routes use: create the household, an invite the partner accepts, rules and budgets, then each person's monthly bank exports through `parseStatement` and `createImport` (own transfers, cash and payments between them left out, as the review would), hand-entered transactions and settlements. About 60 small database transactions, a second or two.
+- The cap counts unexpired sandboxes inside a transaction holding an advisory lock (`pg_advisory_xact_lock`), so parallel requests cannot pass it together. If seeding fails, the sandbox is deleted and the request fails with 500.
+- `deleteDemo` removes a sandbox for good (see hard part 26). Expired sandboxes are cleaned up by a job (next PR).
+
 `household` is `{ id, name, baseCurrency, role, createdAt }` where `role` is the caller's role; members are `{ userId, displayName, role, joinedAt }` (no emails). The raw invite token appears only in the create response; the web app builds the link (and later a QR code) from it.
 
 The refresh cookie: name `refresh_token`, `HttpOnly`, `SameSite=Strict`, `Path=/api/auth` (never sent to other endpoints), `Secure` when `COOKIE_SECURE` is true (default in production), expires with the session (30 days, sliding).
 
 Environment (`apps/api/src/config/env.ts`, validated with Zod at startup, the process exits on invalid config):
 
-| Variable                   | Default            | Notes                              |
-| -------------------------- | ------------------ | ---------------------------------- |
-| `NODE_ENV`                 | development        | development, test, production      |
-| `PORT`                     | 3000               |                                    |
-| `LOG_LEVEL`                | info               | pino levels plus `silent`          |
-| `DATABASE_URL`             | required           | must be a `postgres://` URL        |
-| `JWT_ACCESS_SECRET`        | required           | at least 32 characters (HS256 key) |
-| `ACCESS_TOKEN_TTL_SECONDS` | 900                |                                    |
-| `REFRESH_TOKEN_TTL_DAYS`   | 30                 |                                    |
-| `COOKIE_SECURE`            | true in production | must be false for local http       |
-| `RATE_LIMIT_DISABLED`      | false              | e2e only; refused in production    |
+| Variable                   | Default            | Notes                                                                |
+| -------------------------- | ------------------ | -------------------------------------------------------------------- |
+| `NODE_ENV`                 | development        | development, test, production                                        |
+| `PORT`                     | 3000               |                                                                      |
+| `LOG_LEVEL`                | info               | pino levels plus `silent`                                            |
+| `DATABASE_URL`             | required           | must be a `postgres://` URL                                          |
+| `JWT_ACCESS_SECRET`        | required           | at least 32 characters (HS256 key)                                   |
+| `ACCESS_TOKEN_TTL_SECONDS` | 900                |                                                                      |
+| `REFRESH_TOKEN_TTL_DAYS`   | 30                 |                                                                      |
+| `COOKIE_SECURE`            | true in production | must be false for local http                                         |
+| `RATE_LIMIT_DISABLED`      | false              | e2e only; refused in production                                      |
+| `DEMO_MODE`                | false              | demo instance only; refused unless the database name ends in `_demo` |
+| `DEMO_TTL_DAYS`            | 7                  | days until a sandbox is deleted (1-30)                               |
+| `DEMO_MAX_ACTIVE`          | 200                | unexpired sandboxes at once                                          |
 
 ## 5. Database and migrations
 
@@ -719,6 +735,8 @@ Things that took real debugging or are easy to break. Read these before changing
 
 25. **Undo and its timestamp.** Undoing an import soft deletes its transactions and marks the batch with one shared timestamp. That is how the duplicate check knows a row was removed by the undo (import it again) rather than deleted by the person on their own (leave it out): `deleted_at = undone_at`. Separate timestamps per row would turn every undone row into "deleted".
 
+26. **Deleting a demo sandbox is the one hard delete.** Every foreign key is `ON DELETE NO ACTION` and the rest of the app only soft deletes, so `deleteDemo` deletes in dependency order inside one transaction (audit log, splits, transactions, imports, settlements, budgets, rules, invites, categories, members, the `demos` row, households, then the users; sessions cascade). It first locks the households `FOR UPDATE`, so a write still running in them finishes first. Deleting splits fires the deferred split-sum trigger, which skips transactions that no longer exist. A test deletes a sandbox (plus a household the visitor made) and checks that only another person's rows remain: a new table that references households or users must be added to `deleteDemo`, or that test fails. Before deleting or creating, `assertDemoDatabase` asks Postgres which database the pool reached (`current_database()` must end in `_demo` or `_test`); it runs per call, not at boot, because the API may start before its database exists (hard part 20).
+
 ## 15. Known limitations
 
 - Access tokens cannot be revoked before they expire (15 minutes).
@@ -744,6 +762,8 @@ Reviewed 2026-10-27 (dependencies, auth, authorization, input handling, web clie
 - Web: no `dangerouslySetInnerHTML`; React escapes everything else. Redirect targets after login go through `safeRedirect` (same origin only, no backslashes or control characters, which URL parsing would turn into `//host`). Devtools load only in development.
 - Dependencies: CI runs `pnpm audit:prod` (high and critical advisories in what ships fail the build). Dev tooling is audited by hand (`pnpm audit`). Node 22.19 or newer is required (`engines`): patched `undici` (jsdom) needs zlib zstd support.
 
+- Demo instance: `DEMO_MODE` is refused by env validation unless the database name ends in `_demo`, and the demo service checks `current_database()` again before creating or deleting anything. Production never mounts `/api/demo`. Registration and joining are closed on the demo, so its database holds only seeded sandboxes. Demo accounts cannot log in (random, discarded password; `.invalid` emails). `POST /api/demo` is limited per IP and by a global cap of active sandboxes.
+
 Accepted by design (a household trusts its members; the audit log and transaction history show who changed what):
 
 - Any member can edit or delete any shared transaction, including who paid and the split.
@@ -755,5 +775,6 @@ Before the first deploy:
 - `app.set('trust proxy', ...)` for the reverse proxy, so rate limits and logs see client IPs.
 - The web server sends HSTS, `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` and a CSP (`script-src 'self'` plus the hash of the inline theme script in `index.html`; fonts and styles are self-hosted).
 - `NODE_ENV=production` (secure cookies by default; keep `COOKIE_SECURE` unset or true), a random `JWT_ACCESS_SECRET` from a secret store, the database user without superuser rights.
+- The demo instance gets its own `JWT_ACCESS_SECRET` (with a shared one, a demo access token would verify on production) and its own database; cookies stay host-only (no `Domain`), so the two hosts never share them.
 - GitHub Actions pinned to commit SHAs, Dependabot for npm and actions, a deploy key that can only deploy.
 - A job that deletes expired sessions and invites (Phase 6), and database backups.

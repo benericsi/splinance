@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { buildDemoStory, renderDemoBankFiles } from '@splinance/shared';
+import { budapestToday } from './today';
 
 /**
  * Writes the demo story's bank exports (one Revolut and one K&H file per month) to a folder,
@@ -13,10 +14,6 @@ import { buildDemoStory, renderDemoBankFiles } from '@splinance/shared';
 
 const USAGE =
   'Usage: pnpm --filter @splinance/api demo:bank-files --out <dir> [--seed <n>] [--today <YYYY-MM-DD>]';
-
-/** Today in Budapest, where the demo household lives. */
-const budapestToday = () =>
-  new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Budapest' }).format(new Date());
 
 try {
   const { values } = parseArgs({

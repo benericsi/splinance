@@ -270,6 +270,24 @@ Private and deleted rows never count. Debts are netted within each pair (`netDeb
 - Append-only, written in the same database transaction as the change: never a change without its entry, or the other way round.
 - Snapshots are the API shape, including display names at that time.
 
+### `demos`
+
+One "Try the demo" sandbox on the demo instance. Empty on production.
+
+| Column       | Type                  | Notes                                                                    |
+| ------------ | --------------------- | ------------------------------------------------------------------------ |
+| id           | uuid PK               | uuidv7                                                                   |
+| user_id      | uuid FK -> users      | The visitor; unique (`demos_user_id_unique`)                             |
+| partner_id   | uuid FK -> users      | The made-up partner; differs from the visitor (`demos_people_differ`)    |
+| household_id | uuid FK -> households | The seeded household; null only while seeding runs                       |
+| seed         | integer               | `>= 0`; with `anchor_on` rebuilds the story and its bank files exactly   |
+| anchor_on    | date                  | The day the story ends on (the visitor's today when the demo started)    |
+| expires_at   | timestamptz           | Indexed (`demos_expires_at_idx`): the cap counts unexpired rows, cleanup |
+| created_at   | timestamptz           |                                                                          |
+
+- The exception to "never hard-deleted": a sandbox is deleted with its households, every row in them and both accounts (`deleteDemo`, architecture hard part 26). Soft deleting would keep visitors' text forever and grow the demo database without bound.
+- No `is_demo` flag on households: the demo instance has its own database, so everything in it is demo data; what cleanup and the banner need is the expiry per visitor.
+
 ## Planned (not created yet)
 
 - Later: recurring series, notifications

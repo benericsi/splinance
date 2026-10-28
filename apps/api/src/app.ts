@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
+import { env } from './config/env';
 import { pingDatabase } from './db/client';
 import { logger } from './lib/logger';
 import { redactUrl } from './lib/redact-url';
@@ -10,16 +11,26 @@ import { rateLimiter } from './middleware/rate-limit';
 import { requireAuth } from './middleware/require-auth';
 import { createAuthRouter, getMe } from './modules/auth/auth.routes';
 import { createHouseholdsRouter } from './modules/households/households.routes';
+import { createDemoRouter } from './modules/demo/demo.routes';
+import type { DemoConfig } from './modules/demo/demo.service';
 import { createInvitesRouter } from './modules/invites/invites.routes';
 import { createHealthRouter, type HealthDeps } from './routes/health';
 
-export type AppDeps = HealthDeps;
+export interface AppDeps extends HealthDeps {
+  /** Set on the demo instance only: mounts /api/demo and closes registration and joining. */
+  demo: DemoConfig | null;
+}
 
-const defaultDeps: AppDeps = { pingDatabase };
+const defaultDeps: AppDeps = {
+  pingDatabase,
+  demo: env.DEMO_MODE ? { ttlDays: env.DEMO_TTL_DAYS, maxActive: env.DEMO_MAX_ACTIVE } : null,
+};
 
 const IMPORT_PATH = /^\/api\/households\/[^/]+\/imports(\/check)?$/;
 
-export function createApp(deps: AppDeps = defaultDeps) {
+export function createApp(overrides: Partial<AppDeps> = {}) {
+  const deps: AppDeps = { ...defaultDeps, ...overrides };
+  const demo = deps.demo !== null;
   const app = express();
 
   app.disable('x-powered-by');
@@ -53,10 +64,11 @@ export function createApp(deps: AppDeps = defaultDeps) {
   // A ceiling for everything else (health checks stay out of it); the auth, invite and import
   // routes have tighter limits of their own.
   api.use(rateLimiter(1000));
-  api.use('/auth', createAuthRouter());
+  api.use('/auth', createAuthRouter({ demo }));
   api.get('/me', requireAuth, getMe);
   api.use('/households', createHouseholdsRouter());
-  api.use('/invites', createInvitesRouter());
+  api.use('/invites', createInvitesRouter({ demo }));
+  if (deps.demo) api.use('/demo', createDemoRouter(deps.demo));
   app.use('/api', api);
 
   app.use(notFoundHandler);

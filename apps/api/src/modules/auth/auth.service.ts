@@ -50,7 +50,8 @@ function refreshExpiry(now: Date): Date {
   return new Date(now.getTime() + env.REFRESH_TOKEN_TTL_DAYS * DAY_MS);
 }
 
-async function createSession(executor: Db, user: UserRow): Promise<AuthResult> {
+/** Starts a session (one per login or device) and signs its first access token. */
+export async function createSession(executor: Db, user: UserRow): Promise<AuthResult> {
   const now = new Date();
   const refreshToken = generateToken();
   const expiresAt = refreshExpiry(now);

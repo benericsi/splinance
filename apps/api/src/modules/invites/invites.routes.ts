@@ -4,6 +4,7 @@ import {
   type InvitePreviewResponse,
 } from '@splinance/shared';
 import { type Request, Router } from 'express';
+import { closedInDemo } from '../../middleware/demo-mode';
 import { rateLimiter } from '../../middleware/rate-limit';
 import { getAuth, requireAuth } from '../../middleware/require-auth';
 import { acceptInvite, inviteNotFound, previewInvite } from './invites.service';
@@ -18,7 +19,7 @@ function tokenParam(req: Request): string {
  * Token-addressed routes: /api/invites/:token. The token is a credential, so request logs
  * redact it (see redactUrl). Household-scoped invite routes live in the households router.
  */
-export function createInvitesRouter() {
+export function createInvitesRouter({ demo = false }: { demo?: boolean } = {}) {
   const router = Router();
 
   // Public, so the invite page can show what the link is for before login or registration.
@@ -27,6 +28,7 @@ export function createInvitesRouter() {
     res.json(body);
   });
 
+  if (demo) router.post('/:token/accept', closedInDemo);
   router.post('/:token/accept', rateLimiter(30), requireAuth, async (req, res) => {
     const household = await acceptInvite({ userId: getAuth(req).userId, token: tokenParam(req) });
     const body: HouseholdResponse = { household };

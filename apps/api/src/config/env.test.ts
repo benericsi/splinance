@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseEnv } from './env';
+import { databaseName, parseEnv } from './env';
 
 const required = {
   DATABASE_URL: 'postgres://user:pass@localhost:5432/db',
@@ -17,6 +17,9 @@ describe('parseEnv', () => {
       REFRESH_TOKEN_TTL_DAYS: 30,
       COOKIE_SECURE: false,
       RATE_LIMIT_DISABLED: false,
+      DEMO_MODE: false,
+      DEMO_TTL_DAYS: 7,
+      DEMO_MAX_ACTIVE: 200,
     });
   });
 
@@ -62,5 +65,25 @@ describe('parseEnv', () => {
     };
     expect(parseEnv(example).JWT_ACCESS_SECRET).toBe(example.JWT_ACCESS_SECRET);
     expect(() => parseEnv({ ...example, NODE_ENV: 'production' })).toThrow(/JWT_ACCESS_SECRET/);
+  });
+
+  it('allows DEMO_MODE only on a database whose name ends in _demo', () => {
+    const demo = { ...required, DEMO_MODE: 'true' };
+    expect(() => parseEnv(demo)).toThrow(/DEMO_MODE/);
+    expect(() =>
+      parseEnv({ ...demo, DATABASE_URL: 'postgres://u:p@localhost:5432/splinance' }),
+    ).toThrow(/DEMO_MODE/);
+    expect(() =>
+      parseEnv({ ...demo, DATABASE_URL: 'postgres://u:p@localhost:5432/splinance_demo_old' }),
+    ).toThrow(/DEMO_MODE/);
+    const env = parseEnv({ ...demo, DATABASE_URL: 'postgres://u:p@db:5432/splinance_demo' });
+    expect(env.DEMO_MODE).toBe(true);
+  });
+
+  it('reads the database name from the URL', () => {
+    expect(databaseName('postgres://u:p@localhost:5432/splinance_demo?sslmode=require')).toBe(
+      'splinance_demo',
+    );
+    expect(databaseName('postgresql://localhost/my%5Fdemo')).toBe('my_demo');
   });
 });

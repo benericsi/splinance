@@ -1,3 +1,4 @@
+export * from './api';
 export { type DemoBankFile, demoParseOptions, renderDemoBankFiles } from './bank-files';
 export { createRandom, type Random } from './random';
 export {
