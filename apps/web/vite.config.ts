@@ -2,8 +2,31 @@ import tailwindcss from '@tailwindcss/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
-import { loadEnv } from 'vite';
+import { loadEnv, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+
+/**
+ * Vite writes an imported asset to the output as soon as it loads the importing module,
+ * before tree shaking. The landing page is dropped from production builds, but its tour
+ * video and screenshots would still be emitted: remove the demo assets no chunk refers to.
+ */
+function dropUnusedDemoAssets(): Plugin {
+  return {
+    name: 'drop-unused-demo-assets',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const files = Object.values(bundle);
+      const code = files.map((file) => (file.type === 'chunk' ? file.code : '')).join('\n');
+      for (const file of files) {
+        const demoAsset =
+          file.type === 'asset' &&
+          file.originalFileNames.some((name) => /src[\\/]assets[\\/]demo[\\/]/.test(name));
+        if (demoAsset && !code.includes(file.fileName))
+          Reflect.deleteProperty(bundle, file.fileName);
+      }
+    },
+  };
+}
 
 // The e2e suite points `vite preview` at its own API instance.
 const apiTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:3000';
@@ -30,6 +53,7 @@ export default defineConfig(({ mode }) => ({
     }),
     react(),
     tailwindcss(),
+    dropUnusedDemoAssets(),
   ],
   resolve: {
     alias: {

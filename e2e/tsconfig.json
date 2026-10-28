@@ -4,5 +4,5 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["tests", "demo", "support", "playwright.config.ts", "playwright.demo.config.ts"]
+  "include": ["tests", "demo", "capture", "support", "playwright*.config.ts"]
 }

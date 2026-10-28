@@ -3,8 +3,15 @@ import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { Logo } from '@/components/logo';
 import { PageTitle } from '@/components/page-title';
 import { ThemeToggle } from '@/components/theme-toggle';
+import overviewDark from '@/assets/demo/overview-dark.jpg';
+import overviewLight from '@/assets/demo/overview-light.jpg';
+import phoneDark from '@/assets/demo/phone-dark.jpg';
+import phoneLight from '@/assets/demo/phone-light.jpg';
+import tourDark from '@/assets/demo/tour-dark.webm';
+import tourLight from '@/assets/demo/tour-light.webm';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { useTheme } from '@/lib/theme';
+import { useMediaQuery } from '@/lib/use-media-query';
 import { useStartDemo } from '../hooks';
 
 const REPO = 'https://github.com/benericsi/splinance';
@@ -139,66 +146,39 @@ export function DemoLanding() {
 }
 
 /**
- * The desktop app on the brand's blue tile with the phone overlapping its corner. Drawn
- * shapes for now; the recorded tour and screenshots replace them (A1f).
+ * The recorded tour on the brand's blue tile, the phone overlapping its corner. Recorded
+ * with `pnpm capture:demo` (e2e/capture), in the theme the page is in. With reduced motion
+ * the video waits on its poster with controls instead of playing by itself.
  */
 function AppPreview() {
+  const { resolved } = useTheme();
+  const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
+  const dark = resolved === 'dark';
+
   return (
-    <section aria-hidden className="relative mt-12 pb-8 md:mt-16">
+    <section aria-label="A tour of the app" className="relative mt-12 pb-8 md:mt-16">
       <div className="bg-brand-blue rounded-3xl p-4 pr-20 sm:p-8 sm:pr-36 md:p-12 md:pr-48">
-        <Window className="aspect-video" />
+        <video
+          // A new element when the theme flips, so the other recording loads.
+          key={resolved}
+          src={dark ? tourDark : tourLight}
+          poster={dark ? overviewDark : overviewLight}
+          aria-label="A tour: trying the demo, then the overview, transactions, reports and budgets"
+          autoPlay={!reduceMotion}
+          controls={reduceMotion}
+          preload={reduceMotion ? 'none' : 'auto'}
+          muted
+          loop
+          playsInline
+          className="bg-background aspect-[16/10] w-full rounded-xl"
+        />
       </div>
-      <Phone className="absolute right-4 bottom-0 w-20 sm:right-8 sm:w-28 md:right-12 md:w-36" />
+      <img
+        src={dark ? phoneDark : phoneLight}
+        alt="The demo household's overview on a phone"
+        loading="lazy"
+        className="border-foreground bg-background absolute right-4 bottom-0 aspect-[390/844] w-20 rounded-[1.25rem] border-4 object-cover sm:right-8 sm:w-28 sm:rounded-[1.75rem] md:right-12 md:w-36"
+      />
     </section>
-  );
-}
-
-function Window({ className }: { className?: string }) {
-  return (
-    <div className={cn('bg-background flex flex-col overflow-hidden rounded-xl', className)}>
-      <div className="flex h-6 shrink-0 items-center gap-1.5 border-b px-3">
-        <span className="bg-muted size-2 rounded-full" />
-        <span className="bg-muted size-2 rounded-full" />
-        <span className="bg-muted size-2 rounded-full" />
-      </div>
-      <div className="flex flex-1">
-        <div className="bg-muted/50 hidden w-1/5 flex-col gap-2 border-r p-3 sm:flex">
-          <span className="bg-muted h-2 w-3/4 rounded" />
-          <span className="bg-muted h-2 w-1/2 rounded" />
-          <span className="bg-muted h-2 w-2/3 rounded" />
-        </div>
-        <div className="flex flex-1 flex-col gap-3 p-3 sm:p-6">
-          <span className="bg-muted h-3 w-1/3 rounded" />
-          <span className="bg-brand-green h-6 w-1/4 rounded sm:h-8" />
-          <div className="mt-auto flex h-1/3 items-end gap-2">
-            {[55, 80, 40, 70, 95, 60].map((height) => (
-              <span
-                key={height}
-                className="bg-muted flex-1 rounded-t"
-                style={{ height: `${String(height)}%` }}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Phone({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        'border-foreground bg-background flex aspect-[9/19] flex-col gap-2 rounded-[1.25rem] border-4 p-2 sm:rounded-[1.75rem] sm:p-3',
-        className,
-      )}
-    >
-      <span className="bg-muted h-2 w-2/3 rounded" />
-      <span className="bg-brand-green h-4 w-1/2 rounded" />
-      <span className="bg-muted h-2 w-full rounded" />
-      <span className="bg-muted h-2 w-5/6 rounded" />
-      <span className="bg-muted h-2 w-full rounded" />
-      <span className="bg-muted mt-auto h-3 w-full rounded" />
-    </div>
   );
 }
