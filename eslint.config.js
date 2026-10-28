@@ -9,6 +9,7 @@ export default tseslint.config(
   {
     ignores: [
       '**/dist/**',
+      '**/dist-demo/**',
       '**/coverage/**',
       '**/routeTree.gen.ts',
       '**/playwright-report/**',

@@ -3,6 +3,7 @@ import { AuthLayout } from '@/features/auth/components/auth-layout';
 import { LoginForm } from '@/features/auth/components/login-form';
 import { redirectSearchSchema, safeRedirect } from '@/lib/safe-redirect';
 import { PageTitle } from '@/components/page-title';
+import { DEMO_URL } from '@/lib/demo-site';
 
 export const Route = createFileRoute('/_auth/login')({
   validateSearch: redirectSearchSchema,
@@ -33,6 +34,14 @@ function LoginPage() {
         }
       >
         <LoginForm onSuccess={() => void navigate({ href: safeRedirect(target), replace: true })} />
+        {DEMO_URL && (
+          <p className="text-muted-foreground mt-6 text-center text-sm">
+            Just looking?{' '}
+            <a href={DEMO_URL} className="text-link font-medium underline-offset-4 hover:underline">
+              Try the demo
+            </a>
+          </p>
+        )}
       </AuthLayout>
     </>
   );

@@ -452,13 +452,13 @@ File-based TanStack Router routes in `apps/web/src/routes`:
 ```
 __root.tsx                 shell: TooltipProvider, Toaster, devtools (dev only), session restore,
                            full-page NotFound/Error components
+index.tsx                  /  dispatcher for signed-in users: the last used household, else the first,
+                              else /welcome. Anonymous: /login, or the landing page on the demo site
 _auth.tsx                  pathless layout: if authenticated -> redirect to ?redirect target
   _auth/login.tsx          /login
   _auth/register.tsx       /register
 _authenticated.tsx         pathless layout: if not authenticated -> redirect /login?redirect=<current>;
                            validates ?modal= and renders app-wide modals (ModalHost)
-  _authenticated/index.tsx /  dispatcher: redirect to the last used household, else the first,
-                              else /welcome
   _authenticated/welcome.*.tsx  /welcome (create or join), /welcome/household, /welcome/invite,
                                 /welcome/done (?household=<id>), /welcome/join
   _authenticated/h/$householdId.tsx           household layout: loads the household (404 -> notFound()),
@@ -488,6 +488,17 @@ invite.tsx                 /invite#<token>  public invite landing page (logged i
 - The last used household is kept in localStorage per user id (`splinance-last-household:<userId>`), a convenience only: `/` checks it against the list from the API.
 - Categories (settings card, any member): one kind at a time (Expenses / Income), a row opens the edit dialog, a per-row menu edits or archives (with a confirmation), and archived categories fold away under "Archived (n)" with Restore. The dialog has a live preview tile, the kind (create only; it is fixed afterwards), the name (a taken name shows next to the field), 8 brand color swatches and the 35-icon grid. Swatches and icons are visually hidden native radio inputs, so arrow keys and screen reader announcements work without extra code. A new category gets the color used least among its kind. Archived categories cannot be opened for editing (the API refuses; the route redirects back).
 - Settings: owners rename inline, change roles and remove members from a per-row menu, and archive (typing the household name to confirm). Everyone can leave; the only owner gets an explanation instead of a confirm button (the API enforces `LAST_OWNER` too). Confirmations use `ConfirmDialog` (an alert dialog with local state), not URL-driven modals: a confirmation should not survive a reload or a shared link.
+
+### Demo site
+
+The demo instance (demo.<domain>) serves its own build of the web app. `__DEMO_SITE__` is true in it (`vite --mode demo`, `pnpm --filter @splinance/web dev:demo` on :5174 and `build:demo` into `dist-demo`, or `VITE_DEMO=true`); it is a `define`, a literal at every use, so the bundler removes the demo branches and every import only they use (the landing page, the demo story) from the production build. A constant exported from a module would not do: the bundler does not fold imported constants, only the minifier does, after the shared chunk has kept the story. Vitest turns defines into globals, so tests switch it with `setDemoSite()` (`test/demo-site.ts`).
+
+- `/` for anonymous visitors is the landing page (`DemoLanding`, layout "BC2"): headline, "Try the demo", the app on the brand's blue tile with the phone overlapping it (drawn shapes until the recorded tour arrives), what the demo holds, "How it's built" with links to this document, the source and the data pipeline, and a note that the data is made up. "Try the demo" calls `POST /api/demo` (a second or two, the button says "Setting up your household…"), stores the session and opens the household. Errors (the cap, the rate limit) are the usual toast.
+- No login: `/login` and `/register` lead to `/`, and so does every page under `_authenticated` for a signed-out visitor. `/welcome/join` leads to `/welcome` (the API refuses joining too).
+- `DemoBanner` sits at the top of every household page, level with the account menu on desktop: "Demo data · deleted in 6 days" (`GET /api/demo`, `Intl.RelativeTimeFormat`) and "Start over" (a confirmation, then `DELETE` and `POST /api/demo`). The new household opens with a full page load (`pageLoad.replace`): every cached query and mounted page belongs to the deleted one, and the new refresh cookie restores the session. If the new sandbox cannot be made, the visitor is signed out to the landing page with the error.
+- The account menu shows "Demo account" instead of the email and "End demo" (with a confirmation) instead of "Log out": `DELETE /api/demo`, then the same local sign-out as logging out, so the guards return to the landing page.
+- The import page offers "No export at hand? Try a sample one": a Revolut export of the current month from a fresh demo story (new rows for the household), handed to the import as if picked from disk.
+- Production: when `VITE_DEMO_URL` is an http(s) URL, the login page links to the demo ("Just looking? Try the demo").
 
 ### Onboarding
 

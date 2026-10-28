@@ -16,6 +16,8 @@ export const Route = createFileRoute('/_authenticated')({
   beforeLoad: ({ context, location }) => {
     const { status, endedBy } = context.auth.getState();
     if (status !== 'authenticated') {
+      // The demo site has no login: its visitors start on the landing page.
+      if (__DEMO_SITE__) throw redirect({ to: '/' });
       // Come back here after logging in (deep link, expired session), but not after an
       // explicit logout: the next person may be someone else, who cannot see this page.
       throw redirect({
