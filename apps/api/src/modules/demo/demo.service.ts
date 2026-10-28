@@ -15,6 +15,7 @@ import {
   settlements,
   transactionSplits,
   transactions,
+  type UserRow,
   users,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
@@ -29,6 +30,16 @@ export interface DemoConfig {
   ttlDays: number;
   /** Sandboxes that may exist at once (unexpired ones). */
   maxActive: number;
+}
+
+export interface Sandbox {
+  demoId: string;
+  householdId: string;
+  seed: number;
+  /** The day the story ends on. */
+  today: string;
+  expiresAt: Date;
+  visitor: UserRow;
 }
 
 export interface DemoCreated extends AuthResult {
@@ -60,13 +71,13 @@ export async function assertDemoDatabase(executor: Db): Promise<void> {
 
 /**
  * Creates a sandbox: the visitor and a made-up partner (accounts nobody can log in to:
- * the password is random and thrown away), a household seeded with the demo story for the
- * last 12 months, and a session for the visitor. A failure on the way deletes what was made.
+ * the password is random and thrown away) and a household seeded with the demo story for
+ * the last 12 months. A failure on the way deletes what was made.
  */
-export async function createDemo(
+export async function createSandbox(
   config: DemoConfig,
   options: { today?: string; seed?: number } = {},
-): Promise<DemoCreated> {
+): Promise<Sandbox> {
   const started = Date.now();
   await assertDemoDatabase(db);
   const today = options.today ?? budapestToday();
@@ -111,16 +122,34 @@ export async function createDemo(
   try {
     const householdId = await seedDemo(story, { you: demo.userId, partner: demo.partnerId });
     await db.update(demos).set({ householdId }).where(eq(demos.id, demo.id));
-    const session = await createSession(db, visitor);
     logger.info({ demoId: demo.id, ms: Date.now() - started }, 'Demo created');
-    return { ...session, householdId, expiresAt };
+    return { demoId: demo.id, householdId, seed, today, expiresAt, visitor };
   } catch (error) {
     // Half a household is no demo: remove what was made, then report the original failure.
-    await deleteDemo(demo.id).catch((cleanupError: unknown) => {
-      logger.error({ err: cleanupError, demoId: demo.id }, 'Could not delete a failed demo');
-    });
+    await deleteQuietly(demo.id);
     throw error;
   }
+}
+
+/** A sandbox for a visitor of the demo site, signed in. */
+export async function createDemo(
+  config: DemoConfig,
+  options: { today?: string; seed?: number } = {},
+): Promise<DemoCreated> {
+  const sandbox = await createSandbox(config, options);
+  try {
+    const session = await createSession(db, sandbox.visitor);
+    return { ...session, householdId: sandbox.householdId, expiresAt: sandbox.expiresAt };
+  } catch (error) {
+    await deleteQuietly(sandbox.demoId);
+    throw error;
+  }
+}
+
+async function deleteQuietly(demoId: string): Promise<void> {
+  await deleteDemo(demoId).catch((cleanupError: unknown) => {
+    logger.error({ err: cleanupError, demoId }, 'Could not delete a failed demo');
+  });
 }
 
 /** The caller's sandbox, for the banner; 404 for accounts that are not demos. */
@@ -131,6 +160,13 @@ export async function getDemo(userId: string): Promise<{ expiresAt: Date }> {
     .where(eq(demos.userId, userId));
   if (!demo) throw demoNotFound();
   return demo;
+}
+
+/** "Start over" and "End demo": the visitor deletes their own sandbox. */
+export async function endDemo(userId: string): Promise<void> {
+  const [demo] = await db.select({ id: demos.id }).from(demos).where(eq(demos.userId, userId));
+  if (!demo) throw demoNotFound();
+  await deleteDemo(demo.id);
 }
 
 /**

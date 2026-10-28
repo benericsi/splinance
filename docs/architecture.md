@@ -104,6 +104,7 @@ Open http://localhost:5173. Vite proxies `/api/*` to the API, so the browser see
 | `pnpm --filter @splinance/api db:generate`                                               | SQL migration from `src/db/schema/` changes                                                              |
 | `pnpm --filter @splinance/shared gen:common-passwords`                                   | `src/password/common-passwords.ts` (top 1000 passwords with 10+ chars from `@zxcvbn-ts/language-common`) |
 | `pnpm --filter @splinance/web gen:icons`                                                 | `public/favicon-32.png`, `public/apple-touch-icon.png` from the SVG logos                                |
+| `pnpm --filter @splinance/api demo:create [--seed <n>] [--today <date>] [--days <n>]`    | A demo sandbox on the configured `_demo` database, no session (see Demo in section 4)                    |
 | `pnpm --filter @splinance/api demo:bank-files --out <dir> [--seed <n>] [--today <date>]` | The demo story's monthly Revolut and K&H exports (not committed; for the data track)                     |
 | Vite / TanStack Router plugin (automatic)                                                | `apps/web/src/routeTree.gen.ts` (committed, not linted)                                                  |
 
@@ -282,15 +283,17 @@ Balances and settlements. Also under a household; every member sees all of them 
 
 Demo. Mounted only on the demo instance (`DEMO_MODE`); production has no such routes (404). There, registering and accepting an invite answer 403 `DEMO_MODE`: visitors start with "Try the demo", and sandboxes never share a household.
 
-| Method and path  | Who                     | Request | Success                                                              | Errors                                     |
-| ---------------- | ----------------------- | ------- | -------------------------------------------------------------------- | ------------------------------------------ |
-| `POST /api/demo` | anyone, 5 / 15 min / IP |         | 201 `{ accessToken, user, householdId, expiresAt }` + refresh cookie | 429, 503 `DEMO_CAPACITY` (too many active) |
-| `GET /api/demo`  | signed in               |         | 200 `{ demo: { expiresAt } }`                                        | 404 `DEMO_NOT_FOUND` (not a demo account)  |
+| Method and path    | Who                     | Request | Success                                                                              | Errors                                     |
+| ------------------ | ----------------------- | ------- | ------------------------------------------------------------------------------------ | ------------------------------------------ |
+| `POST /api/demo`   | anyone, 5 / 15 min / IP |         | 201 `{ accessToken, user, householdId, expiresAt }` + refresh cookie                 | 429, 503 `DEMO_CAPACITY` (too many active) |
+| `GET /api/demo`    | signed in               |         | 200 `{ demo: { expiresAt } }`                                                        | 404 `DEMO_NOT_FOUND` (not a demo account)  |
+| `DELETE /api/demo` | signed in, 20 / 15 min  |         | 204, the sandbox deleted for good, refresh cookie cleared ("Start over", "End demo") | 404 `DEMO_NOT_FOUND`                       |
 
 - A sandbox is two accounts (the visitor, John Doe, and the partner, Jane Doe) with `demo-<uuid>@demo.invalid` emails (a reserved domain) and the hash of a random password that is thrown away: nobody can log in to them; the visitor gets a session directly.
 - `seedDemo` builds the household from the demo story (`packages/shared/src/demo`, seed and day stored in `demos`) only through the services the routes use: create the household, an invite the partner accepts, rules and budgets, then each person's monthly bank exports through `parseStatement` and `createImport` (own transfers, cash and payments between them left out, as the review would), hand-entered transactions and settlements. About 60 small database transactions, a second or two.
 - The cap counts unexpired sandboxes inside a transaction holding an advisory lock (`pg_advisory_xact_lock`), so parallel requests cannot pass it together. If seeding fails, the sandbox is deleted and the request fails with 500.
-- `deleteDemo` removes a sandbox for good (see hard part 26). Expired sandboxes are cleaned up by a job (next PR).
+- `deleteDemo` removes a sandbox for good (see hard part 26). On the demo instance, `startDemoCleanup` (started in `index.ts`) runs `deleteExpiredDemos` at boot and every hour: up to 100 expired sandboxes per run, each in its own transaction, under a session-level advisory lock (`pg_try_advisory_lock` on one pooled connection), so two API instances never clean up together and a run that finds the lock taken does nothing. Runs never overlap, a failed run is logged and retried on the next tick. It moves to a BullMQ repeatable job in Phase 6; the function stays.
+- `pnpm --filter @splinance/api demo:create [--seed] [--today] [--days]` makes a sandbox on the configured database without signing anyone in (for example a long-lived showcase household for the data track, `--days 3650`) and prints its seed and day, which `demo:bank-files` turns into the same bank files. Like everything else in `demos`, it refuses to run on a database whose name does not end in `_demo` or `_test`.
 
 `household` is `{ id, name, baseCurrency, role, createdAt }` where `role` is the caller's role; members are `{ userId, displayName, role, joinedAt }` (no emails). The raw invite token appears only in the create response; the web app builds the link (and later a QR code) from it.
 

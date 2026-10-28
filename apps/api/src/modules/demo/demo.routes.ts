@@ -2,8 +2,8 @@ import type { DemoCreateResponse, DemoStatusResponse } from '@splinance/shared';
 import { Router } from 'express';
 import { rateLimiter } from '../../middleware/rate-limit';
 import { getAuth, requireAuth } from '../../middleware/require-auth';
-import { setRefreshCookie } from '../auth/auth.routes';
-import { createDemo, type DemoConfig, getDemo } from './demo.service';
+import { clearRefreshCookie, setRefreshCookie } from '../auth/auth.routes';
+import { createDemo, type DemoConfig, endDemo, getDemo } from './demo.service';
 
 /** Mounted only on the demo instance (`DEMO_MODE`); production answers these with 404. */
 export function createDemoRouter(config: DemoConfig) {
@@ -27,6 +27,13 @@ export function createDemoRouter(config: DemoConfig) {
     const demo = await getDemo(getAuth(req).userId);
     const body: DemoStatusResponse = { demo: { expiresAt: demo.expiresAt.toISOString() } };
     res.json(body);
+  });
+
+  // Deletes the caller's sandbox for good ("Start over", "End demo"); the session goes with it.
+  router.delete('/', requireAuth, rateLimiter(20, { perUser: true }), async (req, res) => {
+    await endDemo(getAuth(req).userId);
+    clearRefreshCookie(res);
+    res.status(204).end();
   });
 
   return router;

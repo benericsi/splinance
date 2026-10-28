@@ -46,6 +46,10 @@ export function setRefreshCookie(res: Response, cookie: RefreshCookie) {
   res.cookie(REFRESH_COOKIE, cookie.token, { ...cookieOptions, expires: cookie.expiresAt });
 }
 
+export function clearRefreshCookie(res: Response) {
+  res.clearCookie(REFRESH_COOKIE, cookieOptions);
+}
+
 function sendAuth(res: Response, status: number, result: AuthResult) {
   if (result.refreshCookie) setRefreshCookie(res, result.refreshCookie);
   const body: AuthResponse = { accessToken: result.accessToken, user: result.user };
@@ -78,7 +82,7 @@ export function createAuthRouter({ demo = false }: { demo?: boolean } = {}) {
 
   router.post('/logout', async (req, res) => {
     await logout(readRefreshCookie(req));
-    res.clearCookie(REFRESH_COOKIE, cookieOptions);
+    clearRefreshCookie(res);
     res.status(204).end();
   });
 
