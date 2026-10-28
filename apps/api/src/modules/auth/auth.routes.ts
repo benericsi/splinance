@@ -13,9 +13,18 @@ import {
 } from 'express';
 import { env } from '../../config/env';
 import { HttpError } from '../../lib/http-error';
+import { closedInDemo } from '../../middleware/demo-mode';
 import { rateLimiter } from '../../middleware/rate-limit';
 import { getAuth } from '../../middleware/require-auth';
-import { type AuthResult, getUser, login, logout, refresh, register } from './auth.service';
+import {
+  type AuthResult,
+  getUser,
+  login,
+  logout,
+  type RefreshCookie,
+  refresh,
+  register,
+} from './auth.service';
 
 export const REFRESH_COOKIE = 'refresh_token';
 
@@ -33,21 +42,21 @@ function readRefreshCookie(req: Request): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+export function setRefreshCookie(res: Response, cookie: RefreshCookie) {
+  res.cookie(REFRESH_COOKIE, cookie.token, { ...cookieOptions, expires: cookie.expiresAt });
+}
+
 function sendAuth(res: Response, status: number, result: AuthResult) {
-  if (result.refreshCookie) {
-    res.cookie(REFRESH_COOKIE, result.refreshCookie.token, {
-      ...cookieOptions,
-      expires: result.refreshCookie.expiresAt,
-    });
-  }
+  if (result.refreshCookie) setRefreshCookie(res, result.refreshCookie);
   const body: AuthResponse = { accessToken: result.accessToken, user: result.user };
   res.status(status).json(body);
 }
 
 /** Rate limiters live per router instance, so each app (and test) gets its own counters. */
-export function createAuthRouter() {
+export function createAuthRouter({ demo = false }: { demo?: boolean } = {}) {
   const router = Router();
 
+  if (demo) router.post('/register', closedInDemo);
   router.post('/register', rateLimiter(5), async (req, res) => {
     const input = registerInputSchema.parse(req.body);
     sendAuth(res, 201, await register(input));

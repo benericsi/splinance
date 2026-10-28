@@ -2,6 +2,7 @@ export * from './audit-log';
 export * from './budgets';
 export * from './categories';
 export * from './category-rules';
+export * from './demos';
 export * from './enums';
 export * from './household-invites';
 export * from './household-members';
