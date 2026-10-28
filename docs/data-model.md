@@ -280,6 +280,7 @@ One "Try the demo" sandbox on the demo instance. Empty on production.
 | user_id      | uuid FK -> users      | The visitor; unique (`demos_user_id_unique`)                             |
 | partner_id   | uuid FK -> users      | The made-up partner; differs from the visitor (`demos_people_differ`)    |
 | household_id | uuid FK -> households | The seeded household; null only while seeding runs                       |
+| seeded_at    | timestamptz, nullable | When seeding finished (database clock, set with `household_id`)          |
 | seed         | integer               | `>= 0`; with `anchor_on` rebuilds the story and its bank files exactly   |
 | anchor_on    | date                  | The day the story ends on (the visitor's today when the demo started)    |
 | expires_at   | timestamptz           | Indexed (`demos_expires_at_idx`): the cap counts unexpired rows, cleanup |
@@ -287,6 +288,36 @@ One "Try the demo" sandbox on the demo instance. Empty on production.
 
 - The exception to "never hard-deleted": a sandbox is deleted with its households, every row in them and both accounts (`deleteDemo`, architecture hard part 26). Soft deleting would keep visitors' text forever and grow the demo database without bound.
 - No `is_demo` flag on households: the demo instance has its own database, so everything in it is demo data; what cleanup and the banner need is the expiry per visitor.
+- `seeded_at` separates the story from the visitor: rows of the household created by then were seeded, later ones the visitor made. The analytics views show free text by it.
+
+## `analytics` schema (views for the data track)
+
+The data track's Postgres extract (D5) reads only these views, as the role `splinance_analytics_reader`, which can read nothing else (migration `0013_analytics_views`, a custom SQL migration). They are the contract between the app and the pipeline: `src/db/analytics.test.ts` pins every view's columns and types, so changing one is a deliberate change of the contract (same PR: test, this section, [data-track.md](data-track.md)).
+
+| View                 | Columns (besides ids)                                                                                                                                                                                                                    | Read by D5                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `households`         | name\*, base_currency, created_by, archived_at, created_at, updated_at, origin                                                                                                                                                           | full snapshot               |
+| `members`            | role, joined_at, left_at                                                                                                                                                                                                                 | full snapshot               |
+| `users`              | display_name (demo people only), created_at                                                                                                                                                                                              | full snapshot               |
+| `demos`              | visitor_id, partner_id, seed, anchor_on, created_at, seeded_at, expires_at                                                                                                                                                               | full snapshot               |
+| `categories`         | name\*, kind, icon, color, archived_at, created_at, updated_at, origin                                                                                                                                                                   | full snapshot               |
+| `budgets`            | category_id, user_id, starts_on, amount, created_by, created_at, updated_at, origin                                                                                                                                                      | full snapshot               |
+| `transactions`       | visibility, redacted, origin, kind, amount, currency, occurred_on, category_id, split_method, paid_by, created_by, import_batch_id, description\*, counterparty\*\*, import_fingerprint\*\*, version, deleted_at, created_at, updated_at | by `updated_at`             |
+| `transaction_splits` | user_id, amount, basis_points, transaction_updated_at, occurred_on                                                                                                                                                                       | by `transaction_updated_at` |
+| `settlements`        | from/to_user_id, amount, currency, settled_on, note\*, created_by, deleted_at, created_at, updated_at, origin                                                                                                                            | by `updated_at`             |
+| `import_batches`     | created_by, source, row_count, undone_at, created_at, changed_at (`greatest(created_at, undone_at)`), origin                                                                                                                             | by `changed_at`             |
+
+Rules every view follows:
+
+- **No credentials or contact data**: no emails, password hashes, tokens, sessions, invites; no category rules (typed patterns), no audit log (JSON snapshots with text), no import file names.
+- **Free text by provenance** (`origin`): a row is `seeded` when its household is a demo's and it was created by `demos.seeded_at`, otherwise `visitor`. Text a person can edit (\*) is shown only for seeded rows that have not changed since (`updated_at <= seeded_at`); bank text the app never edits (\*\*) for seeded rows. Everything else is null, so on a database without `demos` rows (production) every text column is null. Not hashed: short texts are found again from a dictionary, and pseudonymized text is still personal data.
+- **Stubs instead of filters**: private transactions (readable only by their author, the `visibleTo` rule) and transactions a visitor imported (the file may have been a real bank export) stay in the view with `redacted = true`: ids, `visibility`, `origin`, `version` and timestamps, all else null, and no splits. A row that only dropped out of a view (shared made private) would be invisible to an extract by `updated_at`; a stub shows the change.
+- **Tombstones stay columns**: `deleted_at`, `archived_at`, `undone_at`, `left_at`. Hard deletes (expired sandboxes) leave no row: the extract finds them as ids missing from the full snapshots.
+- **Empty outside demo and test databases** (`current_database() ~ '_(demo|test)$'`), next to the role having no login on production.
+- **`security_barrier`** on every view, so a reader's own function in a `WHERE` (the reader may create temporary functions) runs after the view's conditions.
+- Splits have no `updated_at`: they are replaced whole on every edit of their transaction, so the set of a transaction follows `transaction_updated_at`.
+
+The role: `splinance_analytics_reader` (`NOLOGIN`) is created by the migration if missing (roles are per server, shared by every database on it) and gets `USAGE` on the schema and `SELECT` on its views. The login role that is a member of it (`splinance_demo_analytics`, with a password, `CONNECT` on the demo database only) is created outside migrations, where the database is set up. Where migrations run as a role without `CREATEROLE`, `splinance_analytics_reader` must exist first.
 
 ## Planned (not created yet)
 

@@ -85,6 +85,20 @@
       "when": 1793210943252,
       "tag": "0011_demos",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793224134014,
+      "tag": "0012_demos_seeded_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793224163903,
+      "tag": "0013_analytics_views",
+      "breakpoints": true
     }
   ]
 }

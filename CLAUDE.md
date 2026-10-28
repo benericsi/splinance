@@ -88,6 +88,7 @@ Model and pre-deploy checklist: `docs/architecture.md` section 16. Rules for new
 - Ids from params via `idParam` (malformed means 404), bodies and queries via shared Zod schemas with upper bounds (string lengths, array sizes, amounts)
 - SQL only through Drizzle or parameterized `sql` templates; escape user text in LIKE patterns (`escapeLike`)
 - Demo instance (`DEMO_MODE`, own `_demo` database, own JWT secret): `/api/demo` exists only there, registration and invite accept are closed there. A new table that references households or users must also be deleted in `deleteDemo` (its test checks that nothing is left)
+- Data track access: only through the `analytics` views (custom migration, contract test `src/db/analytics.test.ts`), never grants on `public` to `splinance_analytics_reader`. Free text only by the provenance rule (`demos.seeded_at`), rows hidden as stubs not filtered out, no credentials or contact data (`docs/data-model.md`, "analytics schema")
 - New public or expensive endpoints get a `rateLimiter` (`perUser: true` for work behind `requireAuth`); keep `RATE_LIMIT_DISABLED` for e2e only
 - Never put tokens or personal data in query strings, logs or error messages; extend `redactUrl` for new token-bearing paths
 - Web: no `dangerouslySetInnerHTML`; post-login navigation only through `safeRedirect`; nothing sensitive in localStorage

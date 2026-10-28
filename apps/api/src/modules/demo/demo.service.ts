@@ -121,7 +121,11 @@ export async function createSandbox(
 
   try {
     const householdId = await seedDemo(story, { you: demo.userId, partner: demo.partnerId });
-    await db.update(demos).set({ householdId }).where(eq(demos.id, demo.id));
+    // The database clock, like the created_at of the rows seeding wrote.
+    await db
+      .update(demos)
+      .set({ householdId, seededAt: sql`now()` })
+      .where(eq(demos.id, demo.id));
     logger.info({ demoId: demo.id, ms: Date.now() - started }, 'Demo created');
     return { demoId: demo.id, householdId, seed, today, expiresAt, visitor };
   } catch (error) {
