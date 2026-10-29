@@ -37,16 +37,16 @@ The pipeline only **reads** from the app. Nothing it does changes the app's data
 
 ## 2. Status
 
-| PR  | Scope                                                                                       | State                                      |
-| --- | ------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| D1  | `data/` scaffold (uv, ruff, mypy, pytest), CI job, this document                            | done                                       |
-| D2  | Terraform: state bucket, lake bucket, Airflow IAM user and policy, budgets                  | done                                       |
-| D3  | ECB rates: extract, validate, write Parquet                                                 | done                                       |
-| D4  | Airflow 3 in Docker Compose, `ecb_rates` DAG, backfills                                     | done                                       |
-| D5  | Postgres extract: incremental by `updated_at`, month partitions rewritten (needs demo mode) | D5a done (pipeline, CLI, CI); D5b DAG next |
-| D6  | Bank files: Python parsers, fingerprint contract test, raw by hash, quarantine              | planned                                    |
-| D7  | dbt: staging, intermediate, marts, tests, source freshness, data-triggered DAG              | planned                                    |
-| D8  | Portfolio README, dbt docs on GitHub Pages                                                  | planned                                    |
+| PR  | Scope                                                                                       | State                                 |
+| --- | ------------------------------------------------------------------------------------------- | ------------------------------------- |
+| D1  | `data/` scaffold (uv, ruff, mypy, pytest), CI job, this document                            | done                                  |
+| D2  | Terraform: state bucket, lake bucket, Airflow IAM user and policy, budgets                  | done                                  |
+| D3  | ECB rates: extract, validate, write Parquet                                                 | done                                  |
+| D4  | Airflow 3 in Docker Compose, `ecb_rates` DAG, backfills                                     | done                                  |
+| D5  | Postgres extract: incremental by `updated_at`, month partitions rewritten (needs demo mode) | done (D5a pipeline, CLI, CI; D5b DAG) |
+| D6  | Bank files: Python parsers, fingerprint contract test, raw by hash, quarantine              | planned                               |
+| D7  | dbt: staging, intermediate, marts, tests, source freshness, data-triggered DAG              | planned                               |
+| D8  | Portfolio README, dbt docs on GitHub Pages                                                  | planned                               |
 
 Between D4 and D5 the app gets demo mode (done), the deploy (postponed), and the `analytics` views (done: migration `0013`, described in [data-model.md](data-model.md#analytics-schema-views-for-the-data-track)).
 
@@ -239,7 +239,7 @@ UI: http://localhost:8080 (user `airflow`, password `airflow`; the port listens 
 | `airflow-dag-processor` | Parses the files in `dags/` every few seconds                                          |
 
 - **Image:** `data/Dockerfile` extends `apache/airflow:3.3.2-python3.13` with `splinance_data`, installed within Airflow's constraints file (the versions Airflow was tested with). That pins Polars to 1.44, so the local environment uses the same version. `src/` is mounted over the editable install: code changes apply without a rebuild; rebuild when dependencies change. `.dockerignore` allows only `pyproject.toml`, `README.md` and `src/` into the build, so `.env` can never end up in an image.
-- **Credentials:** only the scheduler gets `data/.env` (the `splinance-airflow` key), since tasks run there. The UI and the dag-processor never see it.
+- **Credentials:** only the scheduler gets `data/.env` (the `splinance-airflow` key and the demo database's connection), since tasks run there. The UI and the dag-processor never see it.
 - **DAGs are thin:** each task imports and calls a function from `splinance_data` (tested without Airflow). Imports sit inside the tasks, because the dag-processor re-reads every DAG file every few seconds.
 
 ### `ecb_rates`
@@ -250,6 +250,21 @@ Two decisions that were bugs first (`data/scripts/check_dags.py` now guards both
 
 - **`CronDataIntervalTimetable`, not `schedule="@daily"`.** In Airflow 3, `@daily` is a `CronTriggerTimetable`: each run is a point in time, so the run for 27 October starts at 27 October 00:00 with no data interval, 16 hours before that day's rate is published. `CronDataIntervalTimetable` gives each run the interval [day, day + 1) and starts it when the day is over (Airflow 2's default behavior; Airflow 3 turned it off with `create_cron_data_intervals = False`).
 - **One month build at a time** (`max_active_tis_per_dag=1` on `build`). During a backfill up to 8 runs go in parallel. Two builds of the same month each read the raw days present when they start, and the one that writes last could drop a day the other had just ingested. Serialized, the last build always sees every day ingested before it; ingests still run in parallel.
+
+### `splinance_db`
+
+`ingest` (the `analytics` views for the day's window to `raw/`) then `build` (every raw day replayed into `clean/`), daily since 2026-10-01 with `catchup`, 3 retries. Every row was last changed after the demo database existed, so unpausing it is the initial load. `build` updates one asset per clean dataset (`clean/transactions`, ...), for the dbt DAG.
+
+- **The connection** `splinance_demo` comes from an environment variable in `data/.env`, as the reader role. The app's Postgres runs on the host, which the scheduler reaches as `host.docker.internal` (Docker Desktop provides the name; `extra_hosts: host-gateway` adds it on Linux):
+
+  ```bash
+  AIRFLOW_CONN_SPLINANCE_DEMO=postgresql://splinance_demo_analytics:splinance_demo_analytics@host.docker.internal:5432/splinance_demo
+  ```
+
+  The task reads it with `Connection.get("splinance_demo").get_uri()`; Airflow 3's task runtime looks in its own environment first, so the URL never goes through the metadata database. On a server the password is random and the URL gets `?sslmode=verify-full`.
+
+- **At most 2 runs at once** (`max_active_runs=2`): the reader role allows 3 connections, and one is left for a person with `psql`.
+- **One build at a time**, like `ecb_rates`. A build that starts while an `ingest` is writing ignores that day: `households` is written last and marks a day complete.
 
 ### Running and testing by hand
 
@@ -275,4 +290,4 @@ docker build -t splinance-airflow:dev .
 docker run --rm -v "$PWD/dags:/opt/airflow/dags:ro" -v "$PWD/scripts:/opt/splinance-scripts:ro" --entrypoint python splinance-airflow:dev /opt/splinance-scripts/check_dags.py
 ```
 
-It fails on import errors, tasks without retries, and the two `ecb_rates` regressions above.
+It fails on import errors, tasks without retries, the two regressions above for both daily DAGs (`ecb_rates`, `splinance_db`), `splinance_db` outlets that differ from `DATASETS`, and more parallel `splinance_db` runs than the reader has connections.

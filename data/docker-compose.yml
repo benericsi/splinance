@@ -4,7 +4,8 @@
 #
 #   cd data && docker compose up -d --build
 #
-# Needs data/.env with the splinance-airflow access key (see docs/data-track.md).
+# Needs data/.env with the splinance-airflow access key and, for splinance_db, the demo
+# database's connection (see docs/data-track.md).
 
 name: splinance-airflow
 
@@ -72,8 +73,13 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
-    # With the LocalExecutor tasks run here, so only this container gets the AWS key.
+    # With the LocalExecutor tasks run here, so only this container gets the AWS key and the
+    # demo database's URL.
     env_file: .env
+    # The app's Postgres runs on the host (the repository root's docker-compose.yml). Docker
+    # Desktop resolves this name itself; on Linux it needs the entry.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     healthcheck:
       test: ['CMD', 'curl', '--fail', 'http://localhost:8974/health']
       interval: 30s
