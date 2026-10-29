@@ -19,19 +19,32 @@ for dag_id, dag in bag.dags.items():
         if task.retries < 1:
             problems.append(f"{dag_id}.{task.task_id}: no retries")
 
-# Regressions for ecb_rates: both were real bugs before they were checked.
-ecb = bag.dags.get("ecb_rates")
-if ecb is None:
-    problems.append("ecb_rates: missing")
-else:
-    # "@daily" is a point in time in Airflow 3: the run would fetch a day before it is published.
-    if not isinstance(ecb.timetable, CronDataIntervalTimetable):
-        problems.append("ecb_rates: needs CronDataIntervalTimetable (a data interval per day)")
-    # Parallel month builds race and can drop a day.
-    if ecb.get_task("build").max_active_tis_per_dag != 1:
-        problems.append("ecb_rates.build: must run one at a time (max_active_tis_per_dag=1)")
-    if "build" not in ecb.get_task("ingest").downstream_task_ids:
-        problems.append("ecb_rates: ingest must run before build")
+# Daily ingest -> build DAGs. Both rules were real bugs in ecb_rates before they were checked.
+for dag_id in ("ecb_rates", "splinance_db"):
+    daily = bag.dags.get(dag_id)
+    if daily is None:
+        problems.append(f"{dag_id}: missing")
+        continue
+    # "@daily" is a point in time in Airflow 3: the run would read a day before it is over.
+    if not isinstance(daily.timetable, CronDataIntervalTimetable):
+        problems.append(f"{dag_id}: needs CronDataIntervalTimetable (a data interval per day)")
+    # Parallel builds race: the one that writes last can undo a day the other just added.
+    if daily.get_task("build").max_active_tis_per_dag != 1:
+        problems.append(f"{dag_id}.build: must run one at a time (max_active_tis_per_dag=1)")
+    if "build" not in daily.get_task("ingest").downstream_task_ids:
+        problems.append(f"{dag_id}: ingest must run before build")
+
+db = bag.dags.get("splinance_db")
+if db is not None:
+    from splinance_data.parse.splinance_db import DATASETS
+
+    # Every clean dataset is an asset the dbt DAG can wait for, and no stale ones.
+    outlets = {asset.uri.rsplit("/", 1)[-1] for asset in db.get_task("build").outlets}
+    if outlets != set(DATASETS):
+        problems.append(f"splinance_db.build: outlets {sorted(outlets)} != {sorted(DATASETS)}")
+    # The reader role allows 3 connections; parallel runs beyond that fail to connect.
+    if db.max_active_runs > 2:
+        problems.append("splinance_db: at most 2 runs at once (the reader has 3 connections)")
 
 for problem in problems:
     print(f"FAIL {problem}")
