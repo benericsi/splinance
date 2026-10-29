@@ -96,7 +96,70 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run ruff check .
       - run: uv run mypy
+      # Tests marked postgres skip here; the next job runs them against a real database.
       - run: uv run pytest
+
+  data-postgres:
+    name: Data track x Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # The pipeline against what the app really serves: the init scripts of a fresh local
+    # volume (test and demo databases, the reader login), the app's migrations, a seeded
+    # sandbox, then the tests marked postgres. The one place app and pipeline run together.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: splinance
+          POSTGRES_PASSWORD: splinance
+          POSTGRES_DB: splinance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U splinance -d splinance"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      PGPASSWORD: splinance
+      DATABASE_URL: postgres://splinance:splinance@localhost:5432/splinance_demo
+      JWT_ACCESS_SECRET: ci-only-secret-that-is-at-least-32-characters
+      SPLINANCE_TEST_DSN: postgresql://splinance_demo_analytics:splinance_demo_analytics@localhost:5432/splinance_demo
+      SPLINANCE_TEST_ADMIN_DSN: postgresql://splinance:splinance@localhost:5432/splinance_demo
+      SPLINANCE_REQUIRE_POSTGRES: '1'
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # In file order, like the Postgres image does on first start.
+      - run: >-
+          for f in docker/postgres/init/*.sql;
+          do psql -h localhost -U splinance -d splinance -v ON_ERROR_STOP=1 -f "$f";
+          done
+
+      - run: pnpm --filter @splinance/api db:migrate
+      - run: pnpm --filter @splinance/api demo:create --seed 42 --days 30
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          working-directory: data
+          enable-cache: true
+
+      - run: uv sync --locked
+        working-directory: data
+      - run: uv run pytest -m postgres
+        working-directory: data
 
   airflow:
     name: Airflow DAGs

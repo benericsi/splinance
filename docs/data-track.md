@@ -37,16 +37,16 @@ The pipeline only **reads** from the app. Nothing it does changes the app's data
 
 ## 2. Status
 
-| PR  | Scope                                                                                       | State   |
-| --- | ------------------------------------------------------------------------------------------- | ------- |
-| D1  | `data/` scaffold (uv, ruff, mypy, pytest), CI job, this document                            | done    |
-| D2  | Terraform: state bucket, lake bucket, Airflow IAM user and policy, budgets                  | done    |
-| D3  | ECB rates: extract, validate, write Parquet                                                 | done    |
-| D4  | Airflow 3 in Docker Compose, `ecb_rates` DAG, backfills                                     | done    |
-| D5  | Postgres extract: incremental by `updated_at`, month partitions rewritten (needs demo mode) | planned |
-| D6  | Bank files: Python parsers, fingerprint contract test, raw by hash, quarantine              | planned |
-| D7  | dbt: staging, intermediate, marts, tests, source freshness, data-triggered DAG              | planned |
-| D8  | Portfolio README, dbt docs on GitHub Pages                                                  | planned |
+| PR  | Scope                                                                                       | State                                      |
+| --- | ------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| D1  | `data/` scaffold (uv, ruff, mypy, pytest), CI job, this document                            | done                                       |
+| D2  | Terraform: state bucket, lake bucket, Airflow IAM user and policy, budgets                  | done                                       |
+| D3  | ECB rates: extract, validate, write Parquet                                                 | done                                       |
+| D4  | Airflow 3 in Docker Compose, `ecb_rates` DAG, backfills                                     | done                                       |
+| D5  | Postgres extract: incremental by `updated_at`, month partitions rewritten (needs demo mode) | D5a done (pipeline, CLI, CI); D5b DAG next |
+| D6  | Bank files: Python parsers, fingerprint contract test, raw by hash, quarantine              | planned                                    |
+| D7  | dbt: staging, intermediate, marts, tests, source freshness, data-triggered DAG              | planned                                    |
+| D8  | Portfolio README, dbt docs on GitHub Pages                                                  | planned                                    |
 
 Between D4 and D5 the app gets demo mode (done), the deploy (postponed), and the `analytics` views (done: migration `0013`, described in [data-model.md](data-model.md#analytics-schema-views-for-the-data-track)).
 
@@ -57,9 +57,10 @@ Built only by `splinance_data.lake.paths`, so the layout lives in one place:
 ```
 landing/<source>/<file>                                     uploads waiting to be processed (expire after 7 days)
 raw/source=<source>/ingest_date=YYYY-MM-DD/<sha256>.<ext>   files: exact bytes, named by content hash
-raw/source=<source>/date=YYYY-MM-DD/<name>.<ext>            API pulls: exact response, one per day, replaced on rerun
+raw/source=<source>/date=YYYY-MM-DD/<name>.<ext>            API pulls and database extracts: one per day, replaced on rerun
 quarantine/source=<source>/<sha256>.<ext>                   failed validation, reason stored next to it
 clean/<dataset>/month=YYYY-MM/part.parquet                  one file per month, rewritten whole
+clean/<dataset>/part.parquet                                small tables: the current state, rewritten whole
 ```
 
 - **Content-addressed raw files.** A file's key is its SHA-256, so the same file uploaded twice lands on the same key: "already ingested?" is a key lookup.
@@ -94,6 +95,7 @@ Pipeline steps also run by hand with the CLI (`uv run splinance-data --help`). `
 ```bash
 uv run splinance-data ecb-rates 2026-10-01 --until 2026-10-27                                  # local .lake
 uv run splinance-data --lake s3://splinance-lake-bener ecb-rates 2026-10-01 --until 2026-10-27  # after aws login
+uv run splinance-data splinance-db 2026-10-28 --dsn postgresql://splinance_demo_analytics:splinance_demo_analytics@localhost:5432/splinance_demo
 ```
 
 boto3 reads `aws login` credentials only with `botocore[crt]`, a dev dependency; Airflow uses an access key and does not need it.
@@ -116,6 +118,16 @@ docker compose exec db psql "postgres://splinance_demo_analytics:splinance_demo_
 ```
 
 On a server the same role gets a random password, created by hand next to the database (never in a migration or in Terraform).
+
+Tests marked `postgres` run against such a database and are skipped without one. Locally, with the showcase household seeded:
+
+```bash
+SPLINANCE_TEST_DSN=postgresql://splinance_demo_analytics:splinance_demo_analytics@localhost:5432/splinance_demo \
+SPLINANCE_TEST_ADMIN_DSN=postgresql://splinance:splinance@localhost:5432/splinance_demo \
+uv run pytest -m postgres
+```
+
+The admin URL is only for the test that edits a row as a visitor would; it rolls the edit back. CI job `Data track x Postgres` does the same on a fresh server: the init scripts, the app's migrations, `demo:create`, then these tests.
 
 ## 6. Infrastructure (Terraform)
 
@@ -179,14 +191,29 @@ Code layout in `data/src/splinance_data/`: `extract/` (talks to a source), `pars
 - **Idempotent:** a rerun rewrites the same keys; rebuilding a month gives a byte-identical file (tested).
 - Weekend and holiday gaps are filled later in dbt (forward fill over a date spine), not here: clean data records what was published.
 
-### Postgres (D5, planned): how the `analytics` views are meant to be read
+### Postgres (`pipelines/splinance_db.py`)
 
-The views and their columns are in [data-model.md](data-model.md#analytics-schema-views-for-the-data-track). What the extract has to do with them:
+The app's demo database, read through the `analytics` views ([data-model.md](data-model.md#analytics-schema-views-for-the-data-track)) as the reader role.
+
+| Step         | Does                                                                                                                       | Output                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `ingest_day` | Reads every view for one day's window in one read-only snapshot, checks each, stores them unchanged; `households` last     | `raw/source=splinance/date=YYYY-MM-DD/<view>.parquet` (10 files)              |
+| `build`      | Replays every complete raw day: newest version of each row, deleted sandboxes and stubs dropped, months written if changed | `clean/<fact>/month=YYYY-MM/part.parquet`, `clean/<small table>/part.parquet` |
+
+- **The window is the day**, `[D 00:00 UTC - 10 min, D+1 00:00)`, not a stored watermark: a rerun of a day overwrites its own raw files, and running every day since the demo database existed is the initial load. The 10 minutes reach back because the app takes `updated_at` before its transaction commits.
+- **Contract:** `parse/splinance_db.py` declares every view's columns and Polars types (`DATASETS`). An extract with another shape fails before anything is written, and so does a build that finds raw days of two shapes. A test marked `postgres` compares `DATASETS` with the real views.
+- **Replay instead of merge.** `build` reads all raw days, so the newest version wins whatever order the days were written in (a backfill rerun can hold a newer version than a later day), and every hard case falls out of it: a row moved to another month leaves the old one, a transaction made private (a stub) leaves with its shares, a deleted sandbox leaves when its household is missing from the newest snapshot. The cost is O(all raw days) per build: fine for a few hundred small files; past that the step becomes a merge into a stored current state (or an Iceberg/Delta `MERGE`).
+- **Only changed files are written:** sorted rows and deterministic Parquet give the same bytes for the same rows, so a build without new data writes nothing (tested). A month left without rows becomes an empty file: Airflow's user cannot delete in `clean/`.
+- **Small tables are snapshots of the run**, not of the day: a backfill run for an old day stores today's households under that day. Historic dimensions would come from the daily snapshots going forward (dbt snapshots), not from the source.
+- Soft deletes stay as columns in `clean/` (`deleted_at`, `archived_at`, `undone_at`, `left_at`); dbt staging filters them.
+- First run against the local showcase (seed 42): 282 transactions, 179 in `clean/` (the rest are private stubs), 358 shares, 15 settlements, 24 imports, 73 files.
+
+How the views are meant to be read, which the code above follows:
 
 - **One snapshot per run:** every view in one `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY` transaction, so splits always match their transactions.
 - **Full snapshots** of the small tables: households, members, users, demos, categories, budgets.
-- **Incremental** transactions and settlements by `updated_at`, splits by `transaction_updated_at`, import batches by `changed_at`, from the stored watermark minus an overlap (about 10 minutes): the app takes `updated_at` before the commit, from the API's clock, so a row can commit with a slightly older value than one already seen. Duplicates from the overlap are dropped by id (highest `version`, latest timestamp).
-- **Affected months** are the `occurred_on` months of the changed rows plus the months the lake had them in before: an edit can move a row to another month, and a stub (`redacted = true`) has no date. Those months are rewritten whole.
+- **Incremental** transactions and settlements by `updated_at`, splits by `transaction_updated_at`, import batches by `changed_at`, with an overlap (10 minutes): the app takes `updated_at` before the commit, from the API's clock, so a row can commit with a slightly older value than one already seen. Duplicates from the overlap are dropped by id (latest timestamp, then highest `version`).
+- **Every month a row was ever in** must be able to change: an edit can move a row to another month, and a stub (`redacted = true`) has no date. Replaying every raw day covers both.
 - **Deleted sandboxes** leave no row behind: household ids missing from the households snapshot are gone, and their rows leave `clean/` with the next rewrite of their months.
 - **Text is null** wherever a visitor typed or edited it (`origin` says who made the row); dbt treats null as "not shown", never as empty.
 
