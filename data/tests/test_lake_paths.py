@@ -4,10 +4,13 @@ import pytest
 
 from splinance_data.lake.paths import (
     clean_key,
+    clean_month_prefix,
+    clean_snapshot_key,
     content_sha256,
     quarantine_key,
     raw_daily_key,
     raw_daily_month_prefix,
+    raw_daily_source_prefix,
     raw_file_key,
 )
 
@@ -32,6 +35,13 @@ def test_raw_daily_key_and_month_prefix() -> None:
     assert not key.startswith(raw_daily_month_prefix("ecb", date(2026, 11, 1)))
 
 
+def test_raw_daily_source_prefix_covers_every_day() -> None:
+    key = raw_daily_key("splinance", date(2026, 10, 28), "transactions", "parquet")
+    assert key == "raw/source=splinance/date=2026-10-28/transactions.parquet"
+    assert key.startswith(raw_daily_source_prefix("splinance"))
+    assert not key.startswith(raw_daily_source_prefix("ecb"))
+
+
 def test_quarantine_key() -> None:
     assert quarantine_key("kh", SHA, "csv") == f"quarantine/source=kh/{SHA}.csv"
 
@@ -40,6 +50,13 @@ def test_clean_key_partitions_by_month() -> None:
     # Any day of the month maps to the same partition: a rerun overwrites it.
     assert clean_key("fx_rates", date(2026, 10, 1)) == "clean/fx_rates/month=2026-10/part.parquet"
     assert clean_key("fx_rates", date(2026, 10, 31)) == clean_key("fx_rates", date(2026, 10, 1))
+    assert clean_key("fx_rates", date(2026, 10, 1)).startswith(clean_month_prefix("fx_rates"))
+
+
+def test_clean_snapshot_key_has_no_partition() -> None:
+    assert clean_snapshot_key("households") == "clean/households/part.parquet"
+    # A snapshot never looks like a month partition of the same dataset.
+    assert not clean_snapshot_key("households").startswith(clean_month_prefix("households"))
 
 
 @pytest.mark.parametrize("name", ["", "Revolut", "../raw", "re volut", "kh/2", "1kh"])

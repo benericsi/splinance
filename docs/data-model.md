@@ -292,7 +292,7 @@ One "Try the demo" sandbox on the demo instance. Empty on production.
 
 ## `analytics` schema (views for the data track)
 
-The data track's Postgres extract (D5) reads only these views, as the role `splinance_analytics_reader`, which can read nothing else (migration `0013_analytics_views`, a custom SQL migration). They are the contract between the app and the pipeline: `src/db/analytics.test.ts` pins every view's columns and types, so changing one is a deliberate change of the contract (same PR: test, this section, [data-track.md](data-track.md)).
+The data track's Postgres extract (D5) reads only these views, as the role `splinance_analytics_reader`, which can read nothing else (migration `0013_analytics_views`, a custom SQL migration). They are the contract between the app and the pipeline: `src/db/analytics.test.ts` pins every view's columns and types, and the pipeline declares the same columns in `data/src/splinance_data/parse/splinance_db.py` (checked against the real views in CI job `Data track x Postgres`), so changing one is a deliberate change of the contract (same PR: both, this section, [data-track.md](data-track.md)).
 
 | View                 | Columns (besides ids)                                                                                                                                                                                                                    | Read by D5                  |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |

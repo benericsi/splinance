@@ -10,6 +10,8 @@ dependencies = [
     "httpx>=0.28",
     # Airflow 3.3.2's constraints pin polars 1.44.2; tests run on the version Airflow runs.
     "polars>=1.44,<2",
+    # The Postgres extract (Airflow's constraints pin psycopg 3.3.x).
+    "psycopg[binary]>=3.3,<4",
 ]
 
 [project.scripts]
@@ -58,3 +60,6 @@ files = ["src", "tests"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config"]
+markers = [
+    "postgres: needs a demo database ($SPLINANCE_TEST_DSN); skipped without it",
+]

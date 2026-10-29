@@ -53,6 +53,12 @@ def raw_daily_month_prefix(source: str, month: date) -> str:
     return f"{Layer.RAW}/source={source}/date={month:%Y-%m}-"
 
 
+def raw_daily_source_prefix(source: str) -> str:
+    """`raw/source=splinance/date=`: every daily pull of a source, all days."""
+    _check_name("source", source)
+    return f"{Layer.RAW}/source={source}/date="
+
+
 def quarantine_key(source: str, sha256: str, extension: str) -> str:
     """`quarantine/source=revolut/<sha256>.csv`; the reason is stored next to it."""
     _check(source, sha256, extension)
@@ -63,6 +69,18 @@ def clean_key(dataset: str, month: date) -> str:
     """`clean/transactions/month=2026-10/part.parquet`: the whole month, rewritten on every run."""
     _check_name("dataset", dataset)
     return f"{Layer.CLEAN}/{dataset}/month={month:%Y-%m}/part.parquet"
+
+
+def clean_month_prefix(dataset: str) -> str:
+    """`clean/transactions/month=`: every month partition of a dataset."""
+    _check_name("dataset", dataset)
+    return f"{Layer.CLEAN}/{dataset}/month="
+
+
+def clean_snapshot_key(dataset: str) -> str:
+    """`clean/households/part.parquet`: a small table's current state, rewritten on every run."""
+    _check_name("dataset", dataset)
+    return f"{Layer.CLEAN}/{dataset}/part.parquet"
 
 
 def _check(source: str, sha256: str, extension: str) -> None:
