@@ -96,7 +96,9 @@ jobs:
       - run: pnpm --filter @splinance/e2e e2e:smoke
 
       - if: failure()
-        run: docker compose -f deploy/compose.smoke.yml logs --no-color
+        run: |
+          docker compose -f deploy/compose.smoke.yml ps --all
+          docker compose -f deploy/compose.smoke.yml logs --no-color
 
       - uses: actions/upload-artifact@v7
         if: failure()

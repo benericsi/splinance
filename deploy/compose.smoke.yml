@@ -43,13 +43,15 @@ services:
       db:
         condition: service_healthy
 
+  # After the production one, never beside it: on a fresh server both would create the
+  # analytics reader role at once, and the second CREATE ROLE fails (unique_violation).
   migrate-demo:
     image: splinance-api:smoke
     command: ['node', 'dist/migrate.mjs']
     environment: *demo
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   api:
     image: splinance-api:smoke
