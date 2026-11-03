@@ -37,7 +37,7 @@ e2e               Playwright end-to-end suite against the production builds (and
 deploy/           Web image (Caddy + both builds, Caddyfile), smoke stack, CSP check: see section 13
 data/             Python data track (uv project, not a pnpm package): see data-track.md
 infra/            Terraform for AWS (state bucket, data lake, IAM, budgets): see data-track.md
-docs/             data-model.md, data-track.md, architecture.md (this file)
+docs/             data-model.md, data-track.md, deploy.md (Railway setup and operations), architecture.md (this file)
 docker/           Postgres init scripts (test and demo databases, the data track's login)
 ```
 
@@ -800,13 +800,13 @@ Accepted by design (a household trusts its members; the audit log and transactio
 - Either person involved (or an owner) can record a payment without the other confirming; they can delete it if it is wrong.
 - Owners can remove members and change roles; the last owner cannot leave or step down while others remain.
 
-Before the first deploy:
+Before the first deploy (the setup itself is in [deploy.md](deploy.md), with a checklist for after it):
 
 - `TRUST_PROXY` set for the proxies in front of the API (`app.set('trust proxy', n)`), so rate limits and logs see client IPs; checked after the first deploy with a forged header.
 - `REGISTRATION=allowlist` with `REGISTRATION_ALLOWLIST` on production (closed when unset).
 - `MIGRATE_DATABASE_URL` as the schema owner, `DATABASE_URL` as a role without DDL rights.
 - The web server sends HSTS, `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` and a CSP (`script-src 'self'` plus the hash of the inline theme script in `index.html`; fonts and styles are self-hosted). Done in `deploy/web/Caddyfile`; the smoke suite checks them in a real browser.
-- `NODE_ENV=production` (secure cookies by default; keep `COOKIE_SECURE` unset or true), a random `JWT_ACCESS_SECRET` from a secret store, the database user without superuser rights.
+- `NODE_ENV=production` (secure cookies by default; keep `COOKIE_SECURE` unset or true), a random `JWT_ACCESS_SECRET` from a secret store, the database user without superuser rights: per database an owner for migrations and an app role for rows (`deploy/db/*.sql`; the smoke stack runs on exactly these roles and CI checks what they cannot do).
 - The demo instance gets its own `JWT_ACCESS_SECRET` (with a shared one, a demo access token would verify on production) and its own database; cookies stay host-only (no `Domain`), so the two hosts never share them.
 - GitHub Actions pinned to commit SHAs, Dependabot for npm and actions, a deploy key that can only deploy.
-- Database backups. (Stale sessions and invites are deleted by the maintenance job, at boot and daily.)
+- Database backups: Railway volume backups (daily, weekly) from day one, an offsite encrypted copy later. (Stale sessions and invites are deleted by the maintenance job, at boot and daily.)

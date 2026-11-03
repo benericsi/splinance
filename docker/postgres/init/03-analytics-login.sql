@@ -1,5 +1,5 @@
 -- The data track's login to the demo database. Local only: the password is as public as the
--- compose credentials; on a server it is random and the same SQL runs once by hand.
+-- compose credentials; on a server it is random (deploy/db/demo.sql, docs/deploy.md).
 -- Its rights come from splinance_analytics_reader, which the analytics migration grants SELECT
 -- on the views to. Created here too, because this script runs before any migration.
 DO $$

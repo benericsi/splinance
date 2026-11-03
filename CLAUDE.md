@@ -23,7 +23,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 
 ## Repo conventions
 
-- Read `docs/architecture.md` (how everything works, including "The hard parts") and `docs/data-model.md` before larger changes; update them in the same PR when behavior changes
+- Read `docs/architecture.md` (how everything works, including "The hard parts") and `docs/data-model.md` before larger changes; update them in the same PR when behavior changes. Deployment (Railway services, variables, database roles in `deploy/db`, checklist) is in `docs/deploy.md`: a new env variable, service or role goes there too
 
 - `packages/shared` is consumed as TypeScript source (no build step); the api bundles it with tsdown
 - TypeScript pinned to 6.0 until typescript-eslint supports TS 7; `@types/node` matches the Node runtime major
