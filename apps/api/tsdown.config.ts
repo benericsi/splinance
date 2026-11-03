@@ -1,7 +1,13 @@
 import { defineConfig } from 'tsdown';
 
 export default defineConfig({
-  entry: { index: 'src/index.ts', migrate: 'src/db/migrate.ts' },
+  // demo-create: the showcase household on a server, where there is no tsx
+  // (`node dist/demo-create.mjs --seed 42 --days 3650`).
+  entry: {
+    index: 'src/index.ts',
+    migrate: 'src/db/migrate.ts',
+    'demo-create': 'src/modules/demo/create.cli.ts',
+  },
   format: 'esm',
   platform: 'node',
   target: 'node26',

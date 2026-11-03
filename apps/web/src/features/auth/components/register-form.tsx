@@ -8,6 +8,13 @@ import { errorMessage } from '@/lib/query-client';
 import { useRegister } from '../hooks';
 import { PasswordRequirements } from './password-requirements';
 
+// API errors that are about the email, shown next to the field.
+const EMAIL_ERRORS: Partial<Record<string, string>> = {
+  EMAIL_TAKEN: 'An account with this email already exists',
+  // Production lets only allowlisted emails sign up.
+  REGISTRATION_CLOSED: 'Sign-ups are invite-only for now',
+};
+
 export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   const register = useRegister();
 
@@ -26,8 +33,9 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
   });
 
   // Field-specific API errors go next to the field; everything else above the form.
-  const emailTaken = register.error instanceof ApiError && register.error.code === 'EMAIL_TAKEN';
-  const formError = register.error && !emailTaken ? errorMessage(register.error) : undefined;
+  const code = register.error instanceof ApiError ? register.error.code : undefined;
+  const emailError = EMAIL_ERRORS[code ?? ''];
+  const formError = register.error && !emailError ? errorMessage(register.error) : undefined;
 
   return (
     <form
@@ -62,7 +70,7 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
             type="email"
             placeholder="you@example.com"
             autoComplete="email"
-            serverError={emailTaken ? 'An account with this email already exists' : undefined}
+            serverError={emailError}
             onValueChange={register.reset}
           />
         )}

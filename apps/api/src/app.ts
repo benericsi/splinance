@@ -10,6 +10,7 @@ import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { rateLimiter } from './middleware/rate-limit';
 import { requireAuth } from './middleware/require-auth';
 import { createAuthRouter, getMe } from './modules/auth/auth.routes';
+import type { RegistrationPolicy } from './modules/auth/auth.service';
 import { createHouseholdsRouter } from './modules/households/households.routes';
 import { createDemoRouter } from './modules/demo/demo.routes';
 import type { DemoConfig } from './modules/demo/demo.service';
@@ -19,11 +20,17 @@ import { createHealthRouter, type HealthDeps } from './routes/health';
 export interface AppDeps extends HealthDeps {
   /** Set on the demo instance only: mounts /api/demo and closes registration and joining. */
   demo: DemoConfig | null;
+  /** Who may create an account (REGISTRATION, REGISTRATION_ALLOWLIST). */
+  registration: RegistrationPolicy;
+  /** Proxy hops whose X-Forwarded-For is trusted (TRUST_PROXY). */
+  trustProxy: number;
 }
 
 const defaultDeps: AppDeps = {
   pingDatabase,
   demo: env.DEMO_MODE ? { ttlDays: env.DEMO_TTL_DAYS, maxActive: env.DEMO_MAX_ACTIVE } : null,
+  registration: { mode: env.REGISTRATION, allowlist: env.REGISTRATION_ALLOWLIST },
+  trustProxy: env.TRUST_PROXY,
 };
 
 const IMPORT_PATH = /^\/api\/households\/[^/]+\/imports(\/check)?$/;
@@ -34,6 +41,8 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
   const app = express();
 
   app.disable('x-powered-by');
+  // req.ip (rate limits, logs) comes from X-Forwarded-For only behind this many proxies.
+  app.set('trust proxy', deps.trustProxy);
   app.use(helmet());
   app.use(
     pinoHttp({
@@ -64,7 +73,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
   // A ceiling for everything else (health checks stay out of it); the auth, invite and import
   // routes have tighter limits of their own.
   api.use(rateLimiter(1000));
-  api.use('/auth', createAuthRouter({ demo }));
+  api.use('/auth', createAuthRouter({ demo, registration: deps.registration }));
   api.get('/me', requireAuth, getMe);
   api.use('/households', createHouseholdsRouter());
   api.use('/invites', createInvitesRouter({ demo }));

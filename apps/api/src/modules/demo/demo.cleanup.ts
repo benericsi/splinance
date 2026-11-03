@@ -1,7 +1,8 @@
 import { asc, lte } from 'drizzle-orm';
-import { db, pool } from '../../db/client';
+import { db } from '../../db/client';
 import { demos } from '../../db/schema';
 import { logger } from '../../lib/logger';
+import { startPeriodic, withAdvisoryLock } from '../../lib/periodic';
 import { deleteDemo } from './demo.service';
 
 /** Held for the duration of a cleanup run, so two API instances never run one together. */
@@ -16,63 +17,30 @@ const BATCH = 100;
  * cleanup right now. A plain function, so a BullMQ job (Phase 6) can call it unchanged.
  */
 export async function deleteExpiredDemos(now = new Date()): Promise<number> {
-  // A session-level advisory lock lives on one connection: take and release it on the same one.
-  const client = await pool.connect();
-  try {
-    const { rows } = await client.query<{ locked: boolean }>(
-      'select pg_try_advisory_lock(hashtext($1)) as locked',
-      [CLEANUP_LOCK],
-    );
-    if (!rows[0]?.locked) return 0;
-    try {
-      const expired = await db
-        .select({ id: demos.id })
-        .from(demos)
-        .where(lte(demos.expiresAt, now))
-        .orderBy(asc(demos.expiresAt))
-        .limit(BATCH);
-      let deleted = 0;
-      for (const { id } of expired) {
-        try {
-          if (await deleteDemo(id)) deleted++;
-        } catch (err) {
-          logger.error({ err, demoId: id }, 'Could not delete an expired demo');
-        }
+  const deleted = await withAdvisoryLock(CLEANUP_LOCK, async () => {
+    const expired = await db
+      .select({ id: demos.id })
+      .from(demos)
+      .where(lte(demos.expiresAt, now))
+      .orderBy(asc(demos.expiresAt))
+      .limit(BATCH);
+    let count = 0;
+    for (const { id } of expired) {
+      try {
+        if (await deleteDemo(id)) count++;
+      } catch (err) {
+        logger.error({ err, demoId: id }, 'Could not delete an expired demo');
       }
-      return deleted;
-    } finally {
-      await client.query('select pg_advisory_unlock(hashtext($1))', [CLEANUP_LOCK]);
     }
-  } finally {
-    client.release();
-  }
+    return count;
+  });
+  return deleted ?? 0;
 }
 
-/**
- * Runs the cleanup now and then every `intervalMs` (an hour) in this process, until the
- * returned function stops it. Runs never overlap; a failed run is logged and retried on the
- * next tick (the database may not be up yet when the API starts).
- */
+/** Runs the cleanup now and then every `intervalMs` (an hour), until stopped. */
 export function startDemoCleanup(intervalMs = HOUR_MS): () => void {
-  let running = false;
-  const run = () => {
-    if (running) return;
-    running = true;
-    deleteExpiredDemos()
-      .then((deleted) => {
-        if (deleted > 0) logger.info({ deleted }, 'Expired demos deleted');
-      })
-      .catch((err: unknown) => {
-        logger.error({ err }, 'Demo cleanup failed');
-      })
-      .finally(() => {
-        running = false;
-      });
-  };
-  run();
-  const timer = setInterval(run, intervalMs);
-  timer.unref();
-  return () => {
-    clearInterval(timer);
-  };
+  return startPeriodic('demo-cleanup', intervalMs, async () => {
+    const deleted = await deleteExpiredDemos();
+    if (deleted > 0) logger.info({ deleted }, 'Expired demos deleted');
+  });
 }

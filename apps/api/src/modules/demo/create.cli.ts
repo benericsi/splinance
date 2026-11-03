@@ -10,10 +10,11 @@ import { createSandbox } from './demo.service';
  * Its bank files come from `demo:bank-files` with the printed seed and day.
  *
  *   pnpm --filter @splinance/api demo:create [--seed <n>] [--today <YYYY-MM-DD>] [--days <n>]
+ *   node dist/demo-create.mjs [...]    (the built API, on a server)
  */
 
 const USAGE =
-  'Usage: pnpm --filter @splinance/api demo:create [--seed <n>] [--today <YYYY-MM-DD>] [--days <n>]';
+  'Usage: demo:create (or node dist/demo-create.mjs) [--seed <n>] [--today <YYYY-MM-DD>] [--days <n>]';
 
 try {
   const { values } = parseArgs({

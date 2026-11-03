@@ -3,7 +3,8 @@ import { logger } from '../lib/logger';
 import { runMigrations } from './migrator';
 
 try {
-  await runMigrations(env.DATABASE_URL);
+  // As the schema owner when one is configured: the API's own role cannot change the schema.
+  await runMigrations(env.MIGRATE_DATABASE_URL ?? env.DATABASE_URL);
   logger.info('Migrations applied');
 } catch (err) {
   logger.error({ err }, 'Migration failed');

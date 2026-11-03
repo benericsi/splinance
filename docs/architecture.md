@@ -152,15 +152,15 @@ Graceful shutdown (`index.ts`): on SIGTERM/SIGINT the server stops accepting con
 
 All routes live under `/api`. Request and response bodies are defined by Zod schemas in `packages/shared`.
 
-| Method and path           | Auth                                   | Request                            | Success                                                                    | Errors                                                        |
-| ------------------------- | -------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `GET /api/health/live`    | none                                   |                                    | 200 `{ status: 'ok', uptimeSeconds }`                                      |                                                               |
-| `GET /api/health/ready`   | none                                   |                                    | 200 `{ status: 'ok', checks: { database: 'ok' } }`                         | 503 same shape with `'error'`                                 |
-| `POST /api/auth/register` | none, 5 req / 15 min / IP              | `{ email, password, displayName }` | 201 `{ accessToken, user }` + refresh cookie                               | 400 `VALIDATION_ERROR`, 409 `EMAIL_TAKEN`, 429 `RATE_LIMITED` |
-| `POST /api/auth/login`    | none, 10 failed / 15 min / IP          | `{ email, password }`              | 200 `{ accessToken, user }` + refresh cookie                               | 401 `INVALID_CREDENTIALS`, 429                                |
-| `POST /api/auth/refresh`  | refresh cookie, 100 / 15 min           |                                    | 200 `{ accessToken, user }` (+ rotated cookie, except in the grace window) | 401 `INVALID_REFRESH_TOKEN`                                   |
-| `POST /api/auth/logout`   | refresh cookie (optional)              |                                    | 204, cookie cleared                                                        |                                                               |
-| `GET /api/me`             | `Authorization: Bearer <access token>` |                                    | 200 `{ user }`                                                             | 401 `UNAUTHENTICATED`                                         |
+| Method and path           | Auth                                   | Request                            | Success                                                                    | Errors                                                                                   |
+| ------------------------- | -------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `GET /api/health/live`    | none                                   |                                    | 200 `{ status: 'ok', uptimeSeconds }`                                      |                                                                                          |
+| `GET /api/health/ready`   | none                                   |                                    | 200 `{ status: 'ok', checks: { database: 'ok' } }`                         | 503 same shape with `'error'`                                                            |
+| `POST /api/auth/register` | none, 5 req / 15 min / IP              | `{ email, password, displayName }` | 201 `{ accessToken, user }` + refresh cookie                               | 400 `VALIDATION_ERROR`, 403 `REGISTRATION_CLOSED`, 409 `EMAIL_TAKEN`, 429 `RATE_LIMITED` |
+| `POST /api/auth/login`    | none, 10 failed / 15 min / IP          | `{ email, password }`              | 200 `{ accessToken, user }` + refresh cookie                               | 401 `INVALID_CREDENTIALS`, 429                                                           |
+| `POST /api/auth/refresh`  | refresh cookie, 100 / 15 min           |                                    | 200 `{ accessToken, user }` (+ rotated cookie, except in the grace window) | 401 `INVALID_REFRESH_TOKEN`                                                              |
+| `POST /api/auth/logout`   | refresh cookie (optional)              |                                    | 204, cookie cleared                                                        |                                                                                          |
+| `GET /api/me`             | `Authorization: Bearer <access token>` |                                    | 200 `{ user }`                                                             | 401 `UNAUTHENTICATED`                                                                    |
 
 `user` is `{ id, email, displayName, createdAt }` (`userSchema`).
 
@@ -357,7 +357,7 @@ Passwords use Argon2id via `@node-rs/argon2` (m=19456 KiB, t=2, p=1, the OWASP m
 
 ### Register and login
 
-- Register: hash the password, then in one database transaction insert the user and create the session. A unique-constraint violation on `users_email_unique` becomes 409 `EMAIL_TAKEN` (`isUniqueViolation` checks the error and its `cause`, because Drizzle wraps driver errors).
+- Register: first the registration policy (`REGISTRATION`: `open` in development and tests, `allowlist` on production with `REGISTRATION_ALLOWLIST`, `closed`; unset means `closed` when `NODE_ENV=production`, so a forgotten variable never opens sign-ups). Anyone else gets 403 `REGISTRATION_CLOSED`, which the form shows on the email field. Then hash the password, and in one database transaction insert the user and create the session. A unique-constraint violation on `users_email_unique` becomes 409 `EMAIL_TAKEN` (`isUniqueViolation` checks the error and its `cause`, because Drizzle wraps driver errors).
 - Login: if the email does not exist, the service still runs an Argon2 verification against a dummy hash before answering, so response time does not reveal which emails are registered. Wrong password and unknown email return the identical 401 body.
 - Only failed login attempts count against the rate limit (`skipSuccessfulRequests`).
 - `RATE_LIMIT_DISABLED=true` turns every limiter into a no-op. Only the e2e suite sets it (it registers dozens of users from one IP, against a limit of 5 per 15 minutes); env validation refuses it when `NODE_ENV=production`.
@@ -653,7 +653,7 @@ A tiny external store (`getState`, `subscribe`, `setSession`, `clear`) holding `
 
 - TanStack Form with the shared Zod schema as validator, using `validationLogic: revalidateLogic()` and `validators: { onDynamic: schema }`: nothing is validated until the first submit, then fields re-validate live while the user fixes them.
 - `onSubmit` parses the values with the schema again (applying trim/lowercase transforms) and calls `mutateAsync`.
-- API errors: field-specific ones go next to the field (`EMAIL_TAKEN` on the email field via `serverError`); everything else appears in `FormError` above the form. Editing the field calls `mutation.reset()`, which clears the server error.
+- API errors: field-specific ones go next to the field (`EMAIL_TAKEN` and `REGISTRATION_CLOSED` on the email field via `serverError`); everything else appears in `FormError` above the form. Editing the field calls `mutation.reset()`, which clears the server error.
 - Forms whose fields hold text that is not the API value yet (amounts, percentages) keep a form-values type and map it to the shared input in one function; the validator runs the shared schema on the mapped value (see Transactions above).
 - `SegmentedControl` (a ToggleGroup that cannot be emptied) is the control for one-of-few choices: Expense / Income, Shared / Just me, the payer, the split method.
 - Pickers with many options are searchable comboboxes (`components/ui/combobox.tsx`, Base UI Combobox via the shadcn CLI, plus our `ComboboxSearchInput` for a search box inside the popup): `CategoryPicker` (categories of the transaction's kind, "No category" as a normal item) and the household switcher. Base UI's filter uses `Intl.Collator` with `sensitivity: 'base'`, so matching ignores case and accents ("egesz" finds "Egészség"). `autoHighlight` highlights the first match, so Enter picks it; focus returns to the trigger. Inside the phone drawer the popup opens above the drawer and picking does not close it.
@@ -761,7 +761,7 @@ Things that took real debugging or are easy to break. Read these before changing
 ## 15. Known limitations
 
 - Access tokens cannot be revoked before they expire (15 minutes).
-- Rate limits are per IP and in memory: they reset on restart and are not shared between instances (Redis is planned for Phase 6). Behind a reverse proxy, `trust proxy` must be configured first (Phase 3 deploy), otherwise every request appears to come from the proxy's IP.
+- Rate limits are per IP and in memory: they reset on restart and are not shared between instances (Redis is planned for Phase 6). The IP is `req.ip`, which follows `X-Forwarded-For` only through the `TRUST_PROXY` hops; set it to the number of proxies really in front of the API (1 behind Caddy), never more, or clients could pick their own IP.
 - Registration reveals whether an email exists (409). Avoiding this needs email verification, which is out of scope for now.
 - No email verification, password reset, account deletion or session list yet.
 - Invite links are not bound to an email: whoever holds a valid link can join. Owners can list and revoke pending links; links expire after 7 days.
@@ -794,9 +794,11 @@ Accepted by design (a household trusts its members; the audit log and transactio
 
 Before the first deploy:
 
-- `app.set('trust proxy', ...)` for the reverse proxy, so rate limits and logs see client IPs.
+- `TRUST_PROXY` set for the proxies in front of the API (`app.set('trust proxy', n)`), so rate limits and logs see client IPs; checked after the first deploy with a forged header.
+- `REGISTRATION=allowlist` with `REGISTRATION_ALLOWLIST` on production (closed when unset).
+- `MIGRATE_DATABASE_URL` as the schema owner, `DATABASE_URL` as a role without DDL rights.
 - The web server sends HSTS, `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` and a CSP (`script-src 'self'` plus the hash of the inline theme script in `index.html`; fonts and styles are self-hosted).
 - `NODE_ENV=production` (secure cookies by default; keep `COOKIE_SECURE` unset or true), a random `JWT_ACCESS_SECRET` from a secret store, the database user without superuser rights.
 - The demo instance gets its own `JWT_ACCESS_SECRET` (with a shared one, a demo access token would verify on production) and its own database; cookies stay host-only (no `Domain`), so the two hosts never share them.
 - GitHub Actions pinned to commit SHAs, Dependabot for npm and actions, a deploy key that can only deploy.
-- A job that deletes expired sessions and invites (Phase 6), and database backups.
+- Database backups. (Stale sessions and invites are deleted by the maintenance job, at boot and daily.)
