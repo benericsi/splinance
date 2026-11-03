@@ -33,11 +33,12 @@ pnpm monorepo, three packages:
 apps/api          Express 5 REST API (Node 26, TypeScript, Drizzle, Postgres)
 apps/web          React 19 SPA (Vite 8, TanStack Router/Query/Form, shadcn/ui on Base UI, Tailwind v4)
 packages/shared   Zod schemas, password rules, brand palette: the contract between api and web
-e2e               Playwright end-to-end suite against the production builds
+e2e               Playwright end-to-end suite against the production builds (and the smoke suite against the images)
+deploy/           Web image (Caddy + both builds, Caddyfile), smoke stack, CSP check: see section 13
 data/             Python data track (uv project, not a pnpm package): see data-track.md
 infra/            Terraform for AWS (state bucket, data lake, IAM, budgets): see data-track.md
 docs/             data-model.md, data-track.md, architecture.md (this file)
-docker/           Postgres init script (creates the test database)
+docker/           Postgres init scripts (test and demo databases, the data track's login)
 ```
 
 Key files by concern:
@@ -65,6 +66,7 @@ Key files by concern:
 | Households (web), app shell   | `apps/web/src/features/households/*`, `apps/web/src/routes/_authenticated/h/*`                                           |
 | URL-driven modals             | `apps/web/src/components/route-dialog.tsx`, `apps/web/src/lib/route-modal.ts`                                            |
 | Theme                         | `apps/web/src/lib/theme.ts` + inline script in `apps/web/index.html`                                                     |
+| Images, web server            | `apps/api/Dockerfile`, `deploy/web/Dockerfile`, `deploy/web/Caddyfile`, `.dockerignore`, `deploy/compose.smoke.yml`      |
 | Brand                         | `packages/shared/src/brand.ts`, `apps/web/src/components/brand/*`, `apps/web/src/index.css`                              |
 
 `packages/shared` has no build step: its `package.json` exports `src/index.ts` directly. Every consumer compiles it (Vite in web, tsx in api dev, Vitest in tests) and tsdown inlines it into the production API bundle (`deps.alwaysBundle`).
@@ -719,6 +721,13 @@ E2E specifics (`e2e/`):
 - The demo instance has its own suite (`pnpm e2e:demo`, `e2e/playwright.demo.config.ts`, specs in `e2e/demo/`): the bundled API with `DEMO_MODE` on :3200 against `splinance_e2e_demo` (global setup creates and migrates it like the main one), and the demo build (`build:demo`, `dist-demo`) served by `vite preview` on :4273. Its reports go to `playwright-report/demo` and `test-results/demo`. Flows: "Try the demo" lands on John Doe's household with the banner, a balance with Jane Doe, spending this month, Rent eleven months back, budgets and the monthly Revolut imports; Start over swaps in a fresh household and the old one is gone; End demo returns to the landing page and household pages stay closed; no login or registration; a sample export goes through the import; on a phone the landing page and the demo fit without sideways scrolling. CI runs it in the e2e job after the main suite.
 - Debugging: `pnpm --filter @splinance/e2e e2e:ui` (UI mode) or `e2e:report` (last HTML report with traces of failed tests).
 
+Images and smoke (`deploy/`, CI job `Images and smoke`):
+
+- Two images, both built from the repository root: `apps/api/Dockerfile` (the bundled API, `node:26` Debian slim, production dependencies only, runs as `node`; the same image runs migrations and `demo-create`) and `deploy/web/Dockerfile` (Caddy with both web builds and the Caddyfile, so config and files never drift apart). `.dockerignore` is an allowlist: `.env` files, `data/` and bank files never reach an image. Base images are pinned by digest.
+- `deploy/web/Caddyfile`: plain HTTP on `$PORT` (TLS ends at Railway's edge), the demo host (`demo.$DOMAIN`) gets `dist-demo` and `$API_DEMO_UPSTREAM`, every other host the production build and `$API_UPSTREAM`. Security headers are defaults (`?`), so Helmet's stay on `/api`; the CSP is set on static responses only. The client IP comes from the edge's `X-Real-IP` and is passed on as the only `X-Forwarded-For` entry (the API trusts one hop). No access log: invite tokens travel in API paths.
+- `deploy/scripts/check-csp.mjs` hashes every inline script of `dist/index.html` and `dist-demo/index.html` and fails unless the Caddyfile's `script-src` has it. It runs in the main CI job and in the web image build: changing an inline script without its hash fails a build, not production. There are two: the theme script, and `globalThis.__zod_globalConfig = { jitless: true }`. Zod 4 probes for `new Function` while object schemas are created, and a CSP without `'unsafe-eval'` reports even that caught probe; the global has to exist before any module runs, because `z.config()` in the entry module would run after the bundle chunks that create the schemas (found by the smoke suite).
+- `deploy/compose.smoke.yml` runs both images like Railway does (Postgres 18, one-shot migrations, both APIs, Caddy on :8080); `pnpm --filter @splinance/e2e e2e:smoke` then checks headers, CSP violations (none, in a real browser), cache headers, the production allowlist and "Try the demo" on `demo.localhost`.
+
 ## 14. The hard parts
 
 Things that took real debugging or are easy to break. Read these before changing the related code.
@@ -767,7 +776,6 @@ Things that took real debugging or are easy to break. Read these before changing
 - Invite links are not bound to an email: whoever holds a valid link can join. Owners can list and revoke pending links; links expire after 7 days.
 - A removed member can rejoin through any other valid invite link they see; there is no ban list.
 - Editing an old transaction that involves someone who left, or deleting or restoring a transaction or settlement, can reopen a debt with a former member. It shows up in the balances and can be settled (an owner records it), but the former member cannot see it.
-- The inline theme script in `index.html` needs a CSP hash if a Content Security Policy is added to the frontend.
 - Cross-tab refresh locking is covered by reasoning and the server grace window, not by automated tests (jsdom has no Web Locks, and the e2e suite does not open two tabs of one user).
 - The e2e suite runs Chromium only (desktop and Pixel 7 emulation), not Firefox or WebKit/Safari.
 
@@ -797,7 +805,7 @@ Before the first deploy:
 - `TRUST_PROXY` set for the proxies in front of the API (`app.set('trust proxy', n)`), so rate limits and logs see client IPs; checked after the first deploy with a forged header.
 - `REGISTRATION=allowlist` with `REGISTRATION_ALLOWLIST` on production (closed when unset).
 - `MIGRATE_DATABASE_URL` as the schema owner, `DATABASE_URL` as a role without DDL rights.
-- The web server sends HSTS, `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` and a CSP (`script-src 'self'` plus the hash of the inline theme script in `index.html`; fonts and styles are self-hosted).
+- The web server sends HSTS, `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `frame-ancestors 'none'` and a CSP (`script-src 'self'` plus the hash of the inline theme script in `index.html`; fonts and styles are self-hosted). Done in `deploy/web/Caddyfile`; the smoke suite checks them in a real browser.
 - `NODE_ENV=production` (secure cookies by default; keep `COOKIE_SECURE` unset or true), a random `JWT_ACCESS_SECRET` from a secret store, the database user without superuser rights.
 - The demo instance gets its own `JWT_ACCESS_SECRET` (with a shared one, a demo access token would verify on production) and its own database; cookies stay host-only (no `Domain`), so the two hosts never share them.
 - GitHub Actions pinned to commit SHAs, Dependabot for npm and actions, a deploy key that can only deploy.

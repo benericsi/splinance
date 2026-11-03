@@ -1,0 +1,71 @@
+# The web service: both web builds as static files, /api proxied to the matching API over the
+# private network. TLS ends at Railway's edge, so Caddy speaks plain HTTP on $PORT.
+#   splinance.com        -> /srv/web,      /api -> $API_UPSTREAM
+#   demo.splinance.com   -> /srv/web-demo, /api -> $API_DEMO_UPSTREAM
+# Environment: PORT (Railway sets it), DOMAIN (splinance.com; localhost in the smoke stack),
+# API_UPSTREAM, API_DEMO_UPSTREAM (host:port, e.g. api.railway.internal:3000).
+{
+	auto_https off
+	admin off
+	servers {
+		# Railway's edge is the only way in and puts the client's address in X-Real-IP. Where
+		# the header is absent (the CI smoke stack) the peer's address is used.
+		trusted_proxies static 0.0.0.0/0 ::/0
+		client_ip_headers X-Real-IP
+	}
+}
+
+(security_headers) {
+	# Defaults only (`?`): on /api, Helmet's own (stricter) headers win.
+	header {
+		?Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		?X-Content-Type-Options nosniff
+		?Referrer-Policy no-referrer
+		?Cross-Origin-Opener-Policy same-origin
+		?Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		-Server
+	}
+}
+
+# args[0]: API upstream, args[1]: folder of the web build.
+(site) {
+	import security_headers
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy {args[0]} {
+			# The API trusts exactly this one hop (TRUST_PROXY=1) and takes the client IP from it.
+			header_up X-Forwarded-For {client_ip}
+			# Hold requests while the API restarts during a deploy instead of answering 502.
+			lb_try_duration 15s
+		}
+	}
+
+	handle {
+		root * {args[1]}
+		# script-src: the two inline scripts of index.html by hash, the theme (applies the saved
+		# theme before first paint) and Zod's jitless switch (no eval). check-csp.mjs checks
+		# them against the build (image build and CI): changing one without its hash fails the
+		# build, not production.
+		# style-src 'unsafe-inline': the splash <style> and libraries that inject styles (sonner).
+		header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-Js8wkbjAtb9Fuc7xzTd5zeakgp2WaSM+mc2LVlB4iqM=' 'sha256-4kXv8ASJd5N8bG8EomHmGsYVdHTa7cDCfaf7QUT34rU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'"
+		# Hashed file names never change content; everything else (index.html, the SPA
+		# fallback) is revalidated, so a deploy shows up on the next load. Inline matchers
+		# only: this snippet is imported twice into one site, named ones would collide.
+		header /assets/* Cache-Control "public, max-age=31536000, immutable"
+		header ?Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# No access log: invite tokens travel in API paths; the API logs requests itself (redacted).
+:{$PORT:8080} {
+	@demo host demo.{$DOMAIN}
+	handle @demo {
+		import site {$API_DEMO_UPSTREAM} /srv/web-demo
+	}
+	handle {
+		import site {$API_UPSTREAM} /srv/web
+	}
+}

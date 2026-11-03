@@ -8,6 +8,7 @@
     "e2e:ui": "playwright test --ui",
     "e2e:demo": "playwright test -c playwright.demo.config.ts",
     "capture": "playwright test -c playwright.capture.config.ts",
+    "e2e:smoke": "playwright test -c playwright.smoke.config.ts",
     "e2e:report": "playwright show-report",
     "typecheck": "tsc"
   },

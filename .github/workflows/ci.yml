@@ -54,6 +54,60 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # Every inline script of both builds must be allowed by the Caddyfile's CSP hash.
+      - run: pnpm --filter @splinance/web build:demo && node deploy/scripts/check-csp.mjs
+
+  images:
+    name: Images and smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # The images Railway builds, run together behind the real Caddyfile (deploy/compose.smoke.yml):
+    # migrations, both APIs, headers, CSP, the allowlist and "Try the demo" in a real browser.
+    steps:
+      - uses: actions/checkout@v7
+
+      - run: docker build -f apps/api/Dockerfile -t splinance-api:smoke .
+      - run: >-
+          docker build -f deploy/web/Dockerfile -t splinance-web:smoke
+          --build-arg VITE_DEMO_URL=http://demo.localhost:8080 .
+
+      - run: docker compose -f deploy/compose.smoke.yml up -d
+
+      # Both hosts answer through Caddy once their API and database are up.
+      - run: |
+          for host in localhost demo.localhost; do
+            for i in $(seq 1 60); do
+              curl -fsS -H "Host: $host" http://127.0.0.1:8080/api/health/ready > /dev/null && break
+              if [ "$i" = 60 ]; then echo "$host not ready"; exit 1; fi
+              sleep 2
+            done
+          done
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter @splinance/e2e...
+      - run: pnpm --filter @splinance/e2e exec playwright install --with-deps chromium
+      - run: pnpm --filter @splinance/e2e e2e:smoke
+
+      - if: failure()
+        run: |
+          docker compose -f deploy/compose.smoke.yml ps --all
+          docker compose -f deploy/compose.smoke.yml logs --no-color
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: smoke-report
+          path: |
+            e2e/playwright-report/smoke/
+            e2e/test-results/smoke/
+          retention-days: 14
 
   audit:
     name: Dependency audit
