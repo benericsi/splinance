@@ -30,7 +30,7 @@ Status: Phases 0 to 3 (foundation; auth, households, invites, onboarding; transa
 pnpm monorepo, three packages:
 
 ```
-apps/api          Express 5 REST API (Node 22, TypeScript, Drizzle, Postgres)
+apps/api          Express 5 REST API (Node 24, TypeScript, Drizzle, Postgres)
 apps/web          React 19 SPA (Vite 8, TanStack Router/Query/Form, shadcn/ui on Base UI, Tailwind v4)
 packages/shared   Zod schemas, password rules, brand palette: the contract between api and web
 e2e               Playwright end-to-end suite against the production builds
@@ -781,7 +781,7 @@ Reviewed 2026-10-27 (dependencies, auth, authorization, input handling, web clie
 - Abuse: per-IP limits on register (5), failed logins (10), refresh (100), invite preview (60) and accept (30), a ceiling of 1000 per IP for the whole API, and 30 import checks or imports per user, all per 15 minutes.
 - Secrets in URLs and logs: invite tokens live in the URL fragment on the web and are redacted from API request logs; logs drop authorization headers and cookies. The example `JWT_ACCESS_SECRET` is refused in production.
 - Web: no `dangerouslySetInnerHTML`; React escapes everything else. Redirect targets after login go through `safeRedirect` (same origin only, no backslashes or control characters, which URL parsing would turn into `//host`). Devtools load only in development.
-- Dependencies: CI runs `pnpm audit:prod` (high and critical advisories in what ships fail the build). Dev tooling is audited by hand (`pnpm audit`). Node 22.19 or newer is required (`engines`): patched `undici` (jsdom) needs zlib zstd support.
+- Dependencies: CI runs `pnpm audit:prod` (high and critical advisories in what ships fail the build). Dev tooling is audited by hand (`pnpm audit`). Node 24 (Active LTS, `.nvmrc`; `engines` requires 24.11, the first 24 LTS) runs locally, in CI and in the images; patched `undici` (jsdom) needs its zlib zstd support.
 
 - Demo instance: `DEMO_MODE` is refused by env validation unless the database name ends in `_demo`, and the demo service checks `current_database()` again before creating or deleting anything. Production never mounts `/api/demo`. Registration and joining are closed on the demo, so its database holds only seeded sandboxes. Demo accounts cannot log in (random, discarded password; `.invalid` emails). `POST /api/demo` is limited per IP and by a global cap of active sandboxes.
 - Data track: the pipeline reads the demo database only through the `analytics` views, as a role that can read nothing else (a test checks every table in `public` and `drizzle`). The views carry no credentials or contact data, show free text only where the demo story wrote it, keep private and visitor-imported transactions as stubs, and are empty outside `_demo` / `_test` databases. The login role exists only on the demo database.

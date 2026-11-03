@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.30.0",
   "engines": {
-    "node": ">=22.19"
+    "node": ">=24.11"
   },
   "scripts": {
     "dev": "pnpm -r --parallel --if-present dev",
@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^22.20.5",
+    "@types/node": "^24.19.2",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
