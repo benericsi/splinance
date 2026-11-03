@@ -84,6 +84,19 @@ jobs:
             done
           done
 
+      # The production roles (deploy/db) allow what the API needs and nothing more.
+      - run: |
+          sql() { docker compose -f deploy/compose.smoke.yml exec -T -e PGPASSWORD="$2" db \
+            psql -h 127.0.0.1 -U "$1" -d "$3" -v ON_ERROR_STOP=1 -qAt -c "$4"; }
+          refused() { if sql "$@" > /dev/null 2>&1; then echo "allowed but must not be: $1 $4"; exit 1; fi; }
+          sql splinance_app smoke-app splinance 'select count(*) from users' > /dev/null
+          refused splinance_app smoke-app splinance 'create table should_fail (id int)'
+          refused splinance_app smoke-app splinance_demo 'select 1'
+          sql splinance_demo_analytics smoke-analytics splinance_demo 'select count(*) from analytics.transactions' > /dev/null
+          refused splinance_demo_analytics smoke-analytics splinance_demo 'select count(*) from public.users'
+          refused splinance_demo_analytics smoke-analytics splinance 'select 1'
+          echo "database roles: ok"
+
       - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v7

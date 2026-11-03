@@ -5,9 +5,11 @@
 
 name: splinance-smoke
 
+# The production roles (deploy/db): migrations as the owner, the API as a role without DDL.
 x-production: &production
   NODE_ENV: production
-  DATABASE_URL: postgres://splinance:splinance@db:5432/splinance
+  DATABASE_URL: postgres://splinance_app:smoke-app@db:5432/splinance
+  MIGRATE_DATABASE_URL: postgres://splinance_owner:smoke-owner@db:5432/splinance
   JWT_ACCESS_SECRET: smoke-only-production-secret-not-for-real-use
   TRUST_PROXY: '1'
   REGISTRATION: allowlist
@@ -15,7 +17,8 @@ x-production: &production
 
 x-demo: &demo
   NODE_ENV: production
-  DATABASE_URL: postgres://splinance:splinance@db:5432/splinance_demo
+  DATABASE_URL: postgres://splinance_demo_app:smoke-demo-app@db:5432/splinance_demo
+  MIGRATE_DATABASE_URL: postgres://splinance_demo_owner:smoke-demo-owner@db:5432/splinance_demo
   JWT_ACCESS_SECRET: smoke-only-demo-secret-different-from-production
   TRUST_PROXY: '1'
   DEMO_MODE: 'true'
@@ -26,13 +29,16 @@ services:
     environment:
       POSTGRES_USER: splinance
       POSTGRES_PASSWORD: splinance
-      POSTGRES_DB: splinance
     volumes:
-      - ../docker/postgres/init/02-create-demo-db.sql:/docker-entrypoint-initdb.d/02-create-demo-db.sql:ro
+      # Railway has two servers; here both setups share one (their role names differ).
+      - ./db:/deploy-db:ro
+      - ./db/smoke-init.sh:/docker-entrypoint-initdb.d/smoke-init.sh:ro
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U splinance -d splinance']
+      # Over TCP: the init scripts run on a socket-only server, so this passes only once they
+      # are done and the real server is up.
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U splinance -d splinance_demo']
       interval: 2s
-      retries: 30
+      retries: 60
 
   # Railway runs these as the pre-deploy command of each API service.
   migrate:
