@@ -1,0 +1,22 @@
+# Build context of the app images (apps/api/Dockerfile, deploy/web/Dockerfile), repository
+# root. Allowlist: only what the builds read gets in, so .env files, local databases, bank
+# files and the data track never reach an image. data/ builds with its own context.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!packages/shared
+!apps/api
+!apps/web
+!deploy/web
+!deploy/scripts
+
+# Never, even inside the allowed folders.
+**/node_modules
+**/dist
+**/dist-demo
+**/.env
+**/.env.*
+**/*.log
+**/coverage

@@ -10,7 +10,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Splinance</title>
     <!-- Applies the saved theme before first paint (no light flash in dark mode).
-         Mirrors src/lib/theme.ts; a production CSP needs this script's hash. -->
+         Mirrors src/lib/theme.ts. The CSP in deploy/web/Caddyfile allows it by hash:
+         change it and update the hash (deploy/scripts/check-csp.mjs prints it). -->
     <script>
       (function () {
         var dark = false;

@@ -1,0 +1,81 @@
+# Both images the way Railway runs them, on one machine: CI job "Images and smoke", or locally
+# after building the images (docs/deploy.md). Throwaway secrets; nothing here is for production.
+#   docker compose -f deploy/compose.smoke.yml up -d
+#   http://localhost:8080 (production build), http://demo.localhost:8080 (demo)
+
+name: splinance-smoke
+
+x-production: &production
+  NODE_ENV: production
+  DATABASE_URL: postgres://splinance:splinance@db:5432/splinance
+  JWT_ACCESS_SECRET: smoke-only-production-secret-not-for-real-use
+  TRUST_PROXY: '1'
+  REGISTRATION: allowlist
+  REGISTRATION_ALLOWLIST: smoke@example.com
+
+x-demo: &demo
+  NODE_ENV: production
+  DATABASE_URL: postgres://splinance:splinance@db:5432/splinance_demo
+  JWT_ACCESS_SECRET: smoke-only-demo-secret-different-from-production
+  TRUST_PROXY: '1'
+  DEMO_MODE: 'true'
+
+services:
+  db:
+    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    environment:
+      POSTGRES_USER: splinance
+      POSTGRES_PASSWORD: splinance
+      POSTGRES_DB: splinance
+    volumes:
+      - ../docker/postgres/init/02-create-demo-db.sql:/docker-entrypoint-initdb.d/02-create-demo-db.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U splinance -d splinance']
+      interval: 2s
+      retries: 30
+
+  # Railway runs these as the pre-deploy command of each API service.
+  migrate:
+    image: splinance-api:smoke
+    command: ['node', 'dist/migrate.mjs']
+    environment: *production
+    depends_on:
+      db:
+        condition: service_healthy
+
+  migrate-demo:
+    image: splinance-api:smoke
+    command: ['node', 'dist/migrate.mjs']
+    environment: *demo
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: splinance-api:smoke
+    environment: *production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api-demo:
+    image: splinance-api:smoke
+    environment: *demo
+    depends_on:
+      migrate-demo:
+        condition: service_completed_successfully
+
+  web:
+    image: splinance-web:smoke
+    environment:
+      PORT: '8080'
+      DOMAIN: localhost
+      API_UPSTREAM: api:3000
+      API_DEMO_UPSTREAM: api-demo:3000
+    ports:
+      - '127.0.0.1:8080:8080'
+    depends_on:
+      api:
+        condition: service_healthy
+      api-demo:
+        condition: service_healthy
