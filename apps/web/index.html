@@ -26,6 +26,13 @@
         document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
       })();
     </script>
+    <!-- Zod 4 without its JIT: it probes for `new Function` while the app's modules load, and
+         the production CSP (no 'unsafe-eval') reports even that caught probe. Zod reads this
+         global before creating its config, so it has to exist before any module runs; a
+         module calling z.config() would run too late (bundle chunks load first). -->
+    <script>
+      globalThis.__zod_globalConfig = { jitless: true };
+    </script>
     <!-- Splash styles live inline: the app CSS is not loaded yet when the splash shows. -->
     <style>
       html {
