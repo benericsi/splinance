@@ -45,6 +45,8 @@ One row per login (device). The refresh token rotates in place.
 | revoked_at          | timestamptz, nullable                 | Logout or reuse detection                |
 | created_at          | timestamptz                           |                                          |
 
+Expired sessions, and revoked ones after 7 days, are deleted by the maintenance job (`modules/maintenance`, at API start and daily, one instance at a time through an advisory lock). Nothing references sessions.
+
 Refresh handling:
 
 | Incoming token matches                             | Result                                                                                              |
@@ -102,6 +104,7 @@ A user can belong to any number of households.
 - Only owners create invites. An invite is usable when not revoked, not accepted and not expired, and the household is not archived.
 - The composite FKs make both people members of this very household (and so guarantee the household exists): the database rejects an invite created by a member of another household even if service code had a bug. On accept, the member row is written first, then the invite, in one transaction.
 - When an owner leaves, is removed or is demoted, their pending invites are revoked, so a removed owner cannot rejoin through a link they made.
+- Invites never accepted are deleted 30 days after they expired or were revoked (maintenance job). Accepted ones stay: they record who joined through whose link.
 
 ### `categories`
 

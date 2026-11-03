@@ -114,6 +114,60 @@ describe('POST /api/auth/register', () => {
       .expect(400);
     expect(errorCode(res)).toBe('VALIDATION_ERROR');
   });
+
+  it('lets only allowlisted emails register when the allowlist is on (production)', async () => {
+    const allowlisted = createApp({
+      registration: { mode: 'allowlist', allowlist: ['anna@example.com'] },
+    });
+    const ben = await request(allowlisted)
+      .post('/api/auth/register')
+      .send({ ...credentials, email: 'ben@example.com', displayName: 'Ben' })
+      .expect(403);
+    expect(errorCode(ben)).toBe('REGISTRATION_CLOSED');
+
+    // Compared after the shared schema lowercased and trimmed the email.
+    await request(allowlisted)
+      .post('/api/auth/register')
+      .send({ ...credentials, email: ' ANNA@example.com' })
+      .expect(201);
+    expect((await db.select().from(users)).map((u) => u.email)).toEqual(['anna@example.com']);
+  });
+
+  it('refuses everyone when registration is closed', async () => {
+    const closed = createApp({ registration: { mode: 'closed', allowlist: [] } });
+    const res = await request(closed).post('/api/auth/register').send(credentials).expect(403);
+    expect(errorCode(res)).toBe('REGISTRATION_CLOSED');
+    expect(await db.select().from(users)).toHaveLength(0);
+  });
+});
+
+describe('client IP behind a proxy (TRUST_PROXY)', () => {
+  // Rate limits key on req.ip; register allows 5 requests per IP. Invalid bodies are enough:
+  // they count, and need no password hashing.
+  async function attempts(target: App, ip: string, count: number) {
+    const statuses = [];
+    for (let i = 0; i < count; i++) {
+      const res = await request(target)
+        .post('/api/auth/register')
+        .set('X-Forwarded-For', ip)
+        .send({});
+      statuses.push(res.status);
+    }
+    return statuses;
+  }
+
+  it('counts per forwarded client IP behind one trusted proxy', async () => {
+    const proxied = createApp({ trustProxy: 1 });
+    expect(await attempts(proxied, '203.0.113.7', 6)).toEqual([400, 400, 400, 400, 400, 429]);
+    // Another client behind the same proxy has its own budget.
+    expect(await attempts(proxied, '198.51.100.2', 1)).toEqual([400]);
+  });
+
+  it('ignores the header without a trusted proxy, so a client cannot pick its own IP', async () => {
+    const direct = createApp({ trustProxy: 0 });
+    expect(await attempts(direct, '203.0.113.7', 5)).toEqual([400, 400, 400, 400, 400]);
+    expect(await attempts(direct, '198.51.100.2', 1)).toEqual([429]);
+  });
 });
 
 describe('POST /api/auth/login', () => {

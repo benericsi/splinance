@@ -37,6 +37,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - API routes are mounted under `/api`; errors use the shared `apiErrorResponseSchema` shape
 - API code is organized by domain in `apps/api/src/modules/<name>/` (`<name>.routes.ts` parses input with shared Zod schemas, `<name>.service.ts` holds business logic and Drizzle queries; services accept `Db` so they run inside or outside a transaction). Multi-row writes use `db.transaction`
 - Protected routes use `requireAuth` and read the user with `getAuth(req)`; authorization checks live in services
+- Scheduled work in the API (demo cleanup, maintenance) uses `startPeriodic` + `withAdvisoryLock` (`src/lib/periodic.ts`): plain functions with a `now` parameter, safe with several instances, started and stopped in `index.ts` (Phase 6 moves them to BullMQ unchanged)
 - Web: file-based TanStack Router routes in `apps/web/src/routes` (`routeTree.gen.ts` is generated, committed, not linted); protected pages live under the `_authenticated` layout route; Vite proxies `/api` to the API in dev
 - Web data layer (service layer + custom hooks), per feature in `src/features/<name>/`:
   - `api.ts`: service functions, the only place that imports `http` from `src/lib/http.ts`; object params; return parsed data or void

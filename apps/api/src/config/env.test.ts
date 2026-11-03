@@ -20,7 +20,45 @@ describe('parseEnv', () => {
       DEMO_MODE: false,
       DEMO_TTL_DAYS: 7,
       DEMO_MAX_ACTIVE: 200,
+      TRUST_PROXY: 0,
+      REGISTRATION: 'open',
+      REGISTRATION_ALLOWLIST: [],
     });
+  });
+
+  it('closes registration in production unless it is set', () => {
+    expect(parseEnv({ ...required, NODE_ENV: 'production' }).REGISTRATION).toBe('closed');
+    const allowlist = parseEnv({
+      ...required,
+      NODE_ENV: 'production',
+      REGISTRATION: 'allowlist',
+      REGISTRATION_ALLOWLIST: ' Anna@Example.com, ben@example.com ,',
+    });
+    expect(allowlist.REGISTRATION).toBe('allowlist');
+    expect(allowlist.REGISTRATION_ALLOWLIST).toEqual(['anna@example.com', 'ben@example.com']);
+  });
+
+  it('refuses an empty or malformed allowlist', () => {
+    expect(() => parseEnv({ ...required, REGISTRATION: 'allowlist' })).toThrow(
+      /REGISTRATION_ALLOWLIST/,
+    );
+    expect(() =>
+      parseEnv({ ...required, REGISTRATION: 'allowlist', REGISTRATION_ALLOWLIST: 'anna' }),
+    ).toThrow(/REGISTRATION_ALLOWLIST/);
+  });
+
+  it('accepts a migration URL only for the same database', () => {
+    const owner = 'postgres://owner:secret@localhost:5432/db';
+    expect(parseEnv({ ...required, MIGRATE_DATABASE_URL: owner }).MIGRATE_DATABASE_URL).toBe(owner);
+    expect(() =>
+      parseEnv({ ...required, MIGRATE_DATABASE_URL: 'postgres://owner:secret@localhost/other' }),
+    ).toThrow(/MIGRATE_DATABASE_URL/);
+  });
+
+  it('trusts at most a few proxy hops', () => {
+    expect(parseEnv({ ...required, TRUST_PROXY: '1' }).TRUST_PROXY).toBe(1);
+    expect(() => parseEnv({ ...required, TRUST_PROXY: 'true' })).toThrow(/TRUST_PROXY/);
+    expect(() => parseEnv({ ...required, TRUST_PROXY: '10' })).toThrow(/TRUST_PROXY/);
   });
 
   it('coerces PORT from string', () => {

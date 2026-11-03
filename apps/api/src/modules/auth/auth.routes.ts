@@ -22,6 +22,7 @@ import {
   login,
   logout,
   type RefreshCookie,
+  type RegistrationPolicy,
   refresh,
   register,
 } from './auth.service';
@@ -57,13 +58,16 @@ function sendAuth(res: Response, status: number, result: AuthResult) {
 }
 
 /** Rate limiters live per router instance, so each app (and test) gets its own counters. */
-export function createAuthRouter({ demo = false }: { demo?: boolean } = {}) {
+export function createAuthRouter({
+  demo = false,
+  registration = { mode: 'open', allowlist: [] },
+}: { demo?: boolean; registration?: RegistrationPolicy } = {}) {
   const router = Router();
 
   if (demo) router.post('/register', closedInDemo);
   router.post('/register', rateLimiter(5), async (req, res) => {
     const input = registerInputSchema.parse(req.body);
-    sendAuth(res, 201, await register(input));
+    sendAuth(res, 201, await register(input, registration));
   });
 
   // Only failed attempts count, so normal users never hit the limit.

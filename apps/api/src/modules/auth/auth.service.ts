@@ -69,7 +69,26 @@ export async function createSession(executor: Db, user: UserRow): Promise<AuthRe
   };
 }
 
-export async function register(input: RegisterInput): Promise<AuthResult> {
+/** Who may create an account; `allowlist` holds lowercased emails (like `emailSchema`). */
+export interface RegistrationPolicy {
+  mode: 'open' | 'allowlist' | 'closed';
+  allowlist: readonly string[];
+}
+
+const OPEN: RegistrationPolicy = { mode: 'open', allowlist: [] };
+
+/** Production is allowlist-only: real strangers' data would make this a service. */
+export async function register(
+  input: RegisterInput,
+  policy: RegistrationPolicy = OPEN,
+): Promise<AuthResult> {
+  const allowed =
+    policy.mode === 'open' ||
+    (policy.mode === 'allowlist' && policy.allowlist.includes(input.email));
+  if (!allowed) {
+    throw new HttpError(403, 'Sign-ups are invite-only for now', 'REGISTRATION_CLOSED');
+  }
+
   const passwordHash = await hashPassword(input.password);
 
   try {

@@ -30,6 +30,25 @@ describe('RegisterForm', () => {
     expect(email).toHaveAttribute('aria-invalid', 'false');
   });
 
+  it('explains a closed registration (production allowlist) on the email field', async () => {
+    server.use(
+      mock.post('/api/auth/register', () =>
+        HttpResponse.json(apiError('REGISTRATION_CLOSED'), { status: 403 }),
+      ),
+    );
+    renderWithQuery(<RegisterForm onSuccess={vi.fn()} />);
+    const user = userEvent.setup();
+
+    await user.type(getField('Display name'), 'Ben');
+    await user.type(getField('Email'), 'ben@example.com');
+    await user.type(getField('Password'), 'correct horse battery');
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+
+    expect(await screen.findByText('Sign-ups are invite-only for now')).toBeVisible();
+    expect(getField('Email')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('updates the password checklist live from the shared rules', async () => {
     renderWithQuery(<RegisterForm onSuccess={vi.fn()} />);
     const user = userEvent.setup();
