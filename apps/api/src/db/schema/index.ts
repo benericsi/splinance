@@ -12,4 +12,5 @@ export * from './sessions';
 export * from './settlements';
 export * from './transaction-splits';
 export * from './transactions';
+export * from './user-identities';
 export * from './users';

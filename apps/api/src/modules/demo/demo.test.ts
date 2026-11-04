@@ -18,7 +18,7 @@ import { bearer, createTestUser } from '../../../test/users';
 import { createApp } from '../../app';
 import { db, pool } from '../../db/client';
 import { demos, importBatches, settlements, transactions } from '../../db/schema';
-import { REFRESH_COOKIE } from '../auth/auth.routes';
+import { REFRESH_COOKIE } from '../auth/refresh-cookie';
 import { CLEANUP_LOCK, deleteExpiredDemos } from './demo.cleanup';
 import { createDemo, createSandbox, type DemoConfig, deleteDemo } from './demo.service';
 import type * as SeedModule from './demo.seed';

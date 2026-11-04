@@ -92,7 +92,8 @@ Model and pre-deploy checklist: `docs/architecture.md` section 16. Rules for new
 - Demo instance (`DEMO_MODE`, own `_demo` database, own JWT secret): `/api/demo` exists only there, registration and invite accept are closed there. A new table that references households or users must also be deleted in `deleteDemo` (its test checks that nothing is left)
 - Data track access: only through the `analytics` views (custom migration, contract test `src/db/analytics.test.ts`), never grants on `public` to `splinance_analytics_reader`. Free text only by the provenance rule (`demos.seeded_at`), rows hidden as stubs not filtered out, no credentials or contact data (`docs/data-model.md`, "analytics schema")
 - New public or expensive endpoints get a `rateLimiter` (`perUser: true` for work behind `requireAuth`); keep `RATE_LIMIT_DISABLED` for e2e only
-- Never put tokens or personal data in query strings, logs or error messages; extend `redactUrl` for new token-bearing paths
+- Never put tokens or personal data in query strings, logs or error messages; extend `redactUrl` for new token-bearing paths (provider callbacks are redacted whole)
+- Sign-in providers (`modules/auth/oauth`, architecture 6): a new provider is a `providersFromEnv` entry, env variables and a button; identities match on `(provider, sub)`, never email; an existing account is linked only after its password (`linkByEmail` false where the email claim is unverified); keep `enableNonRepudiationChecks`; never on the demo; tests use `@splinance/fake-oidc`
 - Web: no `dangerouslySetInnerHTML`; post-login navigation only through `safeRedirect`; nothing sensitive in localStorage
 - New dependencies: check `pnpm audit` first; CI fails on high or critical advisories in production dependencies (`pnpm audit:prod`)
 

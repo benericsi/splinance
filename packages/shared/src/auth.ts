@@ -59,6 +59,8 @@ export type User = z.infer<typeof userSchema>;
 export const authResponseSchema = z.object({
   accessToken: z.string(),
   user: userSchema,
+  /** Set by a login that also connected a waiting provider account (e.g. 'google'). */
+  linkedProvider: z.string().optional(),
 });
 
 export type AuthResponse = z.infer<typeof authResponseSchema>;

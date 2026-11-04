@@ -1,17 +1,11 @@
 import {
+  type AuthProvidersResponse,
   type AuthResponse,
   loginInputSchema,
   type MeResponse,
   registerInputSchema,
 } from '@splinance/shared';
-import {
-  type CookieOptions,
-  type Request,
-  type RequestHandler,
-  type Response,
-  Router,
-} from 'express';
-import { env } from '../../config/env';
+import { type RequestHandler, type Response, Router } from 'express';
 import { HttpError } from '../../lib/http-error';
 import { closedInDemo } from '../../middleware/demo-mode';
 import { rateLimiter } from '../../middleware/rate-limit';
@@ -21,39 +15,28 @@ import {
   getUser,
   login,
   logout,
-  type RefreshCookie,
   type RegistrationPolicy,
   refresh,
   register,
 } from './auth.service';
+import { clearOAuthCookie, hasOAuthCookie, readOAuthCookie } from './oauth/cookies';
+import { createOAuthRouter, type OAuthDeps } from './oauth/oauth.routes';
+import {
+  clearRefreshCookie,
+  REFRESH_COOKIE,
+  readRefreshCookie,
+  setRefreshCookie,
+} from './refresh-cookie';
 
-export const REFRESH_COOKIE = 'refresh_token';
-
-// Scoped to /api/auth so the token is never sent with ordinary API requests.
-// SameSite=Strict blocks cross-site requests from carrying it (CSRF on /refresh).
-const cookieOptions: CookieOptions = {
-  httpOnly: true,
-  secure: env.COOKIE_SECURE,
-  sameSite: 'strict',
-  path: '/api/auth',
-};
-
-function readRefreshCookie(req: Request): string | undefined {
-  const value = (req.cookies as Record<string, unknown> | undefined)?.[REFRESH_COOKIE];
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
-}
-
-export function setRefreshCookie(res: Response, cookie: RefreshCookie) {
-  res.cookie(REFRESH_COOKIE, cookie.token, { ...cookieOptions, expires: cookie.expiresAt });
-}
-
-export function clearRefreshCookie(res: Response) {
-  res.clearCookie(REFRESH_COOKIE, cookieOptions);
-}
+export { REFRESH_COOKIE };
 
 function sendAuth(res: Response, status: number, result: AuthResult) {
   if (result.refreshCookie) setRefreshCookie(res, result.refreshCookie);
-  const body: AuthResponse = { accessToken: result.accessToken, user: result.user };
+  const body: AuthResponse = {
+    accessToken: result.accessToken,
+    user: result.user,
+    ...(result.linkedProvider && { linkedProvider: result.linkedProvider }),
+  };
   res.status(status).json(body);
 }
 
@@ -61,8 +44,15 @@ function sendAuth(res: Response, status: number, result: AuthResult) {
 export function createAuthRouter({
   demo = false,
   registration = { mode: 'open', allowlist: [] },
-}: { demo?: boolean; registration?: RegistrationPolicy } = {}) {
+  oauth = null,
+}: {
+  demo?: boolean;
+  registration?: RegistrationPolicy;
+  /** Sign-in providers; never on the demo instance (its database holds only sandboxes). */
+  oauth?: OAuthDeps | null;
+} = {}) {
   const router = Router();
+  const providers = demo ? [] : (oauth?.providers ?? []);
 
   if (demo) router.post('/register', closedInDemo);
   router.post('/register', rateLimiter(5), async (req, res) => {
@@ -70,10 +60,14 @@ export function createAuthRouter({
     sendAuth(res, 201, await register(input, registration));
   });
 
-  // Only failed attempts count, so normal users never hit the limit.
+  // Only failed attempts count, so normal users never hit the limit. A waiting provider
+  // account (link cookie) is connected by the same successful login.
   router.post('/login', rateLimiter(10, { skipSuccessfulRequests: true }), async (req, res) => {
     const input = loginInputSchema.parse(req.body);
-    sendAuth(res, 200, await login(input));
+    const pendingLink = providers.length > 0 ? await readOAuthCookie(req, 'link') : undefined;
+    const result = await login(input, pendingLink);
+    if (hasOAuthCookie(req, 'link')) clearOAuthCookie(res, 'link');
+    sendAuth(res, 200, result);
   });
 
   router.post('/refresh', rateLimiter(100), async (req, res) => {
@@ -89,6 +83,15 @@ export function createAuthRouter({
     clearRefreshCookie(res);
     res.status(204).end();
   });
+
+  router.get('/providers', (_req, res) => {
+    const body: AuthProvidersResponse = { providers: providers.map((p) => ({ id: p.config.id })) };
+    res.json(body);
+  });
+
+  if (oauth && providers.length > 0) {
+    router.use('/oauth', createOAuthRouter({ oauth, registration }));
+  }
 
   return router;
 }

@@ -11,6 +11,8 @@ import { rateLimiter } from './middleware/rate-limit';
 import { requireAuth } from './middleware/require-auth';
 import { createAuthRouter, getMe } from './modules/auth/auth.routes';
 import type { RegistrationPolicy } from './modules/auth/auth.service';
+import type { OAuthDeps } from './modules/auth/oauth/oauth.routes';
+import { providersFromEnv } from './modules/auth/oauth/providers';
 import { createHouseholdsRouter } from './modules/households/households.routes';
 import { createDemoRouter } from './modules/demo/demo.routes';
 import type { DemoConfig } from './modules/demo/demo.service';
@@ -24,6 +26,13 @@ export interface AppDeps extends HealthDeps {
   registration: RegistrationPolicy;
   /** Proxy hops whose X-Forwarded-For is trusted (TRUST_PROXY). */
   trustProxy: number;
+  /** Sign-in providers (APP_ORIGIN, OAUTH_*); null when none are configured. */
+  oauth: OAuthDeps | null;
+}
+
+function oauthFromEnv(): OAuthDeps | null {
+  const providers = providersFromEnv(env);
+  return env.APP_ORIGIN && providers.length > 0 ? { appOrigin: env.APP_ORIGIN, providers } : null;
 }
 
 const defaultDeps: AppDeps = {
@@ -31,6 +40,7 @@ const defaultDeps: AppDeps = {
   demo: env.DEMO_MODE ? { ttlDays: env.DEMO_TTL_DAYS, maxActive: env.DEMO_MAX_ACTIVE } : null,
   registration: { mode: env.REGISTRATION, allowlist: env.REGISTRATION_ALLOWLIST },
   trustProxy: env.TRUST_PROXY,
+  oauth: oauthFromEnv(),
 };
 
 const IMPORT_PATH = /^\/api\/households\/[^/]+\/imports(\/check)?$/;
@@ -73,7 +83,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
   // A ceiling for everything else (health checks stay out of it); the auth, invite and import
   // routes have tighter limits of their own.
   api.use(rateLimiter(1000));
-  api.use('/auth', createAuthRouter({ demo, registration: deps.registration }));
+  api.use('/auth', createAuthRouter({ demo, registration: deps.registration, oauth: deps.oauth }));
   api.get('/me', requireAuth, getMe);
   api.use('/households', createHouseholdsRouter());
   api.use('/invites', createInvitesRouter({ demo }));

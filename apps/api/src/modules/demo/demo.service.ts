@@ -176,7 +176,7 @@ export async function endDemo(userId: string): Promise<void> {
 /**
  * Deletes a sandbox for good, in one transaction: every household either person belongs to
  * (the seeded one and any the visitor made) with all their rows, then both accounts (their
- * sessions cascade). The one place rows are hard-deleted; every foreign key is ON DELETE
+ * sessions and user_identities cascade). The one place rows are hard-deleted; every foreign key is ON DELETE
  * NO ACTION, so children go before parents. Returns false if the demo is gone already.
  */
 export async function deleteDemo(demoId: string): Promise<boolean> {

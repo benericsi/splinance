@@ -1,0 +1,20 @@
+{
+  "name": "@splinance/fake-oidc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A small OpenID Connect provider for API tests and e2e (never deployed).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jose": "^6.2.12"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.3"
+  }
+}

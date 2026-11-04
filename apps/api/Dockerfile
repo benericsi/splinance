@@ -18,6 +18,9 @@ WORKDIR /repo
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/api/package.json apps/api/
 COPY packages/shared/package.json packages/shared/
+# A dev dependency of the API (tests only): the install needs its manifest, never its source,
+# and `deploy --prod` below leaves it out of the image.
+COPY packages/fake-oidc/package.json packages/fake-oidc/
 RUN pnpm install --frozen-lockfile --filter @splinance/api...
 
 COPY tsconfig.base.json ./
