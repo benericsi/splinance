@@ -12,6 +12,10 @@ export const OAUTH_ERROR_CODES = [
   'conflict',
   'unavailable',
   'failed',
+  // Connecting from account settings: that provider account belongs to another user.
+  'taken',
+  // Re-authenticating: the person picked another provider account than the connected one.
+  'wrong_account',
 ] as const;
 
 export const oauthErrorCodeSchema = z.enum(OAUTH_ERROR_CODES);

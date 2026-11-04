@@ -35,7 +35,7 @@ const DATA_ROWS: DataRow[] = [
     data: 'Account: email, display name, a password hash (Argon2id) or your Google account id',
     purpose: 'Your account and signing in',
     basis: CONTRACT,
-    kept: 'Until the account is deleted',
+    kept: 'Until the account is deleted; the Google account id until you disconnect Google in account settings',
   },
   {
     data: 'Household data: members and roles, transactions, splits, payments, categories, rules, budgets, edit history',

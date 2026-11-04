@@ -49,13 +49,30 @@ const COOKIES = {
 
 const token = z.string().min(1).max(512);
 
-export const flowStateSchema = z.object({
+const flowBase = {
   provider: z.string().max(32),
   state: token,
   nonce: token,
   codeVerifier: token,
   redirect: z.string().max(2048).optional(),
-});
+};
+
+/**
+ * What the flow is for. `signin` comes from the public start link. `connect` (add this
+ * provider account to the signed-in user) and `reauth` (prove it is still you before a
+ * sensitive change) come only from authenticated POSTs in account settings, and carry the
+ * user and the session that started them: the callback (a cross-site GET without the
+ * Strict refresh cookie) binds to that session through this encrypted cookie alone.
+ */
+export const flowStateSchema = z.discriminatedUnion('intent', [
+  z.object({ ...flowBase, intent: z.literal('signin') }),
+  z.object({
+    ...flowBase,
+    intent: z.enum(['connect', 'reauth']),
+    userId: z.uuid(),
+    sessionId: z.uuid(),
+  }),
+]);
 
 export type FlowState = z.infer<typeof flowStateSchema>;
 

@@ -1,5 +1,9 @@
+import { oauthErrorCodeSchema, oauthProviderIdSchema } from '@splinance/shared';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
+import { z } from 'zod';
 import { PageHeader } from '@/components/page-header';
 import { PageTitle } from '@/components/page-title';
 import { PageSkeleton, Reveal, RevealPage } from '@/components/reveal';
@@ -11,10 +15,19 @@ import { DeleteAccountCard } from '@/features/account/components/delete-account-
 import { OtherDevicesCard } from '@/features/account/components/other-devices-card';
 import { ProfileCard } from '@/features/account/components/profile-card';
 import { SignInMethodsCard } from '@/features/account/components/sign-in-methods-card';
+import { accountOAuthMessage } from '@/features/account/messages';
 import { accountQueries } from '@/features/account/queries';
+import { PROVIDER_VIEWS } from '@/features/auth/providers';
+
+/** How a connect or re-authentication came back from the provider (API callback). */
+const accountSearchSchema = z.object({
+  connected: oauthProviderIdSchema.optional().catch(undefined),
+  oauth_error: oauthErrorCodeSchema.optional().catch(undefined),
+});
 
 /** The signed-in person's own settings (not household-scoped); not on the demo site. */
 export const Route = createFileRoute('/_authenticated/account')({
+  validateSearch: accountSearchSchema,
   beforeLoad: () => {
     if (__DEMO_SITE__) throw redirect({ to: '/', replace: true });
   },
@@ -25,6 +38,7 @@ export const Route = createFileRoute('/_authenticated/account')({
 
 function AccountPage() {
   const { data: account } = useSuspenseQuery(accountQueries.detail());
+  useProviderResult();
 
   return (
     <AccountLayout>
@@ -50,6 +64,28 @@ function AccountPage() {
       <Outlet />
     </AccountLayout>
   );
+}
+
+/**
+ * Says once how the round trip to the provider went, then drops the parameters (a reload
+ * must not repeat it). Codes only: the URL never carries personal data.
+ */
+function useProviderResult() {
+  const { connected, oauth_error: error } = Route.useSearch();
+  const navigate = Route.useNavigate();
+
+  useEffect(() => {
+    if (!connected && !error) return;
+    const providerName = (id: string | undefined) =>
+      (id && PROVIDER_VIEWS[id]?.name) ?? 'the provider';
+    if (connected) {
+      const name = providerName(connected);
+      toast.success(`${name} is now connected. Next time, you can continue with ${name}.`);
+    }
+    // Only Google exists today; a second provider would carry its id in the error too.
+    if (error) toast.error(accountOAuthMessage(error, providerName('google')));
+    void navigate({ search: {}, replace: true });
+  }, [connected, error, navigate]);
 }
 
 function AccountHeader() {
