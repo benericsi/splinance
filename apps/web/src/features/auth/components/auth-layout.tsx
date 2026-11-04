@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 import { BrandPanel } from '@/components/brand/brand-panel';
 import { Logo } from '@/components/logo';
@@ -28,6 +29,11 @@ export function AuthLayout({ title, description, aside, children }: AuthLayoutPr
           </div>
           {children}
         </div>
+        <p className="text-muted-foreground text-center text-xs">
+          <Link to="/privacy" className="underline-offset-4 hover:underline">
+            Privacy
+          </Link>
+        </p>
       </main>
     </div>
   );
