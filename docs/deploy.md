@@ -260,6 +260,12 @@ Set up and drilled on 2026-11-04 (drill log in section 5): since then production
 
    Passed 2026-11-04 (Google Cloud project `splinance` published, client `splinance-prod`; server checks with curl and `railway logs`, sign-in, reload and cookies by hand in Chrome, Firefox and Safari, a non-allowlisted account refused).
 
+10. **Account settings** (after the account PRs, no configuration needed: connect uses the same callback URL):
+
+- On a password account: Connect Google (password, Google's chooser, back on `/account` with "Google is now connected"), log out, Continue with Google lands in the household; Disconnect with the password.
+- On a Google-only test account: no Disconnect button; Set a password right after signing in; log in with it.
+- `railway logs -s api` shows `account.identity_connected` / `account.identity_disconnected` / `account.password_set` with a user id and no email.
+
 ## 5. Operating
 
 - **Deploying:** merge to `main`. CI runs; with Wait for CI the services whose watch paths changed build and deploy afterwards, each API after its migrations.

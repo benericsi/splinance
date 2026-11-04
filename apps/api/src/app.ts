@@ -86,13 +86,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
   api.use(rateLimiter(1000));
   api.use('/auth', createAuthRouter({ demo, registration: deps.registration, oauth: deps.oauth }));
   api.get('/me', requireAuth, getMe);
-  api.use(
-    '/account',
-    createAccountRouter({
-      demo,
-      providerIds: demo ? [] : (deps.oauth?.providers.map((p) => p.config.id) ?? []),
-    }),
-  );
+  api.use('/account', createAccountRouter({ demo, oauth: deps.oauth }));
   api.use('/households', createHouseholdsRouter());
   api.use('/invites', createInvitesRouter({ demo }));
   if (deps.demo) api.use('/demo', createDemoRouter(deps.demo));

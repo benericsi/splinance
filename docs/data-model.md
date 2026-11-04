@@ -75,7 +75,7 @@ A sign-in provider's account linked to a user ("Continue with Google"). Matched 
 
 - `user_identities_provider_subject_unique (provider, subject)`: one Splinance user per provider account. `user_identities_user_provider_unique (user_id, provider)`: one account per provider and user; its leading column also serves "identities of a user".
 - `provider` is text with a format check, not an enum: the code registry (`modules/auth/oauth/providers.ts`) is the source of truth, so a new provider needs no migration.
-- Cascades with its user like `sessions` (credentials, not history), so `deleteDemo` needs no extra step.
+- Cascades with its user like `sessions` (credentials, not history), so `deleteDemo` needs no extra step. Disconnecting in account settings deletes the row (never the last way in: a user without a password keeps at least one).
 - Not stored: provider tokens (we never call provider APIs), the email or name the provider sent (a new account copies them into `users` once), pictures, locales.
 - Backed up (without it nobody could sign in with Google after a restore). `sub` is a pseudonymous identifier, personal data under GDPR, not a secret: signing in still needs an ID token signed by the provider.
 

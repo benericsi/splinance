@@ -33,4 +33,7 @@ export const OAUTH_ERROR_MESSAGES: Record<OAuthErrorCode, string> = {
   conflict: 'This email is connected to another sign-in. Log in with your password.',
   unavailable: "Google sign-in isn't available right now. Use your password or try again later.",
   failed: "Google sign-in didn't work. Try again.",
+  // Only from account settings, which shows its own messages; listed for completeness.
+  taken: 'This Google account is already used by another Splinance account.',
+  wrong_account: "Google sign-in didn't work. Try again.",
 };

@@ -18,6 +18,11 @@ export const accountResponseSchema = z.object({
   identities: z.array(accountIdentitySchema).max(10),
   /** Providers configured on this instance (what could be connected); empty on the demo. */
   providers: z.array(z.object({ id: oauthProviderIdSchema })).max(10),
+  /**
+   * Whether this session signed in recently enough for changes that need no password
+   * (an account without one sets its first password); otherwise it re-authenticates first.
+   */
+  recentSignIn: z.boolean(),
 });
 
 export type AccountResponse = z.infer<typeof accountResponseSchema>;
@@ -55,3 +60,27 @@ export const revokeSessionsResponseSchema = z.object({
 });
 
 export type RevokeSessionsResponse = z.infer<typeof revokeSessionsResponseSchema>;
+
+/** Step-up for connect and disconnect: required when the account has a password. */
+export const stepUpInputSchema = z.object({
+  currentPassword: z.string().min(1, 'Enter your current password').max(128).optional(),
+});
+
+export type StepUpInput = z.infer<typeof stepUpInputSchema>;
+
+/** POST /api/account/identities/:provider/reauth: where to come back afterwards. */
+export const reauthInputSchema = z.object({
+  redirect: z.string().max(512).optional(),
+});
+
+export type ReauthInput = z.infer<typeof reauthInputSchema>;
+
+/**
+ * Connect and reauth answer with the provider's authorization URL; the web navigates there
+ * (the flow cookie set by the same response carries who started it).
+ */
+export const providerRedirectResponseSchema = z.object({
+  authorizationUrl: z.url().max(4096),
+});
+
+export type ProviderRedirectResponse = z.infer<typeof providerRedirectResponseSchema>;

@@ -35,3 +35,31 @@ export function useChangePassword() {
 export function useRevokeOtherSessions() {
   return useMutation({ mutationFn: accountApi.revokeOtherSessions });
 }
+
+/** Leaves the app for the provider (a full-page navigation, like the sign-in buttons). */
+function goToProvider(authorizationUrl: string) {
+  window.location.assign(authorizationUrl);
+}
+
+// The confirm dialog shows a wrong password next to its field.
+export function useStartConnect() {
+  return useMutation({
+    mutationFn: accountApi.startConnect,
+    onSuccess: goToProvider,
+    meta: { suppressErrorToast: true },
+  });
+}
+
+export function useStartReauth() {
+  return useMutation({ mutationFn: accountApi.startReauth, onSuccess: goToProvider });
+}
+
+// The confirm dialog renders the error.
+export function useDisconnect() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: accountApi.disconnect,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: accountQueries.all() }),
+    meta: { suppressErrorToast: true },
+  });
+}

@@ -7,11 +7,12 @@ import {
 import { type Request, Router } from 'express';
 import { z } from 'zod';
 import { HttpError } from '../../../lib/http-error';
-import { generateToken } from '../../../lib/random-token';
 import { rateLimiter } from '../../../middleware/rate-limit';
+import { connectIdentity, reauthenticate } from '../../account/account.service';
 import type { RegistrationPolicy } from '../auth.service';
 import { setRefreshCookie } from '../refresh-cookie';
-import { clearOAuthCookie, readOAuthCookie, setOAuthCookie } from './cookies';
+import { clearOAuthCookie, type FlowState, readOAuthCookie, setOAuthCookie } from './cookies';
+import { beginFlow, redirectUriFor } from './flow';
 import { signInWithProvider, verifyIdentity } from './oauth.service';
 import type { OAuthProvider } from './providers';
 
@@ -44,6 +45,22 @@ function loginUrl({
   if (redirect && redirect !== '/') params.set('redirect', redirect);
   const query = params.toString();
   return query ? `/login?${query}` : '/login';
+}
+
+/** Where a connect or reauth flow from account settings ends. */
+function accountUrl({ error, connected }: { error?: OAuthErrorCode; connected?: string }): string {
+  const params = new URLSearchParams();
+  if (error) params.set('oauth_error', error);
+  if (connected) params.set('connected', connected);
+  const query = params.toString();
+  return query ? `/account?${query}` : '/account';
+}
+
+/** Errors go back where the flow started: /login for a sign-in, /account otherwise. */
+function failureUrl(flow: FlowState | undefined, code: OAuthErrorCode): string {
+  return flow && flow.intent !== 'signin'
+    ? accountUrl({ error: code })
+    : loginUrl({ error: code, redirect: flow?.redirect });
 }
 
 function sameToken(a: string, b: string): boolean {
@@ -81,9 +98,6 @@ export function createOAuthRouter({
     return provider;
   }
 
-  const redirectUriFor = (provider: OAuthProvider) =>
-    `${oauth.appOrigin}/api/auth/oauth/${provider.config.id}/callback`;
-
   router.get('/link', async (req, res) => {
     const pending = await readOAuthCookie(req, 'link');
     if (!pending) throw new HttpError(404, 'No sign-in is waiting to be connected', 'NOT_FOUND');
@@ -95,17 +109,16 @@ export function createOAuthRouter({
     const provider = providerFor(req);
     const requested = typeof req.query.redirect === 'string' ? req.query.redirect : undefined;
     const redirect = requested ? safeRedirectPath(requested, oauth.appOrigin) : undefined;
-    const flow = {
-      provider: provider.config.id,
-      state: generateToken(),
-      nonce: generateToken(),
-      codeVerifier: generateToken(),
-      redirect,
-    };
 
+    // Always a sign-in: connect and reauth start only from authenticated account routes.
     let url: URL;
     try {
-      url = await provider.authorizationUrl({ ...flow, redirectUri: redirectUriFor(provider) });
+      url = await beginFlow(res, {
+        appOrigin: oauth.appOrigin,
+        provider,
+        redirect,
+        intent: 'signin',
+      });
     } catch (err) {
       req.log.warn(
         { provider: provider.config.id, reason: 'discovery failed', error: errorName(err) },
@@ -115,7 +128,6 @@ export function createOAuthRouter({
       return;
     }
 
-    await setOAuthCookie(res, 'flow', flow);
     res.set('Cache-Control', 'no-store').redirect(303, url.href);
   });
 
@@ -132,7 +144,7 @@ export function createOAuthRouter({
         { provider: id, reason, ...(err !== undefined && { error: errorName(err) }) },
         'Provider sign-in failed',
       );
-      res.redirect(303, loginUrl({ error: code, redirect: flow?.redirect }));
+      res.redirect(303, failureUrl(flow, code));
     };
 
     const query = callbackQuerySchema.safeParse(req.query);
@@ -160,7 +172,7 @@ export function createOAuthRouter({
       return;
     }
 
-    const callbackUrl = new URL(redirectUriFor(provider));
+    const callbackUrl = new URL(redirectUriFor(oauth.appOrigin, provider));
     callbackUrl.search = new URL(req.originalUrl, oauth.appOrigin).search;
     let external;
     try {
@@ -178,6 +190,37 @@ export function createOAuthRouter({
     const identity = verifyIdentity(id, external);
     if (!('subject' in identity)) {
       reject(identity.code, identity.reason);
+      return;
+    }
+
+    if (flow.intent === 'connect') {
+      const caller = { userId: flow.userId, sessionId: flow.sessionId };
+      const connected = await connectIdentity(caller, identity);
+      if (connected.kind === 'rejected') {
+        reject(connected.code, connected.reason);
+        return;
+      }
+      req.log.info(
+        { event: 'account.identity_connected', userId: caller.userId, provider: id },
+        'Provider connected',
+      );
+      res.redirect(303, accountUrl({ connected: id }));
+      return;
+    }
+
+    if (flow.intent === 'reauth') {
+      const caller = { userId: flow.userId, sessionId: flow.sessionId };
+      const reauth = await reauthenticate(caller, identity);
+      if (reauth.kind === 'rejected') {
+        reject(reauth.code, reauth.reason);
+        return;
+      }
+      if (reauth.result.refreshCookie) setRefreshCookie(res, reauth.result.refreshCookie);
+      req.log.info(
+        { event: 'account.reauthenticated', userId: caller.userId, provider: id },
+        'Signed in again to confirm',
+      );
+      res.redirect(303, flow.redirect ?? '/account');
       return;
     }
 

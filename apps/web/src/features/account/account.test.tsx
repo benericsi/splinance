@@ -2,7 +2,7 @@ import type { AccountResponse } from '@splinance/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { http as mock, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { authStore } from '@/lib/auth-store';
 import { setDemoSite } from '../../../test/demo-site';
 import { server } from '../../../test/msw';
@@ -15,6 +15,7 @@ const passwordAccount: AccountResponse = {
   hasPassword: true,
   identities: [],
   providers: [{ id: 'google' }],
+  recentSignIn: true,
 };
 
 const googleOnly: AccountResponse = {
@@ -28,10 +29,22 @@ const googleOnly: AccountResponse = {
     },
   ],
   providers: [{ id: 'google' }],
+  recentSignIn: true,
 };
 
+const bothConnected: AccountResponse = { ...googleOnly, hasPassword: true };
+
+const GOOGLE_AUTHORIZE = 'https://accounts.example/authorize?state=s';
+
 function fakeApi(account: AccountResponse = passwordAccount) {
-  const state = { patches: [] as unknown[], passwords: [] as unknown[], revokes: 0 };
+  const state = {
+    patches: [] as unknown[],
+    passwords: [] as unknown[],
+    revokes: 0,
+    connects: [] as unknown[],
+    reauths: [] as unknown[],
+    disconnects: [] as unknown[],
+  };
   server.use(
     mock.post('/api/auth/refresh', () => HttpResponse.json(authResponse())),
     mock.get('/api/account', () => HttpResponse.json(account)),
@@ -48,9 +61,33 @@ function fakeApi(account: AccountResponse = passwordAccount) {
       state.revokes++;
       return HttpResponse.json({ revoked: 2 });
     }),
+    mock.post('/api/account/identities/google/connect', async ({ request }) => {
+      state.connects.push(await request.json());
+      return HttpResponse.json({ authorizationUrl: GOOGLE_AUTHORIZE });
+    }),
+    mock.post('/api/account/identities/google/reauth', async ({ request }) => {
+      state.reauths.push(await request.json());
+      return HttpResponse.json({ authorizationUrl: GOOGLE_AUTHORIZE });
+    }),
+    mock.post('/api/account/identities/google/disconnect', async ({ request }) => {
+      state.disconnects.push(await request.json());
+      return new HttpResponse(null, { status: 204 });
+    }),
   );
   return state;
 }
+
+/** window.location.assign, which leaves for the provider. */
+function spyOnNavigation() {
+  const assign = vi.fn();
+  const { href, origin } = window.location;
+  vi.stubGlobal('location', { href, origin, assign });
+  return assign;
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function signInMethods(): HTMLElement {
   const card = screen
@@ -80,14 +117,23 @@ describe('account page', () => {
     expect(methods.getByText('Not connected')).toBeVisible();
   });
 
-  it('shows when Google was connected and last used, and no password to change', async () => {
+  it('shows when Google was connected and why it cannot be disconnected', async () => {
     fakeApi(googleOnly);
     renderRoute('/account');
 
     await screen.findByRole('heading', { name: 'Sign-in methods' });
     const methods = within(signInMethods());
     expect(methods.getByText('Not set')).toBeVisible();
-    expect(methods.queryByRole('link', { name: 'Change' })).toBeNull();
+    expect(methods.getByRole('link', { name: 'Set a password' })).toHaveAttribute(
+      'href',
+      '/account/password',
+    );
+    expect(methods.queryByRole('button', { name: 'Disconnect' })).toBeNull();
+    expect(
+      methods.getByText(
+        'Your only way to sign in. Set a password first, then you can disconnect Google.',
+      ),
+    ).toBeVisible();
     expect(methods.getByText(/^Connected Nov 4, 2026 · Last used /)).toBeVisible();
   });
 
@@ -203,13 +249,137 @@ describe('change password dialog', () => {
     expect(state.passwords).toEqual([]);
   });
 
-  it('sends an account without a password back to the page', async () => {
-    fakeApi(googleOnly);
+  it('sets a first password right after signing in with Google', async () => {
+    const state = fakeApi(googleOnly);
     const router = renderRoute('/account/password');
+    const user = userEvent.setup();
+
+    const dialog = await screen.findByRole('dialog', { name: 'Set a password' });
+    expect(within(dialog).queryByLabelText(/^Current password/)).toBeNull();
+    await user.type(within(dialog).getByLabelText(/^New password/), 'violet tram morning');
+    await user.click(within(dialog).getByRole('button', { name: 'Set password' }));
+
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/account');
     });
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(state.passwords).toEqual([{ newPassword: 'violet tram morning' }]);
+  });
+
+  it('asks to confirm with Google first when the sign-in is not recent', async () => {
+    const state = fakeApi({ ...googleOnly, recentSignIn: false });
+    const assign = spyOnNavigation();
+    renderRoute('/account/password');
+    const user = userEvent.setup();
+
+    const dialog = await screen.findByRole('dialog', { name: 'Set a password' });
+    expect(within(dialog).queryByLabelText(/^New password/)).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Continue with Google' }));
+
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledWith(GOOGLE_AUTHORIZE);
+    });
+    expect(state.reauths).toEqual([{ redirect: '/account/password' }]);
+  });
+
+  it('switches to the confirmation when the API says the sign-in got too old', async () => {
+    fakeApi(googleOnly);
+    server.use(
+      mock.post('/api/account/password', () =>
+        HttpResponse.json(apiError('REAUTH_REQUIRED'), { status: 403 }),
+      ),
+    );
+    renderRoute('/account/password');
+    const user = userEvent.setup();
+
+    const dialog = await screen.findByRole('dialog', { name: 'Set a password' });
+    await user.type(within(dialog).getByLabelText(/^New password/), 'violet tram morning');
+    await user.click(within(dialog).getByRole('button', { name: 'Set password' }));
+    expect(
+      await within(dialog).findByRole('button', { name: 'Continue with Google' }),
+    ).toBeVisible();
+  });
+});
+
+describe('providers', () => {
+  it('connects Google after the password and leaves for Google', async () => {
+    const state = fakeApi();
+    const assign = spyOnNavigation();
+    renderRoute('/account');
+    const user = userEvent.setup();
+
+    await screen.findByRole('heading', { name: 'Sign-in methods' });
+    await user.click(within(signInMethods()).getByRole('button', { name: 'Connect' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Connect Google?' });
+    await user.type(within(dialog).getByLabelText('Current password'), 'correct horse battery');
+    await user.click(within(dialog).getByRole('button', { name: 'Continue to Google' }));
+
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledWith(GOOGLE_AUTHORIZE);
+    });
+    expect(state.connects).toEqual([{ currentPassword: 'correct horse battery' }]);
+  });
+
+  it('shows a wrong password next to the field', async () => {
+    fakeApi();
+    server.use(
+      mock.post('/api/account/identities/google/connect', () =>
+        HttpResponse.json(apiError('WRONG_PASSWORD', 'That is not your current password'), {
+          status: 400,
+        }),
+      ),
+    );
+    renderRoute('/account');
+    const user = userEvent.setup();
+
+    await screen.findByRole('heading', { name: 'Sign-in methods' });
+    await user.click(within(signInMethods()).getByRole('button', { name: 'Connect' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Connect Google?' });
+    await user.type(within(dialog).getByLabelText('Current password'), 'not it');
+    await user.click(within(dialog).getByRole('button', { name: 'Continue to Google' }));
+    expect(await within(dialog).findByText('That is not your current password')).toBeVisible();
+    expect(within(dialog).getByLabelText('Current password')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+  });
+
+  it('disconnects Google when a password is left', async () => {
+    const state = fakeApi(bothConnected);
+    renderRoute('/account');
+    const user = userEvent.setup();
+
+    await screen.findByRole('heading', { name: 'Sign-in methods' });
+    await user.click(within(signInMethods()).getByRole('button', { name: 'Disconnect' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Disconnect Google?' });
+    await user.type(within(dialog).getByLabelText('Current password'), 'correct horse battery');
+    await user.click(within(dialog).getByRole('button', { name: 'Disconnect' }));
+
+    expect(
+      await screen.findByText('Google is disconnected. Other devices are signed out.'),
+    ).toBeVisible();
+    expect(state.disconnects).toEqual([{ currentPassword: 'correct horse battery' }]);
+  });
+
+  it('says once that Google is connected, then cleans the URL', async () => {
+    fakeApi(bothConnected);
+    const router = renderRoute('/account?connected=google');
+    expect(
+      await screen.findByText('Google is now connected. Next time, you can continue with Google.'),
+    ).toBeVisible();
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({});
+    });
+  });
+
+  it('explains a failed connect', async () => {
+    fakeApi();
+    const router = renderRoute('/account?oauth_error=taken');
+    expect(
+      await screen.findByText('That Google account is already used by another Splinance account.'),
+    ).toBeVisible();
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({});
+    });
   });
 });
 

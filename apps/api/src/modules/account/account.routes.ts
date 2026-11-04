@@ -1,15 +1,32 @@
 import {
   type AccountResponse,
   changePasswordInputSchema,
+  oauthProviderIdSchema,
   type ProfileResponse,
+  type ProviderRedirectResponse,
+  reauthInputSchema,
   type RevokeSessionsResponse,
+  safeRedirectPath,
+  stepUpInputSchema,
   updateProfileInputSchema,
 } from '@splinance/shared';
-import { Router } from 'express';
+import { type Request, type Response, Router } from 'express';
+import { HttpError } from '../../lib/http-error';
 import { closedInDemo } from '../../middleware/demo-mode';
 import { rateLimiter } from '../../middleware/rate-limit';
 import { getAuth, requireAuth } from '../../middleware/require-auth';
-import { changePassword, getAccount, revokeOtherSessions, updateProfile } from './account.service';
+import { beginFlow } from '../auth/oauth/flow';
+import type { OAuthDeps } from '../auth/oauth/oauth.routes';
+import type { OAuthProvider } from '../auth/oauth/providers';
+import {
+  changePassword,
+  disconnectIdentity,
+  getAccount,
+  prepareConnect,
+  prepareReauth,
+  revokeOtherSessions,
+  updateProfile,
+} from './account.service';
 
 /**
  * The signed-in user's own account, mounted at /api/account. Security log lines carry the
@@ -21,17 +38,62 @@ import { changePassword, getAccount, revokeOtherSessions, updateProfile } from '
  */
 export function createAccountRouter({
   demo = false,
-  providerIds = [],
+  oauth = null,
 }: {
   demo?: boolean;
-  /** Sign-in providers configured on this instance (none on the demo). */
-  providerIds?: readonly string[];
+  /** Sign-in providers (connect, disconnect, re-authenticate); never on the demo. */
+  oauth?: OAuthDeps | null;
 } = {}) {
   const router = Router();
   router.use(requireAuth);
+  const configured = demo ? [] : (oauth?.providers ?? []);
+  const providers = new Map(configured.map((p) => [p.config.id, p]));
+
+  function providerFor(req: Request): OAuthProvider {
+    const provider = providers.get(String(req.params.provider));
+    if (!provider) throw new HttpError(404, 'Unknown sign-in provider', 'NOT_FOUND');
+    return provider;
+  }
+
+  /** The provider's authorization URL, with the flow cookie that remembers who asked. */
+  async function sendProviderRedirect(
+    req: Request,
+    res: Response,
+    provider: OAuthProvider,
+    intent: 'connect' | 'reauth',
+    redirect: string | undefined,
+  ) {
+    const { userId, sessionId } = getAuth(req);
+    let url: URL;
+    try {
+      url = await beginFlow(res, {
+        appOrigin: oauth?.appOrigin ?? '',
+        provider,
+        redirect,
+        intent,
+        userId,
+        sessionId,
+      });
+    } catch {
+      req.log.warn(
+        { provider: provider.config.id, reason: 'discovery failed' },
+        'Provider unavailable',
+      );
+      throw new HttpError(
+        503,
+        'That sign-in provider is not available right now',
+        'PROVIDER_UNAVAILABLE',
+      );
+    }
+    const body: ProviderRedirectResponse = { authorizationUrl: url.href };
+    res.set('Cache-Control', 'no-store').json(body);
+  }
 
   router.get('/', async (req, res) => {
-    const body: AccountResponse = await getAccount(getAuth(req).userId, providerIds);
+    const body: AccountResponse = await getAccount(
+      getAuth(req),
+      configured.map((p) => p.config.id),
+    );
     res.set('Cache-Control', 'no-store').json(body);
   });
 
@@ -39,7 +101,60 @@ export function createAccountRouter({
     router.patch('/', closedInDemo);
     router.post('/password', closedInDemo);
     router.post('/sessions/revoke-others', closedInDemo);
+    router.post('/identities/:provider/:action', closedInDemo);
   }
+
+  // Connect: step-up here, then the provider; the callback binds to this session.
+  router.post(
+    '/identities/:provider/connect',
+    rateLimiter(10, { perUser: true }),
+    async (req, res) => {
+      const provider = providerFor(req);
+      const { currentPassword } = stepUpInputSchema.parse(req.body ?? {});
+      await prepareConnect(getAuth(req), provider.config.id, currentPassword);
+      await sendProviderRedirect(req, res, provider, 'connect', undefined);
+    },
+  );
+
+  // Re-authenticate with a connected provider (accounts without a password), then come back.
+  router.post(
+    '/identities/:provider/reauth',
+    rateLimiter(10, { perUser: true }),
+    async (req, res) => {
+      const provider = providerFor(req);
+      const input = reauthInputSchema.parse(req.body ?? {});
+      await prepareReauth(getAuth(req), provider.config.id);
+      const redirect = safeRedirectPath(
+        input.redirect ?? '/account',
+        oauth?.appOrigin ?? 'http://localhost',
+      );
+      await sendProviderRedirect(req, res, provider, 'reauth', redirect);
+    },
+  );
+
+  router.post(
+    '/identities/:provider/disconnect',
+    rateLimiter(10, { perUser: true }),
+    async (req, res) => {
+      const { currentPassword } = stepUpInputSchema.parse(req.body ?? {});
+      const auth = getAuth(req);
+      // Also for providers no longer configured: an old identity can still be removed.
+      const parsed = oauthProviderIdSchema.safeParse(req.params.provider);
+      if (!parsed.success) throw new HttpError(404, 'Unknown sign-in provider', 'NOT_FOUND');
+      const provider = parsed.data;
+      const { revoked } = await disconnectIdentity(auth, provider, currentPassword);
+      req.log.info(
+        {
+          event: 'account.identity_disconnected',
+          userId: auth.userId,
+          provider,
+          revokedSessions: revoked,
+        },
+        'Provider disconnected',
+      );
+      res.status(204).end();
+    },
+  );
 
   router.patch('/', rateLimiter(30, { perUser: true }), async (req, res) => {
     const input = updateProfileInputSchema.parse(req.body);
