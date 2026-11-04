@@ -27,6 +27,8 @@ export interface AuthStore {
   getState: () => AuthState;
   subscribe: (listener: () => void) => () => void;
   setSession: (accessToken: string, user: User) => void;
+  /** Replaces the signed-in user's details (after a rename); no-op when signed out. */
+  setUser: (user: User) => void;
   /** Ends the session; `expired` (default) for failed refreshes, `logout` when asked to. */
   clear: (reason?: SessionEnd) => void;
 }
@@ -54,6 +56,9 @@ function createAuthStore(): AuthStore & { reset: () => void } {
     },
     setSession: (accessToken, user) => {
       set({ status: 'authenticated', accessToken, user, endedBy: null });
+    },
+    setUser: (user) => {
+      if (state.status === 'authenticated') set({ ...state, user });
     },
     clear: (reason = 'expired') => {
       set({ status: 'anonymous', accessToken: null, user: null, endedBy: reason });

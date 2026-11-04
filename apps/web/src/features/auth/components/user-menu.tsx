@@ -1,5 +1,6 @@
 import type { User } from '@splinance/shared';
-import { LogOut } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { LogOut, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -39,6 +40,15 @@ export function UserMenu({ user }: { user: User }) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        {!__DEMO_SITE__ && (
+          <>
+            <DropdownMenuItem render={<Link to="/account" />}>
+              <UserRound aria-hidden />
+              Account settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <div className="flex items-center justify-between gap-4 px-2 py-1">
           <span className="text-sm">Theme</span>
           <ThemeToggle />

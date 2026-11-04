@@ -16,6 +16,8 @@ import { Route as InviteRouteImport } from './routes/invite'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
+import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
+import { Route as AuthenticatedAccountPasswordRouteImport } from './routes/_authenticated/account.password'
 import { Route as AuthenticatedHHouseholdIdRouteImport } from './routes/_authenticated/h/$householdId'
 import { Route as AuthenticatedWelcomeIndexRouteImport } from './routes/_authenticated/welcome.index'
 import { Route as AuthenticatedWelcomeDoneRouteImport } from './routes/_authenticated/welcome.done'
@@ -72,6 +74,17 @@ const AuthRegisterRoute = AuthRegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => AuthRoute,
 } as any)
+const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedAccountPasswordRoute =
+  AuthenticatedAccountPasswordRouteImport.update({
+    id: '/password',
+    path: '/password',
+    getParentRoute: () => AuthenticatedAccountRoute,
+  } as any)
 const AuthenticatedHHouseholdIdRoute =
   AuthenticatedHHouseholdIdRouteImport.update({
     id: '/h/$householdId',
@@ -210,6 +223,8 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
+  '/account': typeof AuthenticatedAccountRouteWithChildren
+  '/account/password': typeof AuthenticatedAccountPasswordRoute
   '/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
   '/welcome/done': typeof AuthenticatedWelcomeDoneRoute
   '/welcome/household': typeof AuthenticatedWelcomeHouseholdRoute
@@ -238,6 +253,8 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
+  '/account': typeof AuthenticatedAccountRouteWithChildren
+  '/account/password': typeof AuthenticatedAccountPasswordRoute
   '/h/$householdId': typeof AuthenticatedHHouseholdIdOverviewIndexRoute
   '/welcome/done': typeof AuthenticatedWelcomeDoneRoute
   '/welcome/household': typeof AuthenticatedWelcomeHouseholdRoute
@@ -268,6 +285,8 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/register': typeof AuthRegisterRoute
+  '/_authenticated/account': typeof AuthenticatedAccountRouteWithChildren
+  '/_authenticated/account/password': typeof AuthenticatedAccountPasswordRoute
   '/_authenticated/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
   '/_authenticated/welcome/done': typeof AuthenticatedWelcomeDoneRoute
   '/_authenticated/welcome/household': typeof AuthenticatedWelcomeHouseholdRoute
@@ -299,6 +318,8 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/login'
     | '/register'
+    | '/account'
+    | '/account/password'
     | '/h/$householdId'
     | '/welcome/done'
     | '/welcome/household'
@@ -327,6 +348,8 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/login'
     | '/register'
+    | '/account'
+    | '/account/password'
     | '/h/$householdId'
     | '/welcome/done'
     | '/welcome/household'
@@ -356,6 +379,8 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/_auth/login'
     | '/_auth/register'
+    | '/_authenticated/account'
+    | '/_authenticated/account/password'
     | '/_authenticated/h/$householdId'
     | '/_authenticated/welcome/done'
     | '/_authenticated/welcome/household'
@@ -438,6 +463,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/register'
       preLoaderRoute: typeof AuthRegisterRouteImport
       parentRoute: typeof AuthRoute
+    }
+    '/_authenticated/account': {
+      id: '/_authenticated/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AuthenticatedAccountRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/account/password': {
+      id: '/_authenticated/account/password'
+      path: '/password'
+      fullPath: '/account/password'
+      preLoaderRoute: typeof AuthenticatedAccountPasswordRouteImport
+      parentRoute: typeof AuthenticatedAccountRoute
     }
     '/_authenticated/h/$householdId': {
       id: '/_authenticated/h/$householdId'
@@ -608,6 +647,17 @@ const AuthRouteChildren: AuthRouteChildren = {
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
+interface AuthenticatedAccountRouteChildren {
+  AuthenticatedAccountPasswordRoute: typeof AuthenticatedAccountPasswordRoute
+}
+
+const AuthenticatedAccountRouteChildren: AuthenticatedAccountRouteChildren = {
+  AuthenticatedAccountPasswordRoute: AuthenticatedAccountPasswordRoute,
+}
+
+const AuthenticatedAccountRouteWithChildren =
+  AuthenticatedAccountRoute._addFileChildren(AuthenticatedAccountRouteChildren)
+
 interface AuthenticatedHHouseholdIdOverviewRouteChildren {
   AuthenticatedHHouseholdIdOverviewSettleRoute: typeof AuthenticatedHHouseholdIdOverviewSettleRoute
   AuthenticatedHHouseholdIdOverviewIndexRoute: typeof AuthenticatedHHouseholdIdOverviewIndexRoute
@@ -717,6 +767,7 @@ const AuthenticatedHHouseholdIdRouteWithChildren =
   )
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAccountRoute: typeof AuthenticatedAccountRouteWithChildren
   AuthenticatedHHouseholdIdRoute: typeof AuthenticatedHHouseholdIdRouteWithChildren
   AuthenticatedWelcomeDoneRoute: typeof AuthenticatedWelcomeDoneRoute
   AuthenticatedWelcomeHouseholdRoute: typeof AuthenticatedWelcomeHouseholdRoute
@@ -726,6 +777,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAccountRoute: AuthenticatedAccountRouteWithChildren,
   AuthenticatedHHouseholdIdRoute: AuthenticatedHHouseholdIdRouteWithChildren,
   AuthenticatedWelcomeDoneRoute: AuthenticatedWelcomeDoneRoute,
   AuthenticatedWelcomeHouseholdRoute: AuthenticatedWelcomeHouseholdRoute,

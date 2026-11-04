@@ -97,3 +97,14 @@ export function checkPassword(
 ): PasswordRuleResult[] {
   return PASSWORD_RULES.map((rule) => ({ rule, passed: rule.test(password, context) }));
 }
+
+/**
+ * Messages of the required rules a password breaks, besides its length (`passwordSchema`
+ * covers that). Used wherever a new password is chosen: registration and account settings,
+ * on the web and again on the API.
+ */
+export function requiredPasswordIssues(password: string, context: PasswordContext): string[] {
+  return PASSWORD_RULES.filter(
+    (rule) => rule.required && rule.id !== 'minLength' && !rule.test(password, context),
+  ).map((rule) => rule.message);
+}

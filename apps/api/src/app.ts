@@ -9,6 +9,7 @@ import { redactUrl } from './lib/redact-url';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { rateLimiter } from './middleware/rate-limit';
 import { requireAuth } from './middleware/require-auth';
+import { createAccountRouter } from './modules/account/account.routes';
 import { createAuthRouter, getMe } from './modules/auth/auth.routes';
 import type { RegistrationPolicy } from './modules/auth/auth.service';
 import type { OAuthDeps } from './modules/auth/oauth/oauth.routes';
@@ -85,6 +86,13 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
   api.use(rateLimiter(1000));
   api.use('/auth', createAuthRouter({ demo, registration: deps.registration, oauth: deps.oauth }));
   api.get('/me', requireAuth, getMe);
+  api.use(
+    '/account',
+    createAccountRouter({
+      demo,
+      providerIds: demo ? [] : (deps.oauth?.providers.map((p) => p.config.id) ?? []),
+    }),
+  );
   api.use('/households', createHouseholdsRouter());
   api.use('/invites', createInvitesRouter({ demo }));
   if (deps.demo) api.use('/demo', createDemoRouter(deps.demo));
