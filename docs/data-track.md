@@ -133,17 +133,18 @@ The admin URL is only for the test that edits a row as a visitor would; it rolls
 
 AWS account on the Free plan, region `eu-central-1` (Frankfurt). Two stacks in `infra/`, plus a module both use:
 
-| Path                           | What                                                                                         | State                                       |
-| ------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `infra/modules/private-bucket` | A bucket with versioning, SSE-S3, public access blocked, TLS required, `prevent_destroy`     | -                                           |
-| `infra/bootstrap`              | `bener-tfstate`: holds Terraform state for every stack in the account                        | local file (gitignored)                     |
-| `infra/main`                   | Lake bucket `splinance-lake-bener`, IAM user `splinance-airflow` and its policy, two budgets | `s3://bener-tfstate/splinance/main.tfstate` |
+| Path                           | What                                                                                                                                                                            | State                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `infra/modules/private-bucket` | A bucket with versioning, SSE-S3, public access blocked, TLS required, `prevent_destroy`                                                                                        | -                                           |
+| `infra/bootstrap`              | `bener-tfstate`: holds Terraform state for every stack in the account                                                                                                           | local file (gitignored)                     |
+| `infra/main`                   | Lake bucket `splinance-lake-bener`, IAM user `splinance-airflow` and its policy, two budgets; the app's backups (bucket `splinance-backups-bener`, IAM user `splinance-backup`) | `s3://bener-tfstate/splinance/main.tfstate` |
 
 - **Bootstrap first.** The state bucket cannot hold its own state, so `infra/bootstrap` keeps a local state file. It was applied once; if that file is lost, `terraform import` brings the bucket back under Terraform.
 - **Locking:** `use_lockfile = true` writes a lock object next to the state while a plan or apply runs (Terraform 1.10+, no DynamoDB table).
 - **Tags:** `default_tags` puts `project=splinance`, `env=dev` and `managed-by=terraform` on every resource of the main stack.
 - **Budgets:** `zero-spend` (anything above one cent) was created in the console and imported; `monthly-5usd` alerts at 85% and 100% actual and 100% forecast. Both exclude credits (`include_credit = false`): with credits counted, the Free plan's credits would hide every cost and the alerts would never fire.
 - **Airflow's permissions:** list, get and put in `landing/`, `raw/`, `clean/`, `quarantine/`; delete only in `landing/`; no `s3:DeleteObjectVersion`, so versioning keeps `raw/` history even if a file is overwritten. Checked with `aws iam simulate-principal-policy`.
+- **Backups are not part of the lake.** `splinance-backups-bener` holds the app's encrypted nightly database dumps ([deploy.md](deploy.md), "Backups"): its own bucket, so the Airflow user has no access to it. `splinance-backup` may only add new files under `splinance/daily/`, `splinance/monthly/` and `splinance_demo/daily/` (`s3:PutObject` with `If-None-Match: *`, so nothing is overwritten), never list, read or delete. Retention by lifecycle rule: 35 days, 13 months and 14 days; hidden versions go after 7 days. Its access key is created by hand like Airflow's and stored only in the Railway `backup` service.
 
 Workflow (credentials from `aws login`, never stored keys):
 
