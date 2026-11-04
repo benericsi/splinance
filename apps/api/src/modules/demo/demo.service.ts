@@ -9,7 +9,7 @@ import { type AuthResult, createSession } from '../auth/auth.service';
 import { hashPassword } from '../auth/passwords';
 import { deleteHouseholdContents } from '../households/hard-delete';
 import { seedDemo } from './demo.seed';
-import { budapestToday } from './today';
+import { budapestToday } from '../../lib/today';
 
 export interface DemoConfig {
   /** Days until a sandbox and everything in it is deleted. */

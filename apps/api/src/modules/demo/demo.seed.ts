@@ -14,6 +14,7 @@ import { listCategories } from '../categories/categories.service';
 import { createHousehold } from '../households/households.service';
 import { createImport } from '../imports/imports.service';
 import { acceptInvite, createInvite } from '../invites/invites.service';
+import { confirmSuggestion, createSeries } from '../recurring/recurring.service';
 import { createRule } from '../rules/rules.service';
 import { createSettlement } from '../settlements/settlements.service';
 import { createTransaction } from '../transactions/transactions.service';
@@ -137,6 +138,35 @@ export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<st
       settledOn: settlement.settledOn,
       note: settlement.note,
     });
+  }
+
+  // Recurring payments last: detection and matching look at the transactions above. Dates
+  // follow the story's day, not the server's.
+  const options = { today: story.today };
+  for (const confirmed of story.recurring.confirmed) {
+    await confirmSuggestion(
+      scopeOf(confirmed.person),
+      { scope: confirmed.scope, key: confirmed.key },
+      options,
+    );
+  }
+  for (const added of story.recurring.added) {
+    await createSeries(
+      scopeOf(added.person),
+      {
+        name: added.name,
+        pattern: added.pattern,
+        cadence: added.cadence,
+        amount: added.amount,
+        amountVaries: false,
+        anchorOn: added.anchorOn,
+        startsOn: null,
+        categoryId: categoryId('expense', added.category),
+        scope: added.scope,
+        remind: true,
+      },
+      options,
+    );
   }
 
   return householdId;

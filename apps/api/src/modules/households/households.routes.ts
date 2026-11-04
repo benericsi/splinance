@@ -16,6 +16,7 @@ import { createBudgetsRouter } from '../budgets/budgets.routes';
 import { createCategoriesRouter } from '../categories/categories.routes';
 import { createImportsRouter } from '../imports/imports.routes';
 import { createReportsRouter } from '../reports/reports.routes';
+import { createRecurringRouter } from '../recurring/recurring.routes';
 import { createRulesRouter } from '../rules/rules.routes';
 import { createSettlementsRouter } from '../settlements/settlements.routes';
 import { createTransactionsRouter } from '../transactions/transactions.routes';
@@ -119,6 +120,7 @@ export function createHouseholdsRouter() {
   router.use('/:id/rules', createRulesRouter());
   router.use('/:id/budgets', createBudgetsRouter());
   router.use('/:id/reports', createReportsRouter());
+  router.use('/:id/recurring', createRecurringRouter());
 
   return router;
 }

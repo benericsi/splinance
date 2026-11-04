@@ -7,6 +7,7 @@ import {
   demoStatusResponseSchema,
   householdDetailResponseSchema,
   meResponseSchema,
+  recurringListResponseSchema,
   renderDemoBankFiles,
 } from '@splinance/shared';
 import { and, count, eq, isNull } from 'drizzle-orm';
@@ -148,6 +149,25 @@ describe('POST /api/demo', { timeout: 30_000 }, () => {
       .expect(200);
     const list = budgetListResponseSchema.parse(budgetRes.body).budgets.budgets;
     expect(list.some((b) => b.spent / b.amount >= 0.8)).toBe(true);
+
+    // Recurring payments: three confirmed suggestions, two added by hand that the imports
+    // matched (one of them stopped months ago), the rest left as suggestions.
+    const recurringRes = await request(app)
+      .get(`/api/households/${demo.householdId}/recurring`)
+      .set('Authorization', auth)
+      .expect(200);
+    const { series } = recurringListResponseSchema.parse(recurringRes.body).recurring;
+    expect(series.map((s) => [s.name, s.source]).sort()).toEqual(
+      [
+        ['Gym membership', 'manual'],
+        ['Internet', 'detected'],
+        ['Netflix', 'detected'],
+        ['Rent', 'detected'],
+        ['Spotify Duo', 'manual'],
+      ].sort(),
+    );
+    expect(series.find((s) => s.name === 'Spotify Duo')?.paymentCount).toBe(6);
+    expect(series.find((s) => s.name === 'Gym membership')?.paymentCount).toBe(8);
   });
 
   it('gives demo accounts no usable password', async () => {
@@ -204,6 +224,7 @@ describe('deleteDemo', { timeout: 30_000 }, () => {
       'import_batches',
       'category_rules',
       'budgets',
+      'recurring_series',
       'household_invites',
     ]) {
       expect(after[table], table).toBe(0);
