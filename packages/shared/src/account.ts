@@ -84,3 +84,37 @@ export const providerRedirectResponseSchema = z.object({
 });
 
 export type ProviderRedirectResponse = z.infer<typeof providerRedirectResponseSchema>;
+
+/** A household as the deletion preview names it. */
+const deletionHouseholdSchema = z.object({
+  householdId: z.uuid(),
+  householdName: z.string().max(60),
+});
+
+/**
+ * GET /api/account/deletion: what deleting the account would do, and what stops it.
+ * Blockers must be resolved first (settle up, hand over ownership); nothing is half done.
+ */
+export const accountDeletionPreviewSchema = z.object({
+  blockers: z
+    .array(deletionHouseholdSchema.extend({ code: z.enum(['UNSETTLED_BALANCE', 'LAST_OWNER']) }))
+    .max(200),
+  /** Households shared with others: the person leaves, their shared entries stay. */
+  leaves: z.array(deletionHouseholdSchema).max(200),
+  /** Households nobody else was ever in: deleted with everything in them. */
+  deletes: z.array(deletionHouseholdSchema).max(200),
+  /** Households only former members were in besides the person: archived. */
+  archives: z.array(deletionHouseholdSchema).max(200),
+  /** Private transactions, erased (only their author could ever read them). */
+  privateTransactionCount: z.number().int().nonnegative(),
+});
+
+export type AccountDeletionPreview = z.infer<typeof accountDeletionPreviewSchema>;
+
+/** POST /api/account/delete: step-up plus the email typed again. */
+export const deleteAccountInputSchema = z.object({
+  currentPassword: z.string().min(1, 'Enter your current password').max(128).optional(),
+  confirmEmail: z.string().trim().toLowerCase().max(254),
+});
+
+export type DeleteAccountInput = z.infer<typeof deleteAccountInputSchema>;

@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 import { z } from 'zod';
 import { NewHouseholdDialog } from '@/features/households/components/new-household-dialog';
+import { endedOnPurpose } from '@/lib/auth-store';
 
 /**
  * App-wide modals, opened from any page with `?modal=...` (URL-driven: reload, share and
@@ -22,7 +23,7 @@ export const Route = createFileRoute('/_authenticated')({
       // explicit logout: the next person may be someone else, who cannot see this page.
       throw redirect({
         to: '/login',
-        search: endedBy === 'logout' ? {} : { redirect: location.href },
+        search: endedOnPurpose(endedBy) ? {} : { redirect: location.href },
       });
     }
   },

@@ -66,7 +66,7 @@ async function findActiveSession(
   return session && session.expiresAt > now ? session : undefined;
 }
 
-async function activeSession(executor: Db, caller: Caller, now: Date): Promise<SessionRow> {
+export async function activeSession(executor: Db, caller: Caller, now: Date): Promise<SessionRow> {
   const session = await findActiveSession(executor, caller, now);
   if (!session) throw sessionEnded();
   return session;
@@ -119,7 +119,7 @@ export async function getAccount(
 ): Promise<AccountResponse> {
   const { userId } = caller;
   const [user] = await db.select().from(users).where(eq(users.id, userId));
-  if (!user) throw sessionEnded();
+  if (!user || user.deletedAt) throw sessionEnded();
   const session = await findActiveSession(db, caller, now);
   const identities = await db
     .select({

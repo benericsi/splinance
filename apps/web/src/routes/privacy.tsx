@@ -228,10 +228,14 @@ function PrivacyPage() {
 
           <Section title="8. Your rights">
             <p>
-              You can ask for access to your data, its correction or deletion, restricted
-              processing, a copy in a portable format, and object to processing based on legitimate
-              interest. Write to the email above; requests are answered within one month. Deleted
-              data leaves the backups as they expire.
+              You can delete your account yourself in Account settings: your sign-in, name, email
+              and private transactions are erased at once, and households only you were ever in are
+              deleted. Shared entries stay for the other members, who need them for their balances,
+              under &quot;Former member&quot; with nothing that identifies you. You can also ask for
+              access to your data, its correction or deletion, restricted processing, a copy in a
+              portable format, and object to processing based on legitimate interest. Write to the
+              email above; requests are answered within one month. Deleted data leaves the backups
+              as they expire.
             </p>
             <p>
               You can complain to the Hungarian data protection authority (NAIH, 1055 Budapest, Falk

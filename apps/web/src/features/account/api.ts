@@ -1,5 +1,7 @@
 import {
+  accountDeletionPreviewSchema,
   accountResponseSchema,
+  type DeleteAccountInput,
   type ChangePasswordInput,
   profileResponseSchema,
   providerRedirectResponseSchema,
@@ -40,6 +42,9 @@ export const accountApi = {
         redirect,
       })
     ).authorizationUrl,
+  deletionPreview: ({ signal }: { signal?: AbortSignal | undefined } = {}) =>
+    http.get('/account/deletion', accountDeletionPreviewSchema, { signal }),
+  deleteAccount: (input: DeleteAccountInput) => http.post('/account/delete', noContent, input),
   disconnect: ({
     provider,
     currentPassword,

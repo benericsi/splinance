@@ -7,6 +7,8 @@ export default defineConfig({
     index: 'src/index.ts',
     migrate: 'src/db/migrate.ts',
     'demo-create': 'src/modules/demo/create.cli.ts',
+    // account-erase: repeats deletions after a restore (deploy.md 5).
+    'account-erase': 'src/modules/account/erase.cli.ts',
   },
   format: 'esm',
   platform: 'node',

@@ -250,6 +250,9 @@ export async function logout(rawToken: string | undefined): Promise<void> {
 
 export async function getUser(userId: string): Promise<User> {
   const [user] = await db.select().from(users).where(eq(users.id, userId));
-  if (!user) throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+  // A deleted account's access token outlives its sessions by up to 15 minutes.
+  if (!user || user.deletedAt) {
+    throw new HttpError(401, 'Authentication required', 'UNAUTHENTICATED');
+  }
   return toUser(user);
 }

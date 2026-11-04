@@ -2,6 +2,7 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 import { DemoLanding } from '@/features/demo/components/demo-landing';
 import { readLastHousehold } from '@/features/households/last-household';
 import { householdQueries } from '@/features/households/queries';
+import { endedOnPurpose } from '@/lib/auth-store';
 
 /**
  * `/` is a dispatcher for signed-in users: the household used last, else the first one,
@@ -15,7 +16,7 @@ export const Route = createFileRoute('/')({
       // As in _authenticated: come back after logging in, but not after a logout.
       throw redirect({
         to: '/login',
-        search: endedBy === 'logout' ? {} : { redirect: location.href },
+        search: endedOnPurpose(endedBy) ? {} : { redirect: location.href },
       });
     }
   },

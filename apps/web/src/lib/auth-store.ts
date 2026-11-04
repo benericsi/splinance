@@ -4,10 +4,16 @@ import { useSyncExternalStore } from 'react';
 export type AuthStatus = 'unknown' | 'authenticated' | 'anonymous';
 
 /**
- * Why the last session ended. After an explicit logout the next person on this browser may
- * be someone else, so the login page must not send them back to the previous page.
+ * Why the last session ended. After an explicit logout (or deleting the account) the next
+ * person on this browser may be someone else, so the login page must not send them back
+ * to the previous page.
  */
-export type SessionEnd = 'logout' | 'expired';
+export type SessionEnd = 'logout' | 'expired' | 'deleted';
+
+/** Ended on purpose: start fresh at /login instead of returning to the last page. */
+export function endedOnPurpose(endedBy: SessionEnd | null): boolean {
+  return endedBy === 'logout' || endedBy === 'deleted';
+}
 
 export interface AuthState {
   status: AuthStatus;
@@ -61,6 +67,11 @@ function createAuthStore(): AuthStore & { reset: () => void } {
       if (state.status === 'authenticated') set({ ...state, user });
     },
     clear: (reason = 'expired') => {
+      // A request that fails after a logout or a deletion (a page still refetching while
+      // the router leaves it) must not turn that end into "expired".
+      if (state.status === 'anonymous' && reason === 'expired' && endedOnPurpose(state.endedBy)) {
+        return;
+      }
       set({ status: 'anonymous', accessToken: null, user: null, endedBy: reason });
     },
     reset: () => {

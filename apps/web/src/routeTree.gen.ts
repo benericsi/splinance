@@ -17,6 +17,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
+import { Route as AuthenticatedAccountDeleteRouteImport } from './routes/_authenticated/account.delete'
 import { Route as AuthenticatedAccountPasswordRouteImport } from './routes/_authenticated/account.password'
 import { Route as AuthenticatedHHouseholdIdRouteImport } from './routes/_authenticated/h/$householdId'
 import { Route as AuthenticatedWelcomeIndexRouteImport } from './routes/_authenticated/welcome.index'
@@ -79,6 +80,12 @@ const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
   path: '/account',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAccountDeleteRoute =
+  AuthenticatedAccountDeleteRouteImport.update({
+    id: '/delete',
+    path: '/delete',
+    getParentRoute: () => AuthenticatedAccountRoute,
+  } as any)
 const AuthenticatedAccountPasswordRoute =
   AuthenticatedAccountPasswordRouteImport.update({
     id: '/password',
@@ -224,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
   '/account': typeof AuthenticatedAccountRouteWithChildren
+  '/account/delete': typeof AuthenticatedAccountDeleteRoute
   '/account/password': typeof AuthenticatedAccountPasswordRoute
   '/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
   '/welcome/done': typeof AuthenticatedWelcomeDoneRoute
@@ -254,6 +262,7 @@ export interface FileRoutesByTo {
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
   '/account': typeof AuthenticatedAccountRouteWithChildren
+  '/account/delete': typeof AuthenticatedAccountDeleteRoute
   '/account/password': typeof AuthenticatedAccountPasswordRoute
   '/h/$householdId': typeof AuthenticatedHHouseholdIdOverviewIndexRoute
   '/welcome/done': typeof AuthenticatedWelcomeDoneRoute
@@ -286,6 +295,7 @@ export interface FileRoutesById {
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/register': typeof AuthRegisterRoute
   '/_authenticated/account': typeof AuthenticatedAccountRouteWithChildren
+  '/_authenticated/account/delete': typeof AuthenticatedAccountDeleteRoute
   '/_authenticated/account/password': typeof AuthenticatedAccountPasswordRoute
   '/_authenticated/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
   '/_authenticated/welcome/done': typeof AuthenticatedWelcomeDoneRoute
@@ -319,6 +329,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/account'
+    | '/account/delete'
     | '/account/password'
     | '/h/$householdId'
     | '/welcome/done'
@@ -349,6 +360,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/account'
+    | '/account/delete'
     | '/account/password'
     | '/h/$householdId'
     | '/welcome/done'
@@ -380,6 +392,7 @@ export interface FileRouteTypes {
     | '/_auth/login'
     | '/_auth/register'
     | '/_authenticated/account'
+    | '/_authenticated/account/delete'
     | '/_authenticated/account/password'
     | '/_authenticated/h/$householdId'
     | '/_authenticated/welcome/done'
@@ -470,6 +483,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/account'
       preLoaderRoute: typeof AuthenticatedAccountRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/account/delete': {
+      id: '/_authenticated/account/delete'
+      path: '/delete'
+      fullPath: '/account/delete'
+      preLoaderRoute: typeof AuthenticatedAccountDeleteRouteImport
+      parentRoute: typeof AuthenticatedAccountRoute
     }
     '/_authenticated/account/password': {
       id: '/_authenticated/account/password'
@@ -648,10 +668,12 @@ const AuthRouteChildren: AuthRouteChildren = {
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface AuthenticatedAccountRouteChildren {
+  AuthenticatedAccountDeleteRoute: typeof AuthenticatedAccountDeleteRoute
   AuthenticatedAccountPasswordRoute: typeof AuthenticatedAccountPasswordRoute
 }
 
 const AuthenticatedAccountRouteChildren: AuthenticatedAccountRouteChildren = {
+  AuthenticatedAccountDeleteRoute: AuthenticatedAccountDeleteRoute,
   AuthenticatedAccountPasswordRoute: AuthenticatedAccountPasswordRoute,
 }
 

@@ -22,6 +22,7 @@ import {
   requireMembership,
   toHousehold,
 } from '../households/households.service';
+import { assertLiveUser } from '../account/live-user';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -151,6 +152,7 @@ export async function acceptInvite({
   const tokenHash = hashToken(token);
 
   return db.transaction(async (tx) => {
+    await assertLiveUser(tx, userId);
     const [found] = await tx
       .select({ id: householdInvites.id, householdId: householdInvites.householdId })
       .from(householdInvites)

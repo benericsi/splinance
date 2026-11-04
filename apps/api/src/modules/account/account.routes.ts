@@ -1,6 +1,8 @@
 import {
   type AccountResponse,
+  type AccountDeletionPreview,
   changePasswordInputSchema,
+  deleteAccountInputSchema,
   oauthProviderIdSchema,
   type ProfileResponse,
   type ProviderRedirectResponse,
@@ -18,6 +20,7 @@ import { getAuth, requireAuth } from '../../middleware/require-auth';
 import { beginFlow } from '../auth/oauth/flow';
 import type { OAuthDeps } from '../auth/oauth/oauth.routes';
 import type { OAuthProvider } from '../auth/oauth/providers';
+import { clearRefreshCookie } from '../auth/refresh-cookie';
 import {
   changePassword,
   disconnectIdentity,
@@ -27,6 +30,7 @@ import {
   revokeOtherSessions,
   updateProfile,
 } from './account.service';
+import { deleteAccount, previewDeletion } from './deletion.service';
 
 /**
  * The signed-in user's own account, mounted at /api/account. Security log lines carry the
@@ -102,7 +106,25 @@ export function createAccountRouter({
     router.post('/password', closedInDemo);
     router.post('/sessions/revoke-others', closedInDemo);
     router.post('/identities/:provider/:action', closedInDemo);
+    // Demo accounts end with "End demo" (deleteDemo), never through this.
+    router.get('/deletion', closedInDemo);
+    router.post('/delete', closedInDemo);
   }
+
+  router.get('/deletion', async (req, res) => {
+    const body: AccountDeletionPreview = await previewDeletion(getAuth(req).userId);
+    res.set('Cache-Control', 'no-store').json(body);
+  });
+
+  router.post('/delete', rateLimiter(5, { perUser: true }), async (req, res) => {
+    const input = deleteAccountInputSchema.parse(req.body);
+    const auth = getAuth(req);
+    const result = await deleteAccount(auth, input);
+    // The user id is pseudonymous and what the restore runbook needs to repeat this.
+    req.log.info({ event: 'account.deleted', userId: auth.userId, ...result }, 'Account deleted');
+    clearRefreshCookie(res);
+    res.status(204).end();
+  });
 
   // Connect: step-up here, then the provider; the callback binds to this session.
   router.post(

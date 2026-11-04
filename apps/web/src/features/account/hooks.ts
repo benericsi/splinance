@@ -63,3 +63,20 @@ export function useDisconnect() {
     meta: { suppressErrorToast: true },
   });
 }
+
+/**
+ * After deleting, nothing of the account may stay in memory: the session ends as
+ * `deleted` (the guards send the browser to /login, which says so) and the cache is
+ * emptied. The dialog renders errors itself.
+ */
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: accountApi.deleteAccount,
+    onSuccess: () => {
+      authStore.clear('deleted');
+      queryClient.clear();
+    },
+    meta: { suppressErrorToast: true },
+  });
+}
