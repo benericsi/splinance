@@ -1,4 +1,4 @@
-import type { AccountResponse } from '@splinance/shared';
+import type { AccountDeletionPreview, AccountResponse } from '@splinance/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { http as mock, HttpResponse } from 'msw';
@@ -7,7 +7,7 @@ import { authStore } from '@/lib/auth-store';
 import { setDemoSite } from '../../../test/demo-site';
 import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
-import { apiError, authResponse, getField, testUser } from '../../../test/utils';
+import { apiError, authResponse, getField, testHousehold, testUser } from '../../../test/utils';
 import { formatLastUsed } from './format';
 
 const passwordAccount: AccountResponse = {
@@ -34,6 +34,14 @@ const googleOnly: AccountResponse = {
 
 const bothConnected: AccountResponse = { ...googleOnly, hasPassword: true };
 
+const cleanPreview: AccountDeletionPreview = {
+  blockers: [],
+  leaves: [{ householdId: testHousehold.id, householdName: 'Otthon' }],
+  deletes: [],
+  archives: [],
+  privateTransactionCount: 3,
+};
+
 const GOOGLE_AUTHORIZE = 'https://accounts.example/authorize?state=s';
 
 function fakeApi(account: AccountResponse = passwordAccount) {
@@ -44,10 +52,18 @@ function fakeApi(account: AccountResponse = passwordAccount) {
     connects: [] as unknown[],
     reauths: [] as unknown[],
     disconnects: [] as unknown[],
+    deletes: [] as unknown[],
   };
   server.use(
     mock.post('/api/auth/refresh', () => HttpResponse.json(authResponse())),
     mock.get('/api/account', () => HttpResponse.json(account)),
+    // The Back link names the household used last.
+    mock.get('/api/households', () => HttpResponse.json({ households: [testHousehold] })),
+    mock.get('/api/account/deletion', () => HttpResponse.json(cleanPreview)),
+    mock.post('/api/account/delete', async ({ request }) => {
+      state.deletes.push(await request.json());
+      return new HttpResponse(null, { status: 204 });
+    }),
     mock.patch('/api/account', async ({ request }) => {
       const body = (await request.json()) as { displayName: string };
       state.patches.push(body);
@@ -164,12 +180,12 @@ describe('account page', () => {
     expect(state.revokes).toBe(1);
   });
 
-  it('points to the privacy contact for deletion', async () => {
+  it('leads back to the household used last, by name', async () => {
     fakeApi();
     renderRoute('/account');
-    expect(await screen.findByRole('link', { name: 'bene.richard24@gmail.com' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Back to Otthon' })).toHaveAttribute(
       'href',
-      'mailto:bene.richard24@gmail.com',
+      `/h/${testHousehold.id}`,
     );
   });
 
@@ -394,5 +410,77 @@ describe('last used', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('delete account dialog', () => {
+  it('says what happens, then deletes with the password and the email', async () => {
+    const state = fakeApi();
+    const router = renderRoute('/account/delete');
+    const user = userEvent.setup();
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete your account?' });
+    expect(
+      within(dialog).getByText(/Your shared entries stay there as Former member/),
+    ).toBeVisible();
+    expect(within(dialog).getByText('3 private transactions are deleted.')).toBeVisible();
+
+    await user.type(within(dialog).getByLabelText(/^Current password/), 'correct horse battery');
+    await user.type(within(dialog).getByLabelText(/^Type anna@example.com/), 'anna@example.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete my account' }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/login');
+    });
+    expect(state.deletes).toEqual([
+      { currentPassword: 'correct horse battery', confirmEmail: 'anna@example.com' },
+    ]);
+    expect(authStore.getState().endedBy).toBe('deleted');
+    expect(await screen.findByText(/Your account has been deleted/)).toBeVisible();
+    // No way back to the deleted account's pages.
+    expect(router.state.location.search).toEqual({});
+  });
+
+  it('refuses another email before sending', async () => {
+    const state = fakeApi();
+    renderRoute('/account/delete');
+    const user = userEvent.setup();
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete your account?' });
+    await user.type(within(dialog).getByLabelText(/^Current password/), 'correct horse battery');
+    await user.type(within(dialog).getByLabelText(/^Type anna@example.com/), 'ana@example.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete my account' }));
+    expect(await within(dialog).findByText('Type your email exactly as shown')).toBeVisible();
+    expect(state.deletes).toEqual([]);
+  });
+
+  it('shows only the blockers, with the way to resolve them', async () => {
+    fakeApi();
+    server.use(
+      mock.get('/api/account/deletion', () =>
+        HttpResponse.json({
+          ...cleanPreview,
+          blockers: [
+            { householdId: testHousehold.id, householdName: 'Otthon', code: 'UNSETTLED_BALANCE' },
+          ],
+        }),
+      ),
+    );
+    renderRoute('/account/delete');
+
+    const dialog = await screen.findByRole('dialog', { name: 'Delete your account?' });
+    expect(within(dialog).getByRole('link', { name: 'Settle up' })).toHaveAttribute(
+      'href',
+      `/h/${testHousehold.id}`,
+    );
+    expect(within(dialog).queryByRole('button', { name: 'Delete my account' })).toBeNull();
+  });
+
+  it('asks a Google-only account to confirm with Google when the sign-in is old', async () => {
+    fakeApi({ ...googleOnly, recentSignIn: false });
+    renderRoute('/account/delete');
+    const dialog = await screen.findByRole('dialog', { name: 'Delete your account?' });
+    expect(within(dialog).getByRole('button', { name: 'Continue with Google' })).toBeVisible();
+    expect(within(dialog).queryByLabelText(/^Type anna@example.com/)).toBeNull();
   });
 });

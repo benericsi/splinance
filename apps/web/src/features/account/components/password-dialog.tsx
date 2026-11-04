@@ -71,7 +71,7 @@ export function PasswordDialog({
       onClose={onClose}
     >
       {needsReauth ? (
-        <ReauthPrompt account={account} />
+        <ReauthPrompt account={account} redirect="/account/password" />
       ) : (
         <PasswordForm
           user={user}
@@ -86,8 +86,14 @@ export function PasswordDialog({
   );
 }
 
-/** "Confirm it's you" with a connected provider; it returns to this dialog. */
-function ReauthPrompt({ account }: { account: AccountResponse }) {
+/** "Confirm it's you" with a connected provider; it returns to `redirect` (the dialog). */
+export function ReauthPrompt({
+  account,
+  redirect,
+}: {
+  account: AccountResponse;
+  redirect: '/account/password' | '/account/delete';
+}) {
   const reauth = useStartReauth();
   const leaving = reauth.isPending || reauth.isSuccess;
 
@@ -107,7 +113,7 @@ function ReauthPrompt({ account }: { account: AccountResponse }) {
             className="h-10 w-full"
             disabled={leaving}
             onClick={() => {
-              reauth.mutate({ provider, redirect: '/account/password' });
+              reauth.mutate({ provider, redirect });
             }}
           >
             <view.Logo className="size-4" />

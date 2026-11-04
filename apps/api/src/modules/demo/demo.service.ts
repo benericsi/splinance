@@ -2,26 +2,12 @@ import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { buildDemoStory, DEMO_PEOPLE } from '@splinance/shared';
 import { count, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
-import {
-  auditLog,
-  budgets,
-  categories,
-  categoryRules,
-  demos,
-  householdInvites,
-  householdMembers,
-  households,
-  importBatches,
-  settlements,
-  transactionSplits,
-  transactions,
-  type UserRow,
-  users,
-} from '../../db/schema';
+import { demos, householdMembers, households, type UserRow, users } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
 import { logger } from '../../lib/logger';
 import { type AuthResult, createSession } from '../auth/auth.service';
 import { hashPassword } from '../auth/passwords';
+import { deleteHouseholdContents } from '../households/hard-delete';
 import { seedDemo } from './demo.seed';
 import { budapestToday } from './today';
 
@@ -197,29 +183,7 @@ export async function deleteDemo(demoId: string): Promise<boolean> {
       ]),
     ];
 
-    if (householdIds.length > 0) {
-      // Waits for writes still running in them (they hold the shared household lock).
-      await tx
-        .select({ id: households.id })
-        .from(households)
-        .where(inArray(households.id, householdIds))
-        .orderBy(households.id)
-        .for('update');
-      for (const table of [
-        auditLog,
-        transactionSplits,
-        transactions,
-        importBatches,
-        settlements,
-        budgets,
-        categoryRules,
-        householdInvites,
-        categories,
-        householdMembers,
-      ]) {
-        await tx.delete(table).where(inArray(table.householdId, householdIds));
-      }
-    }
+    await deleteHouseholdContents(tx, householdIds);
     await tx.delete(demos).where(eq(demos.id, demo.id));
     if (householdIds.length > 0) {
       await tx.delete(households).where(inArray(households.id, householdIds));

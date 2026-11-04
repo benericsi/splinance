@@ -26,7 +26,10 @@ Living document: it describes the tables that exist today plus the conventions e
 | email                  | text, unique (`users_email_unique`) | Lowercased by the shared `emailSchema`; `CHECK (email = lower(email))`                                                                        |
 | password_hash          | text, nullable                      | Argon2id (`@node-rs/argon2`, m=19456 KiB, t=2, p=1), PHC string with salt and parameters; null for accounts that only sign in with a provider |
 | display_name           | text                                | 1-50 characters (CHECK)                                                                                                                       |
+| deleted_at             | timestamptz, nullable               | Set when the person deleted their account (the row then holds nothing personal, see below)                                                    |
 | created_at, updated_at | timestamptz                         |                                                                                                                                               |
+
+Account deletion keeps the row (history references it) and anonymizes it: `display_name` "Former member", `email` `deleted-<id>@deleted.invalid` (frees the address and keeps the unique and lowercase checks), `password_hash` null, `deleted_at` set; identities and sessions are deleted, private transactions erased with their audit rows, households only the person was ever in deleted whole (architecture.md 6, "Account deletion"). Users are never hard deleted outside the demo.
 
 Deliberately not stored: first/last name, phone number. No feature needs them yet (data minimization, GDPR). Add them with the feature that does.
 

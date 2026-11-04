@@ -1,6 +1,7 @@
 import { oauthErrorCodeSchema } from '@splinance/shared';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { CircleCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { FormError } from '@/components/form/form-error';
@@ -12,6 +13,7 @@ import { ProviderButtons } from '@/features/auth/components/provider-buttons';
 import { OAUTH_ERROR_MESSAGES, PROVIDER_VIEWS } from '@/features/auth/providers';
 import { authQueries } from '@/features/auth/queries';
 import { useSignInProviders } from '@/features/auth/use-sign-in-providers';
+import { useAuth } from '@/lib/auth-store';
 import { DEMO_URL } from '@/lib/demo-site';
 import { redirectSearchSchema, safeRedirect } from '@/lib/safe-redirect';
 
@@ -46,6 +48,8 @@ function LoginPage() {
 
   // Shown once: the code leaves the URL, so a reload or going back does not repeat it.
   const [shownError] = useState(oauthError);
+  // In memory only: a reload (or the next login) forgets it.
+  const deleted = useAuth().endedBy === 'deleted';
   useEffect(() => {
     if (oauthError) {
       void navigate({ search: (prev) => ({ ...prev, oauth_error: undefined }), replace: true });
@@ -77,6 +81,15 @@ function LoginPage() {
           </>
         }
       >
+        {deleted && (
+          <p
+            role="status"
+            className="bg-muted text-foreground mb-4 flex gap-2 rounded-lg px-3 py-2.5 text-sm"
+          >
+            <CircleCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
+            Your account has been deleted. Thanks for using Splinance.
+          </p>
+        )}
         {shownError && (
           <div className="mb-4">
             <FormError message={OAUTH_ERROR_MESSAGES[shownError]} />

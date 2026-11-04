@@ -266,6 +266,8 @@ Set up and drilled on 2026-11-04 (drill log in section 5): since then production
 - On a Google-only test account: no Disconnect button; Set a password right after signing in; log in with it.
 - `railway logs -s api` shows `account.identity_connected` / `account.identity_disconnected` / `account.password_set` with a user id and no email.
 
+11. **Account deletion** (after the deletion PR): on a throwaway allowlisted account with a household and a partner test account: an open balance blocks with a Settle up link; once settled, delete with the password and the email; `/login` says so, the old login fails, the partner sees "Former member"; `railway logs -s api` shows `account.deleted` with a user id and counts, no email.
+
 ## 5. Operating
 
 - **Deploying:** merge to `main`. CI runs; with Wait for CI the services whose watch paths changed build and deploy afterwards, each API after its migrations.
@@ -306,6 +308,12 @@ Set up and drilled on 2026-11-04 (drill log in section 5): since then production
   ```
 
   Then redeploy `api` (its pre-deploy migration finds nothing to do). Up to a day of data is lost (RPO 24 h).
+
+  **Repeat account deletions** made after the backup's date: the restored database still holds those people. Find them in the logs (`railway logs -s api`, `account.deleted`, the `userId`; Railway keeps logs for a limited time, so note each id in the password manager when a deletion happens until a ledger exists) and erase them again (idempotent; skips ids already deleted):
+
+  ```bash
+  railway ssh -s api -- node dist/account-erase.mjs <userId> [<userId> ...]
+  ```
 
   The binary pipe through `railway ssh` was drilled on 2026-11-04 with a demo dump into a scratch database on `postgres-demo` (the real one untouched). To repeat it (bash, age not on `PATH` after winget until a new terminal):
 

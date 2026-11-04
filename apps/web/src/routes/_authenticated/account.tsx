@@ -11,7 +11,7 @@ import { SkeletonCard, SkeletonLine } from '@/components/skeletons';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountLayout } from '@/features/account/components/account-layout';
-import { DeleteAccountCard } from '@/features/account/components/delete-account-card';
+import { DangerZoneCard } from '@/features/account/components/danger-zone-card';
 import { OtherDevicesCard } from '@/features/account/components/other-devices-card';
 import { ProfileCard } from '@/features/account/components/profile-card';
 import { SignInMethodsCard } from '@/features/account/components/sign-in-methods-card';
@@ -56,7 +56,7 @@ function AccountPage() {
             <OtherDevicesCard />
           </Reveal>
           <Reveal index={3}>
-            <DeleteAccountCard />
+            <DangerZoneCard />
           </Reveal>
         </div>
       </RevealPage>

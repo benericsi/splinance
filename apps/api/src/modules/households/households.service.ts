@@ -19,6 +19,7 @@ import {
   users,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
+import { assertLiveUser } from '../account/live-user';
 import { assertSettled } from '../balances/ledger';
 
 export const householdNotFound = () =>
@@ -156,6 +157,7 @@ export async function createHousehold(
   input: CreateHouseholdInput,
 ): Promise<Household> {
   return db.transaction(async (tx) => {
+    await assertLiveUser(tx, userId);
     const [household] = await tx
       .insert(households)
       .values({ name: input.name, createdBy: userId })
@@ -263,7 +265,8 @@ export async function updateMemberRole(
   });
 }
 
-async function endMembership(tx: Db, householdId: string, userId: string): Promise<void> {
+/** Ends a membership and revokes the invites the person created there (hard part 15). */
+export async function endMembership(tx: Db, householdId: string, userId: string): Promise<void> {
   await tx
     .update(householdMembers)
     .set({ leftAt: new Date() })

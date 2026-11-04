@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { check, pgTable, text } from 'drizzle-orm/pg-core';
-import { createdAt, id, updatedAt } from './columns';
+import { createdAt, id, timestamptz, updatedAt } from './columns';
 
 export const users = pgTable(
   'users',
@@ -11,6 +11,9 @@ export const users = pgTable(
     // Null for accounts that only sign in with a provider (user_identities).
     passwordHash: text(),
     displayName: text().notNull(),
+    // Set when the person deleted their account: the row stays (history references it) but
+    // holds nothing personal any more (see account deletion in docs/data-model.md).
+    deletedAt: timestamptz(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
