@@ -56,7 +56,9 @@ Six services. Every merge to `main` deploys the services whose files changed, af
 
 ## 3. One-time setup
 
-Needs the Railway CLI (`npm install --global @railway/cli`, then `railway login`) for the database steps; everything else is in the dashboard. Commands run from the repository root.
+Needs the Railway CLI (`npm install --global @railway/cli`, then `railway login`) for the database steps; everything else is in the dashboard. Commands run from the repository root, in Git Bash (in PowerShell with script execution disabled, call `railway.cmd` instead of `railway`). Each `railway ssh` asks for the SSH key's passphrase.
+
+Never seal `RAILWAY_DOCKERFILE_PATH`: the builder does not see a sealed value and falls back to Railpack ("No start command detected"). A sealed variable cannot be unsealed; delete it and add it again.
 
 ### 3.1 Project and usage limit
 
@@ -182,7 +184,7 @@ Each backup is `<UTC stamp>.dump.age` plus `<UTC stamp>.manifest.txt.age` (size,
    aws iam create-access-key --user-name splinance-backup --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text | clip
    ```
 
-   Paste it into the password manager (id, then secret), then into the variables below, then clear the clipboard. Rotate like Airflow's key: a second key, switch the variables, delete the old one.
+   It prints nothing: the key (id, a tab, the secret) is on the clipboard. Run it once; every run creates another key (at most two per user), and a key whose secret you did not keep has to be deleted (`aws iam list-access-keys`, `delete-access-key`). Paste it into the password manager, then into the variables below, then clear the clipboard. Rotate like Airflow's key: a second key, switch the variables, delete the old one.
 
 4. **Healthchecks.io** (free): a check `splinance-backup` with the cron schedule `17 2 * * *`, time zone UTC, grace time 1 hour, email notifications. Copy its ping URL.
 5. **The `backup` service**, from the repository, branch `main`:
@@ -196,7 +198,7 @@ Each backup is `<UTC stamp>.dump.age` plus `<UTC stamp>.manifest.txt.age` (size,
    | Wait for CI               | on                                    |
    | Public networking         | none                                  |
 
-   Variables, all sealed except the bucket:
+   Variables, all sealed except the bucket (and `RAILWAY_DOCKERFILE_PATH`, never sealed):
 
    | Variable                                     | Value                                                                                                                       |
    | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -206,7 +208,9 @@ Each backup is `<UTC stamp>.dump.age` plus `<UTC stamp>.manifest.txt.age` (size,
    | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | from step 3                                                                                                                 |
    | `HC_PING_URL`                                | from step 4 (whoever has it can report a fake success)                                                                      |
 
-6. **First run** by hand (`railway cron run`, or from the service in the dashboard): the log ends with `all backups uploaded`, Healthchecks shows a green run, and `aws s3 ls s3://splinance-backups-bener --recursive` lists four new files. Then the restore drill (section 5).
+6. **First run** by hand (`railway cron run`, or from the service in the dashboard; deploying a cron service does not run it): the log ends with `all backups uploaded`, Healthchecks shows a green run, and `aws s3 ls s3://splinance-backups-bener --recursive` lists four new files. Then the restore drill (section 5).
+
+Set up and drilled on 2026-11-04 (drill log in section 5): since then production may hold real data.
 
 ## 4. First-deploy checklist
 
@@ -216,7 +220,7 @@ Each backup is `<UTC stamp>.dump.age` plus `<UTC stamp>.manifest.txt.age` (size,
 4. **Registration:** a non-allowlisted email gets "Sign-ups are invite-only for now".
 5. **Demo:** "Try the demo" works; `https://splinance.com/api/demo` is 404; the `api-demo` log shows the hourly cleanup.
 6. **Pre-deploy gate:** a deploy whose migration fails stops before going live (read one deploy log, or try it on a throwaway branch environment).
-7. **Restore drill:** both databases from S3 with `restore.sh`, and the Railway path once (section 5); results into the drill log. Until it has passed, production holds no real data.
+7. **Restore drill:** both databases from S3 with `restore.sh`, and the Railway path once (section 5); results into the drill log. Until it has passed, production holds no real data. (Passed 2026-11-04.)
 8. **Networking:** `postgres` has no public URL; `railway connect postgres` works anyway (it tunnels over SSH).
 
 ## 5. Operating
@@ -258,14 +262,34 @@ Each backup is `<UTC stamp>.dump.age` plus `<UTC stamp>.manifest.txt.age` (size,
     pg_restore -U splinance_owner -d splinance --no-owner --exit-on-error --single-transaction
   ```
 
-  Then redeploy `api` (its pre-deploy migration finds nothing to do). Up to a day of data is lost (RPO 24 h). The pipe through `railway ssh` was drilled once on `postgres-demo` with a demo dump: `createdb -U postgres drill`, the same `age -d ... | railway ssh -s postgres-demo -- pg_restore -U postgres -d drill --no-owner --no-acl ...`, then `dropdb -U postgres drill`.
+  Then redeploy `api` (its pre-deploy migration finds nothing to do). Up to a day of data is lost (RPO 24 h).
+
+  The binary pipe through `railway ssh` was drilled on 2026-11-04 with a demo dump into a scratch database on `postgres-demo` (the real one untouched). To repeat it (bash, age not on `PATH` after winget until a new terminal):
+
+  ```bash
+  S=splinance_demo/daily/<stamp>; D="$TEMP/drill"; mkdir -p "$D"
+  aws s3 cp --only-show-errors "s3://splinance-backups-bener/$S.dump.age" "$D/dump.age"
+  aws s3 cp --only-show-errors "s3://splinance-backups-bener/$S.manifest.txt.age" "$D/manifest.age"
+  read -rsp 'age identity: ' id; echo; (umask 077; printf '%s\n' "$id" > "$D/key"); unset id
+  railway ssh -s postgres-demo -- dropdb -U postgres --if-exists drill
+  railway ssh -s postgres-demo -- createdb -U postgres drill
+  age -d -i "$D/key" "$D/dump.age" | railway ssh -s postgres-demo -- \
+    pg_restore -U postgres -d drill --no-owner --no-acl --exit-on-error --single-transaction
+  age -d -i "$D/key" "$D/manifest.age" | grep -E '^table public\.(users|transactions) '
+  railway ssh -s postgres-demo -- psql -U postgres -d drill -XAt \
+    -c "select 'users', count(*) from users union all select 'transactions', count(*) from transactions"
+  railway ssh -s postgres-demo -- dropdb -U postgres drill
+  rm -rf "$D"
+  ```
 
 - **Backup keys:** the AWS key rotates like Airflow's (3.7 step 3); a backup role password like the other roles (below). A new age key goes into `recipients.txt` through a pull request; keep the old private key until the last backup encrypted to it has expired (13 months).
 - **Restore drill log:**
 
-  | Date | Database | Backup | Encrypted size | Restore | Total | Result |
-  | ---- | -------- | ------ | -------------- | ------- | ----- | ------ |
-  | -    | -        | -      | -              | -       | -     | -      |
+  | Date       | Database                            | Backup                   | Encrypted size | Restore                             | Total           | Result                                                                         |
+  | ---------- | ----------------------------------- | ------------------------ | -------------- | ----------------------------------- | --------------- | ------------------------------------------------------------------------------ |
+  | 2026-11-04 | `splinance`                         | `20261104T114309Z` daily | 66,119 B       | 0 s                                 | 2 s (fetch 2 s) | PASSED, 14 of 14 tables match, app role ok                                     |
+  | 2026-11-04 | `splinance_demo`                    | `20261104T114309Z` daily | 106,159 B      | 0 s                                 | 2 s (fetch 2 s) | PASSED, 14 of 14 tables match, app role ok                                     |
+  | 2026-11-04 | `splinance_demo` over `railway ssh` | `20261104T114309Z` daily | 106,159 B      | under 11 s, SSH passphrase included | -               | PASSED, users 2, households 1, transactions 247, splits 314 as in the manifest |
 
 - **Secrets:** rotating `JWT_ACCESS_SECRET` signs everyone out within 15 minutes (access tokens), refresh cookies keep working. Role passwords: `ALTER ROLE ... PASSWORD` over `railway ssh`, then the variable, then redeploy.
 - **Data track:** when the pipeline reads the deployed demo (D5 switch), enable the TCP proxy on `postgres-demo` only, connect as `splinance_demo_analytics` with `sslmode=verify-ca` and the server's certificate pinned (the image's certificate is self-signed); see [data-track.md](data-track.md).
