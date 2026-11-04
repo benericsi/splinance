@@ -8,13 +8,14 @@
 
 Household expense tracker for personal spending and shared expenses with a partner, roommates or family.
 
-> Work in progress.
+Live at [splinance.com](https://splinance.com) (registration by invitation) and as a public demo with seeded data at [demo.splinance.com](https://demo.splinance.com).
 
 ## Documentation
 
 - [Architecture](docs/architecture.md): how the code works, auth flow, data layer, testing, and the tricky parts
 - [Data model](docs/data-model.md): tables and database conventions
 - [Data track](docs/data-track.md): Python pipelines into an S3 data lake, dbt reports, and the decisions behind them
+- [Deployment](docs/deploy.md): how production and the demo run on Railway, nightly encrypted backups to S3, the restore drill and the runbook
 
 ## Tech stack
 
@@ -23,6 +24,7 @@ Household expense tracker for personal spending and shared expenses with a partn
 - **Shared:** Zod schemas and types used by both apps
 - **Data track:** Python, uv, Polars, httpx, boto3, ruff, mypy, pytest, Terraform, AWS (S3, IAM) (Airflow and dbt to come)
 - **Tooling:** pnpm workspaces, Docker Compose, Vitest, Supertest, Testing Library, Playwright, ESLint, Prettier, GitHub Actions
+- **Hosting:** Railway (Docker images, Caddy, Postgres 18), Cloudflare DNS, AWS S3 for backups, Healthchecks.io
 
 ## Repository layout
 
@@ -30,13 +32,15 @@ Household expense tracker for personal spending and shared expenses with a partn
 apps/api         Express REST API
 apps/web         React SPA (Vite)
 packages/shared  Zod schemas and types shared by api and web
+e2e              Playwright suites (app, demo, and the images behind Caddy)
+deploy           Images, Caddyfile, database roles, backup job and restore drill
 data             Python data track (see docs/data-track.md)
-infra            Terraform for AWS: data lake, IAM, budgets
+infra            Terraform for AWS: data lake, backups bucket, IAM, budgets
 ```
 
 ## Getting started
 
-Requirements: Node.js 22.12+, pnpm 10 (`corepack enable`) and Docker.
+Requirements: Node.js 26.13+ (`.nvmrc`), pnpm 10 (`npm install --global pnpm@10`; Node 25+ no longer ships corepack) and Docker.
 
 ```bash
 pnpm install
@@ -66,7 +70,7 @@ The data model and its conventions are described in [docs/data-model.md](docs/da
 
 ### Migrations
 
-Schema lives in `apps/api/src/db/schema.ts`. Migrations are SQL files in `apps/api/drizzle`, generated from the schema and committed.
+Schema lives in `apps/api/src/db/schema/` (one file per table). Migrations are SQL files in `apps/api/drizzle`, generated from the schema and committed.
 
 ```bash
 pnpm --filter @splinance/api db:generate   # create a migration from schema changes
