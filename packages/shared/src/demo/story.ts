@@ -1,4 +1,5 @@
 import type { StatementSource } from '../imports';
+import type { RecurringCadence, RecurringScope } from '../recurring';
 import { addMonths, monthsBetween } from '../reports';
 import { allocate, PERCENT_SCALE } from '../splits';
 import type { TransactionKind } from '../transactions';
@@ -101,6 +102,26 @@ export interface DemoRule {
   markShared: boolean;
 }
 
+/** A suggestion someone confirmed: detection finds `key` in `scope`, `person` says yes. */
+export interface DemoRecurringConfirmed {
+  person: DemoPerson;
+  scope: RecurringScope;
+  key: string;
+}
+
+/** A recurring payment someone added by hand; the imported payments then match it. */
+export interface DemoRecurringAdded {
+  person: DemoPerson;
+  scope: RecurringScope;
+  name: string;
+  pattern: string;
+  cadence: RecurringCadence;
+  amount: number;
+  /** The first payment. */
+  anchorOn: string;
+  category: string;
+}
+
 export interface DemoBudget {
   category: string;
   /** `YYYY-MM`: in force from this month on. */
@@ -122,6 +143,7 @@ export interface DemoStory {
   bankRows: DemoBankRow[];
   rules: DemoRule[];
   budgets: DemoBudget[];
+  recurring: { confirmed: DemoRecurringConfirmed[]; added: DemoRecurringAdded[] };
 }
 
 const RENT = 320_000;
@@ -742,5 +764,38 @@ export function buildDemoStory({ seed, today }: { seed: number; today: string })
       // Raised when Spotify joined Netflix.
       { category: 'Entertainment', from: addMonths(current, -5), amount: 10_000 },
     ],
+    recurring: {
+      // The visitor confirmed the big ones; Spotify, the phone plan and the passes are left
+      // as suggestions for them to try.
+      confirmed: [
+        { person: 'you', scope: 'shared', key: 'kovacs ingatlan kft.' },
+        { person: 'you', scope: 'shared', key: 'netflix' },
+        { person: 'you', scope: 'shared', key: 'telekom' },
+      ],
+      added: [
+        // Added by hand when it started: the imports since then are its payments.
+        {
+          person: 'partner',
+          scope: 'shared',
+          name: 'Spotify Duo',
+          pattern: 'spotify',
+          cadence: 'monthly',
+          amount: 3_290,
+          anchorOn: `${addMonths(current, -5)}-12`,
+          category: 'Entertainment',
+        },
+        // Stopped four months ago: shows as "Cancelled?".
+        {
+          person: 'partner',
+          scope: 'shared',
+          name: 'Gym membership',
+          pattern: 'fitness park',
+          cadence: 'monthly',
+          amount: 14_900,
+          anchorOn: `${first}-03`,
+          category: 'Health',
+        },
+      ],
+    },
   };
 }

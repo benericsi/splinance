@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { buildDemoStory, renderDemoBankFiles } from '@splinance/shared';
-import { budapestToday } from './today';
+import { budapestToday } from '../../lib/today';
 
 /**
  * Writes the demo story's bank exports (one Revolut and one K&H file per month) to a folder,

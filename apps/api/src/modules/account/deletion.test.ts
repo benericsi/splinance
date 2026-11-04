@@ -19,6 +19,7 @@ import {
   householdMembers,
   households,
   importBatches,
+  recurringSeries,
   sessions,
   transactions,
   userIdentities,
@@ -131,6 +132,24 @@ async function annasWorld() {
     fileName: 'anna-statement.csv',
     rowCount: 0,
   });
+
+  // A recurring payment of her own and one she set up for the household.
+  for (const userId of [anna.id, null]) {
+    await db.insert(recurringSeries).values({
+      householdId: home,
+      userId,
+      status: 'active',
+      source: 'manual',
+      name: userId ? 'Therapy' : 'Netflix',
+      pattern: userId ? 'therapy' : 'netflix',
+      patternKey: userId ? 'therapy' : 'netflix',
+      cadence: 'monthly',
+      amount: 4_490,
+      currency: 'HUF',
+      anchorOn: '2026-10-07',
+      createdBy: anna.id,
+    });
+  }
 
   const flat = await createHousehold(app, anna, 'Annas flat');
   await addTransaction(flat, anna, { visibility: 'private', description: 'Rent' });
@@ -264,6 +283,13 @@ describe('delete', () => {
       .from(importBatches)
       .where(eq(importBatches.createdBy, anna.id));
     expect(batch?.fileName).toBeNull();
+
+    // Her private recurring payment is gone; the household's stays.
+    expect(
+      (await db.select().from(recurringSeries).where(eq(recurringSeries.householdId, home))).map(
+        (r) => r.name,
+      ),
+    ).toEqual(['Netflix']);
 
     // Her flat is gone whole, the old place is archived, her memberships ended.
     expect(await db.select().from(households).where(eq(households.id, flat))).toEqual([]);

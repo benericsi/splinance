@@ -253,6 +253,35 @@ describe('the story as recurring payments', () => {
     );
   });
 
+  it.each([
+    [1, '2026-10-28'],
+    [5, '2026-11-01'],
+    [8, '2026-02-14'],
+    [13, '2026-12-31'],
+  ])('sets up recurring payments the seeder can make for seed %i on %s', (seed, today) => {
+    const s = buildDemoStory({ seed, today });
+    for (const confirmed of s.recurring.confirmed) {
+      const found = detectRecurring(seenBy(s, confirmed.person), { today });
+      expect(found.some((f) => f.scope === confirmed.scope && f.key === confirmed.key)).toBe(true);
+    }
+    const categories = new Set(DEFAULT_CATEGORIES.map((c) => c.name));
+    for (const added of s.recurring.added) {
+      expect(categories.has(added.category)).toBe(true);
+      const series = {
+        id: added.name,
+        kind: 'expense' as const,
+        ownerId: null,
+        pattern: added.pattern,
+        amount: added.amount,
+        amountVaries: false,
+        startsOn: null,
+      };
+      const payments = assignPayments([series], seenBy(s, added.person)).payments.get(added.name);
+      // Every payment since the first one belongs to it.
+      expect(payments?.at(-1)?.occurredOn).toBe(added.anchorOn);
+    }
+  });
+
   it('shows the Netflix price rise and the gym going quiet', () => {
     const today = '2026-11-04';
     const s = buildDemoStory({ seed: 1, today });

@@ -12,6 +12,8 @@ export {
   demoBalance,
   type DemoPerson,
   type DemoPersonInfo,
+  type DemoRecurringAdded,
+  type DemoRecurringConfirmed,
   type DemoRule,
   type DemoSettlement,
   type DemoShare,
