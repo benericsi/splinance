@@ -1,0 +1,47 @@
+# Restore drill (docs/deploy.md "Backups"): a scratch Postgres 18 that keeps nothing (tmpfs) and
+# the backup image to restore into it. Also used by CI after the smoke suite.
+#   docker compose -f deploy/backup/compose.drill.yml up -d --wait scratch
+#   docker compose -f deploy/backup/compose.drill.yml run --rm restore restore.sh --db splinance
+#   docker compose -f deploy/backup/compose.drill.yml down -v
+
+name: splinance-drill
+
+services:
+  scratch:
+    image: postgres:18-alpine@sha256:10a5c69a83035ab5239f5620d708520e8b28f5aa1f2b20143e6024532edadfb5
+    # Like Railway's template: superuser postgres and nothing else, so the role scripts run as
+    # they would on a new production server.
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: drill-only
+      POSTGRES_DB: postgres
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U postgres']
+      interval: 2s
+      retries: 30
+
+  restore:
+    image: splinance-backup:local
+    build:
+      context: ../..
+      dockerfile: deploy/backup/Dockerfile
+    # Only with `run`, never with `up`.
+    profiles: [drill]
+    command: ['restore.sh']
+    environment:
+      PGHOST: scratch
+      PGUSER: postgres
+      PGPASSWORD: drill-only
+      BACKUP_BUCKET: splinance-backups-bener
+      # From your shell: eval "$(aws configure export-credentials --format env)" (short-lived).
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+    # The decrypted manifest and the identity live here and vanish with the container.
+    tmpfs:
+      - /tmp:uid=70,gid=70,mode=0700
+    depends_on:
+      scratch:
+        condition: service_healthy

@@ -95,6 +95,11 @@ jobs:
           sql splinance_demo_analytics smoke-analytics splinance_demo 'select count(*) from analytics.transactions' > /dev/null
           refused splinance_demo_analytics smoke-analytics splinance_demo 'select count(*) from public.users'
           refused splinance_demo_analytics smoke-analytics splinance 'select 1'
+          sql splinance_backup smoke-backup splinance 'select count(*) from sessions' > /dev/null
+          refused splinance_backup smoke-backup splinance 'delete from sessions'
+          refused splinance_backup smoke-backup splinance 'create table should_fail (id int)'
+          refused splinance_backup smoke-backup splinance_demo 'select 1'
+          refused splinance_demo_backup smoke-demo-backup splinance 'select 1'
           echo "database roles: ok"
 
       - uses: pnpm/action-setup@v6
@@ -107,6 +112,28 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter @splinance/e2e...
       - run: pnpm --filter @splinance/e2e exec playwright install --with-deps chromium
       - run: pnpm --filter @splinance/e2e e2e:smoke
+
+      # The backup job against both smoke databases (as the backup roles, with the rows the suite
+      # left behind), then the restore drill into a fresh server: every row count must match.
+      # A throwaway age key, and files instead of S3 (the upload is checked on Railway).
+      - run: docker build -f deploy/backup/Dockerfile -t splinance-backup:local .
+      - run: |
+          out=$RUNNER_TEMP/backups key=$RUNNER_TEMP/age
+          mkdir -p "$out" "$key" && chmod 777 "$out"
+          docker run --rm splinance-backup:local age-keygen > "$key/identity.txt" 2> /dev/null
+          grep '^# public key: ' "$key/identity.txt" | cut -d ' ' -f 4 > "$key/recipients.txt"
+          chmod 644 "$key"/*
+          docker run --rm --network splinance-smoke_default -v "$out:/backups" -v "$key:/age:ro" \
+            -e PROD_DATABASE_URL=postgres://splinance_backup:smoke-backup@db:5432/splinance \
+            -e DEMO_DATABASE_URL=postgres://splinance_demo_backup:smoke-demo-backup@db:5432/splinance_demo \
+            -e BACKUP_TARGET=dir:/backups -e AGE_RECIPIENTS_FILE=/age/recipients.txt \
+            splinance-backup:local
+          drill="docker compose -f deploy/backup/compose.drill.yml"
+          $drill up -d --wait scratch
+          for db in splinance splinance_demo; do
+            $drill run --rm -T -v "$out:/backups:ro" -v "$key:/age:ro" \
+              -e AGE_IDENTITY_FILE=/age/identity.txt restore restore.sh --db "$db" --from dir:/backups
+          done
 
       - if: failure()
         run: |
