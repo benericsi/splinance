@@ -7,7 +7,7 @@ import { createApp } from '../../app';
 import { db } from '../../db/client';
 import { sessions, users } from '../../db/schema';
 import { hashToken } from '../../lib/random-token';
-import { REFRESH_COOKIE } from './auth.routes';
+import { REFRESH_COOKIE } from './refresh-cookie';
 import { REUSE_GRACE_MS } from './auth.service';
 
 type App = ReturnType<typeof createApp>;

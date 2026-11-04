@@ -23,6 +23,7 @@ describe('parseEnv', () => {
       TRUST_PROXY: 0,
       REGISTRATION: 'open',
       REGISTRATION_ALLOWLIST: [],
+      OAUTH_GOOGLE_ISSUER: 'https://accounts.google.com',
     });
   });
 
@@ -116,6 +117,50 @@ describe('parseEnv', () => {
     ).toThrow(/DEMO_MODE/);
     const env = parseEnv({ ...demo, DATABASE_URL: 'postgres://u:p@db:5432/splinance_demo' });
     expect(env.DEMO_MODE).toBe(true);
+  });
+
+  describe('Google sign-in', () => {
+    const google = {
+      ...required,
+      APP_ORIGIN: 'https://splinance.com/',
+      OAUTH_GOOGLE_CLIENT_ID: 'client.apps.googleusercontent.com',
+      OAUTH_GOOGLE_CLIENT_SECRET: 'secret',
+    };
+
+    it('accepts a complete configuration and normalizes the origin', () => {
+      const env = parseEnv({ ...google, NODE_ENV: 'production' });
+      expect(env.APP_ORIGIN).toBe('https://splinance.com');
+      expect(env.OAUTH_GOOGLE_ISSUER).toBe('https://accounts.google.com');
+    });
+
+    it('needs both client values and an origin', () => {
+      const noSecret = { ...google, OAUTH_GOOGLE_CLIENT_SECRET: undefined };
+      expect(() => parseEnv(noSecret)).toThrow(/OAUTH_GOOGLE_CLIENT_SECRET/);
+      const noOrigin = { ...google, APP_ORIGIN: undefined };
+      expect(() => parseEnv(noOrigin)).toThrow(/APP_ORIGIN/);
+    });
+
+    it('refuses http outside localhost and in production', () => {
+      const fake = { ...google, OAUTH_GOOGLE_ISSUER: 'http://localhost:3300' };
+      expect(parseEnv(fake).OAUTH_GOOGLE_ISSUER).toBe('http://localhost:3300');
+      expect(() => parseEnv({ ...fake, NODE_ENV: 'production' })).toThrow(/OAUTH_GOOGLE_ISSUER/);
+      expect(() => parseEnv({ ...google, OAUTH_GOOGLE_ISSUER: 'http://idp.example' })).toThrow(
+        /OAUTH_GOOGLE_ISSUER/,
+      );
+      expect(() =>
+        parseEnv({ ...google, NODE_ENV: 'production', APP_ORIGIN: 'http://splinance.com' }),
+      ).toThrow(/APP_ORIGIN/);
+    });
+
+    it('is refused on the demo instance', () => {
+      expect(() =>
+        parseEnv({
+          ...google,
+          DEMO_MODE: 'true',
+          DATABASE_URL: 'postgres://u:p@db:5432/splinance_demo',
+        }),
+      ).toThrow(/demo instance/);
+    });
   });
 
   it('reads the database name from the URL', () => {

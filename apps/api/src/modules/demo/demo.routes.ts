@@ -2,7 +2,7 @@ import type { DemoCreateResponse, DemoStatusResponse } from '@splinance/shared';
 import { Router } from 'express';
 import { rateLimiter } from '../../middleware/rate-limit';
 import { getAuth, requireAuth } from '../../middleware/require-auth';
-import { clearRefreshCookie, setRefreshCookie } from '../auth/auth.routes';
+import { clearRefreshCookie, setRefreshCookie } from '../auth/refresh-cookie';
 import { createDemo, type DemoConfig, endDemo, getDemo } from './demo.service';
 
 /** Mounted only on the demo instance (`DEMO_MODE`); production answers these with 404. */

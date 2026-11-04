@@ -20,13 +20,13 @@ Living document: it describes the tables that exist today plus the conventions e
 
 ### `users`
 
-| Column                 | Type                                | Notes                                                                                    |
-| ---------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------- |
-| id                     | uuid PK                             | uuidv7                                                                                   |
-| email                  | text, unique (`users_email_unique`) | Lowercased by the shared `emailSchema`; `CHECK (email = lower(email))`                   |
-| password_hash          | text                                | Argon2id (`@node-rs/argon2`, m=19456 KiB, t=2, p=1), PHC string with salt and parameters |
-| display_name           | text                                | 1-50 characters (CHECK)                                                                  |
-| created_at, updated_at | timestamptz                         |                                                                                          |
+| Column                 | Type                                | Notes                                                                                                                                         |
+| ---------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                     | uuid PK                             | uuidv7                                                                                                                                        |
+| email                  | text, unique (`users_email_unique`) | Lowercased by the shared `emailSchema`; `CHECK (email = lower(email))`                                                                        |
+| password_hash          | text, nullable                      | Argon2id (`@node-rs/argon2`, m=19456 KiB, t=2, p=1), PHC string with salt and parameters; null for accounts that only sign in with a provider |
+| display_name           | text                                | 1-50 characters (CHECK)                                                                                                                       |
+| created_at, updated_at | timestamptz                         |                                                                                                                                               |
 
 Deliberately not stored: first/last name, phone number. No feature needs them yet (data minimization, GDPR). Add them with the feature that does.
 
@@ -59,6 +59,25 @@ Refresh handling:
 Rows are locked with `SELECT ... FOR UPDATE`, so truly concurrent refreshes produce exactly one rotation. A token stolen two or more rotations ago is rejected but does not trigger a revoke (accepted tradeoff for a single table).
 
 Access tokens are stateless JWTs (HS256, 15 minutes). A revoked session's access token stays valid until it expires.
+
+### `user_identities`
+
+A sign-in provider's account linked to a user ("Continue with Google"). Matched by the provider's `sub`, never by email (emails change and get reused).
+
+| Column       | Type                                  | Notes                                                                                       |
+| ------------ | ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| id           | uuid PK                               | uuidv7                                                                                      |
+| user_id      | uuid FK -> users, `ON DELETE CASCADE` | `user_identities_user_id_fk`                                                                |
+| provider     | text                                  | `google`; `CHECK (provider ~ '^[a-z][a-z0-9-]{1,31}$')` (`user_identities_provider_format`) |
+| subject      | text                                  | The provider's stable `sub`; 1-255 characters (`user_identities_subject_length`)            |
+| created_at   | timestamptz                           | When it was connected                                                                       |
+| last_used_at | timestamptz                           | Updated on every sign-in through it                                                         |
+
+- `user_identities_provider_subject_unique (provider, subject)`: one Splinance user per provider account. `user_identities_user_provider_unique (user_id, provider)`: one account per provider and user; its leading column also serves "identities of a user".
+- `provider` is text with a format check, not an enum: the code registry (`modules/auth/oauth/providers.ts`) is the source of truth, so a new provider needs no migration.
+- Cascades with its user like `sessions` (credentials, not history), so `deleteDemo` needs no extra step.
+- Not stored: provider tokens (we never call provider APIs), the email or name the provider sent (a new account copies them into `users` once), pictures, locales.
+- Backed up (without it nobody could sign in with Google after a restore). `sub` is a pseudonymous identifier, personal data under GDPR, not a secret: signing in still needs an ID token signed by the provider.
 
 ### `households`
 

@@ -3,7 +3,7 @@ import { and, eq, isNull, or } from 'drizzle-orm';
 import { env } from '../../config/env';
 import { db, type Db } from '../../db/client';
 import { isUniqueViolation } from '../../db/errors';
-import { sessions, users, type UserRow } from '../../db/schema';
+import { sessions, userIdentities, users, type UserRow } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
 import { generateToken, hashToken } from '../../lib/random-token';
 import { logger } from '../../lib/logger';
@@ -28,6 +28,15 @@ export interface AuthResult {
   accessToken: string;
   /** null when the browser already holds the latest refresh cookie (grace window). */
   refreshCookie: RefreshCookie | null;
+  /** Set when this login also connected a waiting provider account (see oauth.service). */
+  linkedProvider?: string;
+}
+
+/** A provider account waiting to be connected (from the link cookie, see oauth/cookies.ts). */
+export interface PendingLink {
+  provider: string;
+  subject: string;
+  email: string;
 }
 
 const invalidCredentials = () =>
@@ -77,15 +86,19 @@ export interface RegistrationPolicy {
 
 const OPEN: RegistrationPolicy = { mode: 'open', allowlist: [] };
 
+/** `email` lowercased; shared by password registration and first provider sign-ins. */
+export function isRegistrationAllowed(policy: RegistrationPolicy, email: string): boolean {
+  return (
+    policy.mode === 'open' || (policy.mode === 'allowlist' && policy.allowlist.includes(email))
+  );
+}
+
 /** Production is allowlist-only: real strangers' data would make this a service. */
 export async function register(
   input: RegisterInput,
   policy: RegistrationPolicy = OPEN,
 ): Promise<AuthResult> {
-  const allowed =
-    policy.mode === 'open' ||
-    (policy.mode === 'allowlist' && policy.allowlist.includes(input.email));
-  if (!allowed) {
+  if (!isRegistrationAllowed(policy, input.email)) {
     throw new HttpError(403, 'Sign-ups are invite-only for now', 'REGISTRATION_CLOSED');
   }
 
@@ -108,10 +121,16 @@ export async function register(
   }
 }
 
-export async function login(input: LoginInput): Promise<AuthResult> {
+/**
+ * Accounts that only sign in with a provider have no password: they take the same dummy
+ * verification as unknown emails, so the answer reveals neither that the account exists nor
+ * how it signs in. With `pendingLink` for this account's email, a correct password also
+ * connects that provider account, in the same transaction as the session (proving both).
+ */
+export async function login(input: LoginInput, pendingLink?: PendingLink): Promise<AuthResult> {
   const [user] = await db.select().from(users).where(eq(users.email, input.email));
 
-  if (!user) {
+  if (!user?.passwordHash) {
     await verifyDummyPassword(input.password);
     throw invalidCredentials();
   }
@@ -119,7 +138,19 @@ export async function login(input: LoginInput): Promise<AuthResult> {
     throw invalidCredentials();
   }
 
-  return createSession(db, user);
+  if (pendingLink?.email !== user.email) return createSession(db, user);
+
+  return db.transaction(async (tx) => {
+    // Nothing is linked if the provider account or this user's slot for the provider was
+    // taken meanwhile (both unique); the login itself still succeeds.
+    const [linked] = await tx
+      .insert(userIdentities)
+      .values({ userId: user.id, provider: pendingLink.provider, subject: pendingLink.subject })
+      .onConflictDoNothing()
+      .returning({ id: userIdentities.id });
+    const result = await createSession(tx, user);
+    return linked ? { ...result, linkedProvider: pendingLink.provider } : result;
+  });
 }
 
 type RefreshOutcome = { kind: 'ok'; result: AuthResult } | { kind: 'invalid' } | { kind: 'reuse' };

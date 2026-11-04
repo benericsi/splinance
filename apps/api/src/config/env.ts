@@ -3,6 +3,11 @@ import { z } from 'zod';
 /** Who may create an account (see REGISTRATION below). */
 export const REGISTRATION_MODES = ['open', 'allowlist', 'closed'] as const;
 
+/** http only for a fake provider on this machine (tests, e2e); real providers are https. */
+export function isLocalHttp(url: URL): boolean {
+  return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+}
+
 /** The database name in a postgres:// URL (`splinance_demo` in `postgres://u:p@host/splinance_demo`). */
 export function databaseName(url: string): string {
   return decodeURIComponent(new URL(url).pathname.slice(1));
@@ -55,6 +60,18 @@ const envSchema = z
     DEMO_MODE: z.stringbool().default(false),
     DEMO_TTL_DAYS: z.coerce.number().int().min(1).max(30).default(7),
     DEMO_MAX_ACTIVE: z.coerce.number().int().positive().max(10_000).default(200),
+
+    // Where the browser reaches this app (https://splinance.com). Provider redirect URIs are
+    // built from it, never from the Host header. Required once a sign-in provider is set.
+    APP_ORIGIN: z
+      .url({ protocol: /^https?$/ })
+      .transform((url) => new URL(url).origin)
+      .optional(),
+    // "Continue with Google": both or neither. The issuer is overridable for the fake
+    // provider in tests and e2e (http only on localhost, never in production).
+    OAUTH_GOOGLE_CLIENT_ID: z.string().trim().min(1).max(512).optional(),
+    OAUTH_GOOGLE_CLIENT_SECRET: z.string().trim().min(1).max(512).optional(),
+    OAUTH_GOOGLE_ISSUER: z.url({ protocol: /^https?$/ }).default('https://accounts.google.com'),
   })
   .refine((e) => !(e.RATE_LIMIT_DISABLED && e.NODE_ENV === 'production'), {
     message: 'RATE_LIMIT_DISABLED must not be set in production',
@@ -68,6 +85,33 @@ const envSchema = z
     message: 'REGISTRATION=allowlist needs at least one email in REGISTRATION_ALLOWLIST',
     path: ['REGISTRATION_ALLOWLIST'],
   })
+  .refine((e) => !e.OAUTH_GOOGLE_CLIENT_ID === !e.OAUTH_GOOGLE_CLIENT_SECRET, {
+    message: 'Set both OAUTH_GOOGLE_CLIENT_ID and OAUTH_GOOGLE_CLIENT_SECRET, or neither',
+    path: ['OAUTH_GOOGLE_CLIENT_SECRET'],
+  })
+  // The demo database must only hold seeded sandboxes, never a real person's account.
+  .refine((e) => !(e.DEMO_MODE && e.OAUTH_GOOGLE_CLIENT_ID), {
+    message: 'Sign-in providers are not allowed on the demo instance',
+    path: ['OAUTH_GOOGLE_CLIENT_ID'],
+  })
+  .refine((e) => !e.OAUTH_GOOGLE_CLIENT_ID || e.APP_ORIGIN, {
+    message: 'APP_ORIGIN is required when a sign-in provider is configured',
+    path: ['APP_ORIGIN'],
+  })
+  .refine((e) => !(e.NODE_ENV === 'production' && e.APP_ORIGIN?.startsWith('http:')), {
+    message: 'APP_ORIGIN must be https in production',
+    path: ['APP_ORIGIN'],
+  })
+  .refine(
+    (e) => {
+      const issuer = new URL(e.OAUTH_GOOGLE_ISSUER);
+      return issuer.protocol === 'https:' || (e.NODE_ENV !== 'production' && isLocalHttp(issuer));
+    },
+    {
+      message: 'OAUTH_GOOGLE_ISSUER must be https (http only for localhost outside production)',
+      path: ['OAUTH_GOOGLE_ISSUER'],
+    },
+  )
   // Migrating one database while the API runs on another would leave the API's schema behind.
   .refine(
     (e) =>

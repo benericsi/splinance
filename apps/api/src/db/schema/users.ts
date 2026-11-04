@@ -8,7 +8,8 @@ export const users = pgTable(
     id: id(),
     // Normalized to lowercase by the shared emailSchema; the check guards other write paths.
     email: text().notNull().unique('users_email_unique'),
-    passwordHash: text().notNull(),
+    // Null for accounts that only sign in with a provider (user_identities).
+    passwordHash: text(),
     displayName: text().notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
