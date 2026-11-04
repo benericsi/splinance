@@ -258,11 +258,13 @@ Set up and drilled on 2026-11-04 (drill log in section 5): since then production
    - `https://splinance.com/api/auth/oauth/google/callback?code=x&state=y` in a fresh tab lands on `/login` with "try again"; the `api` log line shows `callback?[redacted]`.
    - A Google account whose email is not allowlisted gets "Sign-ups are invite-only for now".
 
+   Passed 2026-11-04 (Google Cloud project `splinance` published, client `splinance-prod`; server checks with curl and `railway logs`, sign-in, reload and cookies by hand in Chrome, Firefox and Safari, a non-allowlisted account refused).
+
 ## 5. Operating
 
 - **Deploying:** merge to `main`. CI runs; with Wait for CI the services whose watch paths changed build and deploy afterwards, each API after its migrations.
 - **Migrations are forward-only and must work with the previous image** (expand, then contract in a later release). Rolling back is then the previous deployment (dashboard: Deployments -> an earlier one -> Redeploy); the database goes back only from a backup, if a migration destroyed data.
-- **Logs:** `railway logs -s api` (pino JSON). Requests are logged with redacted URLs, never tokens.
+- **Logs:** `railway logs -s api` (pino JSON, the level as text so Railway shows warnings and errors as such; the dashboard filters them with `@level:warn`). Requests are logged with redacted URLs, never tokens.
 - **Before touching the images, the Caddyfile or `deploy/db`:** run the smoke stack locally (the CI job `Images and smoke` does the same):
 
   ```bash
