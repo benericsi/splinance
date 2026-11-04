@@ -1,0 +1,8 @@
+# Who can decrypt the database backups (age public keys, one per line). The backup job
+# encrypts every file to all of them; any one private key decrypts it. Changing this file
+# changes who can read backups, so it goes through a pull request. docs/deploy.md "Backups".
+
+# Main key: private key in the owner's password manager.
+age1dk9fwuchpusn2ae6nlx7m363mr9e4vcus5nymm8hpj8dffzaxcsqj2etwv
+# Break-glass key: private key kept offline.
+age134z6lfmwzvu5ld5tjl4xnrsevppqgyhz0dkyuvl4k5hvuqka2essu2qh3p

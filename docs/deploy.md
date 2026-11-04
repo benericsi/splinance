@@ -29,25 +29,30 @@ How production and the demo run, how to set them up once, and how to operate the
   +------+-----+  +-----+------+
          |              |
   +------v-----+  +-----v--------+
-  | postgres   |  | postgres-demo|  postgres-ssl:18, a volume and backups each
+  | postgres   |  | postgres-demo|  postgres-ssl:18, a volume each (Hobby: no Railway backups)
   | no public  |  | TCP proxy    |  only for the data track's read-only login (later)
-  +------------+  +--------------+
+  +------^-----+  +-----^--------+
+         | pg_dump      |
+  +------+--------------+------+
+  | backup: cron 02:17 UTC     |    age-encrypted dumps -> S3 splinance-backups-bener (Frankfurt)
+  +----------------------------+    every run reports to Healthchecks.io
 ```
 
-Five services. Every merge to `main` deploys the services whose files changed, after CI passed.
+Six services. Every merge to `main` deploys the services whose files changed, after CI passed.
 
 ## 2. Decisions
 
-| Topic     | Choice                                                                                      | Why                                                                                                                                                                                                  |
-| --------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Postgres  | Two services, image `ghcr.io/railwayapp-templates/postgres-ssl:18`                          | The schema needs Postgres 18 (`uuidv7()`); the template's default is older. Public access is per service: the demo's can get a TCP proxy for the data track while production never has a public port |
-| Roles     | Per database an owner (migrations) and an app role (rows only), from `deploy/db/*.sql`      | A compromised API cannot drop or alter tables. The owner has no `CREATEROLE`, so the analytics group role is created by the script                                                                   |
-| TLS       | Railway's edge issues certificates; Caddy speaks plain HTTP on `$PORT`                      | One certificate owner, no ACME in the container                                                                                                                                                      |
-| Client IP | Edge's `X-Real-IP` -> Caddy -> one `X-Forwarded-For` entry, API `TRUST_PROXY=1`             | Railway documents `X-Real-IP`, not `X-Forwarded-For`; checked after the first deploy (section 4)                                                                                                     |
-| Settings  | Dashboard, written down here                                                                | Config as Code (`railway.json`) stops being read on 2026-12-01; Infrastructure as Code (`.railway/railway.ts`) needs a Railway token in GitHub: a later step                                         |
-| Deploys   | GitHub autodeploy from `main` with "Wait for CI"; migrations as the pre-deploy command      | A commit that failed CI never deploys; a failed migration stops the deploy and the old deployment keeps serving                                                                                      |
-| Domains   | Hobby allows two per service: apex and `demo` on `web`; `www` by a Cloudflare redirect rule | No third service just for a redirect                                                                                                                                                                 |
-| Backups   | Railway volume backups (daily + weekly); offsite encrypted dumps to S3 later                | Restore inside Railway from day one; offsite copy is a separate step                                                                                                                                 |
+| Topic     | Choice                                                                                             | Why                                                                                                                                                                                                         |
+| --------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Postgres  | Two services, image `ghcr.io/railwayapp-templates/postgres-ssl:18`                                 | The schema needs Postgres 18 (`uuidv7()`); the template's default is older. Public access is per service: the demo's can get a TCP proxy for the data track while production never has a public port        |
+| Roles     | Per database an owner (migrations) and an app role (rows only), from `deploy/db/*.sql`             | A compromised API cannot drop or alter tables. The owner has no `CREATEROLE`, so the analytics group role is created by the script                                                                          |
+| TLS       | Railway's edge issues certificates; Caddy speaks plain HTTP on `$PORT`                             | One certificate owner, no ACME in the container                                                                                                                                                             |
+| Client IP | Edge's `X-Real-IP` -> Caddy -> one `X-Forwarded-For` entry, API `TRUST_PROXY=1`                    | Railway documents `X-Real-IP`, not `X-Forwarded-For`; checked after the first deploy (section 4)                                                                                                            |
+| Settings  | Dashboard, written down here                                                                       | Config as Code (`railway.json`) stops being read on 2026-12-01; Infrastructure as Code (`.railway/railway.ts`) needs a Railway token in GitHub: a later step                                                |
+| Deploys   | GitHub autodeploy from `main` with "Wait for CI"; migrations as the pre-deploy command             | A commit that failed CI never deploys; a failed migration stops the deploy and the old deployment keeps serving                                                                                             |
+| Domains   | Hobby allows two per service: apex and `demo` on `web`; `www` by a Cloudflare redirect rule        | No third service just for a redirect                                                                                                                                                                        |
+| Backups   | Our own: a Railway cron service runs `pg_dump` nightly, encrypts with age, uploads to S3 Frankfurt | Railway Hobby cannot create backups at all (manual or scheduled is Pro only). Another provider is offsite by definition; age keeps the private keys out of Railway and AWS; the uploader can only add files |
+| Alerting  | Healthchecks.io (free) as a dead man's switch for the backup job                                   | A cron run that never starts produces no Railway event; Healthchecks emails when the success ping does not arrive                                                                                           |
 
 ## 3. One-time setup
 
@@ -64,7 +69,7 @@ For `postgres` and then `postgres-demo`:
 
 1. New service from the image `ghcr.io/railwayapp-templates/postgres-ssl:18` (check that the tag exists), with a volume mounted where the template mounts it. Name it exactly `postgres` / `postgres-demo` (the variable references below use the names).
 2. Settings -> Networking: no public access (for `postgres-demo` too, until the data track needs it).
-3. Backups: daily and weekly schedules (`postgres-demo`: daily is enough).
+3. Backups: Railway's are Pro only (manual and scheduled), so Hobby has none; the `backup` service (3.7) covers both databases.
 4. Generate the passwords locally, one per role, and keep them in your password manager until they are stored as variables:
 
    ```bash
@@ -148,15 +153,70 @@ Railway sets `PORT` for this service itself; Caddy listens on it.
 2. Register yourself (an allowlisted email) on production.
 3. Run the checklist below.
 
+### 3.7 Backups
+
+Railway Hobby cannot create backups, so the cron service `backup` (`deploy/backup`) dumps both databases every night: `pg_dump --format=custom` and a row count per table from one snapshot, both encrypted with age to the public keys in `deploy/backup/recipients.txt`, uploaded to S3 in Frankfurt (another provider and country, still the EU). Nothing on Railway or AWS can decrypt them: the private keys exist only in your password manager (main) and offline (break-glass). Rows of `sessions` stay out (no refresh-token hashes offsite; everyone logs in again after a restore).
+
+| Prefix in `splinance-backups-bener`     | Kept      |
+| --------------------------------------- | --------- |
+| `splinance/daily/`                      | 35 days   |
+| `splinance/monthly/` (the 1st, UTC)     | 13 months |
+| `splinance_demo/daily/` (seeded, cheap) | 14 days   |
+
+Each backup is `<UTC stamp>.dump.age` plus `<UTC stamp>.manifest.txt.age` (size, sha256, versions, row counts); the manifest is uploaded last, so a backup without one is incomplete. The bucket and the IAM user `splinance-backup` come from Terraform (`infra/main/backups.tf`, [data-track.md](data-track.md) section 6): the user can add new files under those prefixes and nothing else (no list, read, overwrite or delete).
+
+1. **age keys** (done 2026-11-04): `age-keygen` twice on your machine (`winget install FiloSottile.age`). The main key's output goes into the password manager, the break-glass key offline; only the two `age1...` public keys go into `recipients.txt`, through a pull request. A private key never goes to Railway, AWS, the repository or a chat.
+2. **Backup roles**, one password each (generated as in 3.2). They read everything, including tables later migrations add (`pg_read_all_data`), and write nothing:
+
+   ```bash
+   railway ssh -s postgres -- psql -U postgres -d railway -v ON_ERROR_STOP=1 \
+     -v db=splinance -v role=splinance_backup -v backup_password='<backup>' -f - < deploy/db/backup.sql
+
+   railway ssh -s postgres-demo -- psql -U postgres -d railway -v ON_ERROR_STOP=1 \
+     -v db=splinance_demo -v role=splinance_demo_backup -v backup_password='<backup>' -f - < deploy/db/backup.sql
+   ```
+
+3. **AWS access key** for `splinance-backup`, by hand (a key created by Terraform would sit in its state in plain text). Git Bash, after `aws login`; the key goes to the clipboard, not the screen:
+
+   ```bash
+   aws iam create-access-key --user-name splinance-backup --query 'AccessKey.[AccessKeyId,SecretAccessKey]' --output text | clip
+   ```
+
+   Paste it into the password manager (id, then secret), then into the variables below, then clear the clipboard. Rotate like Airflow's key: a second key, switch the variables, delete the old one.
+
+4. **Healthchecks.io** (free): a check `splinance-backup` with the cron schedule `17 2 * * *`, time zone UTC, grace time 1 hour, email notifications. Copy its ping URL.
+5. **The `backup` service**, from the repository, branch `main`:
+
+   | Setting                   | Value                                 |
+   | ------------------------- | ------------------------------------- |
+   | `RAILWAY_DOCKERFILE_PATH` | `deploy/backup/Dockerfile`            |
+   | Cron schedule             | `17 2 * * *` (UTC)                    |
+   | Restart policy            | Never (Healthchecks reports failures) |
+   | Watch paths               | `deploy/backup/**`, `deploy/db/**`    |
+   | Wait for CI               | on                                    |
+   | Public networking         | none                                  |
+
+   Variables, all sealed except the bucket:
+
+   | Variable                                     | Value                                                                                                                       |
+   | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+   | `PROD_DATABASE_URL`                          | `postgresql://splinance_backup:<backup>@${{postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/splinance?sslmode=require`                |
+   | `DEMO_DATABASE_URL`                          | `postgresql://splinance_demo_backup:<backup>@${{postgres-demo.RAILWAY_PRIVATE_DOMAIN}}:5432/splinance_demo?sslmode=require` |
+   | `BACKUP_BUCKET`                              | `splinance-backups-bener`                                                                                                   |
+   | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | from step 3                                                                                                                 |
+   | `HC_PING_URL`                                | from step 4 (whoever has it can report a fake success)                                                                      |
+
+6. **First run** by hand (`railway cron run`, or from the service in the dashboard): the log ends with `all backups uploaded`, Healthchecks shows a green run, and `aws s3 ls s3://splinance-backups-bener --recursive` lists four new files. Then the restore drill (section 5).
+
 ## 4. First-deploy checklist
 
-1. **Headers:** `curl -I https://splinance.com/login` shows HSTS, CSP (`script-src 'self' 'sha256-...'`), `nosniff`, `Referrer-Policy: no-referrer`, no `Server`; `curl -I https://splinance.com/api/health/ready` shows Helmet's headers. Same for the demo.
+1. **Headers:** `curl -I https://splinance.com/login` shows HSTS, CSP (`script-src 'self' 'sha256-...'`), `nosniff`, `Referrer-Policy: no-referrer`, no `Server` from Caddy (`Server: railway-hikari` is added by Railway's edge and cannot be removed); `curl -I https://splinance.com/api/health/ready` shows Helmet's headers. Same for the demo.
 2. **Client IP:** the API log line of your request shows your IP, not Railway's. Send `curl -H "X-Real-IP: 203.0.113.9" -H "X-Forwarded-For: 203.0.113.9" https://splinance.com/api/health/live`: the log must still show your real IP. If it shows the forged one, fix that before relying on rate limits.
 3. **Cookies:** after login the refresh cookie is `Secure; HttpOnly; SameSite=Strict; Path=/api/auth`, without `Domain` (host-only), on both hosts.
 4. **Registration:** a non-allowlisted email gets "Sign-ups are invite-only for now".
 5. **Demo:** "Try the demo" works; `https://splinance.com/api/demo` is 404; the `api-demo` log shows the hourly cleanup.
 6. **Pre-deploy gate:** a deploy whose migration fails stops before going live (read one deploy log, or try it on a throwaway branch environment).
-7. **Restore drill:** restore yesterday's `postgres-demo` backup, check that the household is there, note how long it took, switch back.
+7. **Restore drill:** both databases from S3 with `restore.sh`, and the Railway path once (section 5); results into the drill log. Until it has passed, production holds no real data.
 8. **Networking:** `postgres` has no public URL; `railway connect postgres` works anyway (it tunnels over SSH).
 
 ## 5. Operating
@@ -174,7 +234,38 @@ Railway sets `PORT` for this service itself; Caddy listens on it.
   docker compose -f deploy/compose.smoke.yml down -v
   ```
 
-  It runs on the production roles from `deploy/db` (migrations as the owner, the API as the app role) on one Postgres server.
+  It runs on the production roles from `deploy/db` (migrations as the owner, the API as the app role) on one Postgres server. CI then also runs the backup job against both smoke databases (as the backup roles, files instead of S3, a throwaway age key) and restores them into a scratch server: every row count must match.
+
+- **Backups** (3.7): nightly at 02:17 UTC; `railway logs -s backup`. A failed, hung or missing run emails you from Healthchecks.io. A Postgres major upgrade on Railway needs the backup image's `postgres:` tag bumped first (pg_dump refuses a newer server).
+- **Restore drill:** before real data goes into production, then quarterly, after changes to `deploy/backup` or `deploy/db`, and after a Postgres upgrade. On your machine, with Docker (bash):
+
+  ```bash
+  aws login
+  eval "$(aws configure export-credentials --format env)"
+  docker compose -f deploy/backup/compose.drill.yml up -d --wait scratch
+  docker compose -f deploy/backup/compose.drill.yml run --rm restore restore.sh --db splinance
+  docker compose -f deploy/backup/compose.drill.yml run --rm restore restore.sh --db splinance_demo
+  docker compose -f deploy/backup/compose.drill.yml down -v
+  ```
+
+  The first `run` builds the image. `restore.sh` takes the newest daily backup (`--stamp <UTC stamp>` or `--tier monthly` for others), asks for the age identity (paste the `AGE-SECRET-KEY-1...` line; not echoed, kept in the container's tmpfs), checks the dump's sha256, sets up the scratch server with `deploy/db` (throwaway passwords), restores as the owner in one transaction, compares every row count with the manifest, checks that the app role can read but not change the schema, and prints the timings. The scratch server keeps nothing (tmpfs). It refuses a server that already has the database, so it cannot overwrite production. With real data in the backups, run it only on a machine you trust.
+
+- **Disaster restore (the Railway path):** a new `postgres` service as in 3.2 (prod.sql and backup.sql with the passwords from the password manager), then from your machine, with the identity in a temporary file you delete afterwards:
+
+  ```bash
+  aws s3 cp s3://splinance-backups-bener/splinance/daily/<stamp>.dump.age .
+  age -d -i <identity-file> <stamp>.dump.age | railway ssh -s postgres -- \
+    pg_restore -U splinance_owner -d splinance --no-owner --exit-on-error --single-transaction
+  ```
+
+  Then redeploy `api` (its pre-deploy migration finds nothing to do). Up to a day of data is lost (RPO 24 h). The pipe through `railway ssh` was drilled once on `postgres-demo` with a demo dump: `createdb -U postgres drill`, the same `age -d ... | railway ssh -s postgres-demo -- pg_restore -U postgres -d drill --no-owner --no-acl ...`, then `dropdb -U postgres drill`.
+
+- **Backup keys:** the AWS key rotates like Airflow's (3.7 step 3); a backup role password like the other roles (below). A new age key goes into `recipients.txt` through a pull request; keep the old private key until the last backup encrypted to it has expired (13 months).
+- **Restore drill log:**
+
+  | Date | Database | Backup | Encrypted size | Restore | Total | Result |
+  | ---- | -------- | ------ | -------------- | ------- | ----- | ------ |
+  | -    | -        | -      | -              | -       | -     | -      |
 
 - **Secrets:** rotating `JWT_ACCESS_SECRET` signs everyone out within 15 minutes (access tokens), refresh cookies keep working. Role passwords: `ALTER ROLE ... PASSWORD` over `railway ssh`, then the variable, then redeploy.
 - **Data track:** when the pipeline reads the deployed demo (D5 switch), enable the TCP proxy on `postgres-demo` only, connect as `splinance_demo_analytics` with `sslmode=verify-ca` and the server's certificate pinned (the image's certificate is self-signed); see [data-track.md](data-track.md).
