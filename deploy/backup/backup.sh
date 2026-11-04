@@ -33,10 +33,12 @@ die() {
 
 # Healthchecks.io: /start, then the exit code with the end of the log as the body. The log holds
 # names, sizes, timings and errors, never row data or connection strings. A failed ping never
-# fails the backup.
+# fails the backup. The body comes from a file, not a pipe: a pipe into a ping that is skipped
+# or fails early would kill the writer with SIGPIPE (exit 141) and hide the real exit code.
+# ping_hc <start|exit code> [body file]
 ping_hc() {
   [[ -n ${HC_PING_URL:-} ]] || return 0
-  curl -fsS -m 10 --retry 3 -o /dev/null --data-binary @- "$HC_PING_URL/$1" ||
+  curl -fsS -m 10 --retry 3 -o /dev/null --data-binary "@${2:-/dev/null}" "$HC_PING_URL/$1" ||
     log "warning: Healthchecks ping failed"
 }
 
@@ -44,16 +46,18 @@ ping_hc() {
 # Railway skip every later one) and reports the outcome, whatever it is.
 supervise() {
   [[ -n ${HC_PING_URL:-} ]] || log "warning: HC_PING_URL is not set, a failure will go unnoticed"
-  ping_hc start < /dev/null
+  ping_hc start
   local logfile code
   logfile=$(mktemp)
   set +e
   timeout -s TERM "${BACKUP_TIMEOUT:-900}" "$0" run 2>&1 | tee "$logfile"
   code=${PIPESTATUS[0]}
   set -e
-  ((code == 0)) || log "backup failed (exit $code)" | tee -a "$logfile"
-  tail -c 10000 "$logfile" | ping_hc "$code"
-  rm -f "$logfile"
+  ((code == 0)) || log "backup failed (exit $code)" >> "$logfile"
+  ((code == 0)) || tail -n 1 "$logfile"
+  tail -c 10000 "$logfile" > "$logfile.tail"
+  ping_hc "$code" "$logfile.tail"
+  rm -f "$logfile" "$logfile.tail"
   exit "$code"
 }
 
