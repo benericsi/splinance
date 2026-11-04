@@ -61,7 +61,8 @@ export function RouteDialog({ title, description, onClose, children }: RouteDial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete}>
-      <DialogContent className="sm:max-w-md">
+      {/* Taller than the window (a series with its payments): it scrolls instead of being cut off. */}
+      <DialogContent className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}

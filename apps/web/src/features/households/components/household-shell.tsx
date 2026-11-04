@@ -6,6 +6,7 @@ import {
   House,
   type LucideIcon,
   PiggyBank,
+  Repeat,
   Settings,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -21,9 +22,12 @@ interface NavItem {
     | '/h/$householdId'
     | '/h/$householdId/transactions'
     | '/h/$householdId/budgets'
+    | '/h/$householdId/recurring'
     | '/h/$householdId/reports'
     | '/h/$householdId/settings';
   label: string;
+  /** For the phone tab bar, where six columns leave about 60 px each at 360 px. */
+  shortLabel?: string;
   icon: LucideIcon;
   exact?: boolean;
   /** Modal routes over this section's page that keep the section highlighted. */
@@ -40,15 +44,21 @@ const NAV_ITEMS: NavItem[] = [
     exact: true,
     alsoActiveOn: '/h/$householdId/settle',
   },
-  { to: '/h/$householdId/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  {
+    to: '/h/$householdId/transactions',
+    label: 'Transactions',
+    shortLabel: 'Activity',
+    icon: ArrowLeftRight,
+  },
   { to: '/h/$householdId/budgets', label: 'Budgets', icon: PiggyBank },
+  { to: '/h/$householdId/recurring', label: 'Recurring', icon: Repeat },
   { to: '/h/$householdId/reports', label: 'Reports', icon: ChartColumn },
   { to: '/h/$householdId/settings', label: 'Settings', icon: Settings },
 ];
 
 function NavLinks({ householdId, variant }: { householdId: string; variant: 'sidebar' | 'tabs' }) {
   const matchRoute = useMatchRoute();
-  return NAV_ITEMS.map(({ to, label, icon: Icon, exact, alsoActiveOn }) => (
+  return NAV_ITEMS.map(({ to, label, shortLabel, icon: Icon, exact, alsoActiveOn }) => (
     <Link
       key={to}
       to={to}
@@ -68,7 +78,7 @@ function NavLinks({ householdId, variant }: { householdId: string; variant: 'sid
       )}
     >
       <Icon className="size-4" aria-hidden />
-      {label}
+      {variant === 'tabs' ? (shortLabel ?? label) : label}
     </Link>
   ));
 }

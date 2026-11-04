@@ -669,10 +669,20 @@ invitee: opens /invite#<token>
 
 ### Budgets
 
-- A section of its own (sidebar and phone tabs: Overview, Transactions, Budgets, Settings) with the month in `?month=` like transactions; the switcher is the shared `MonthNav`.
+- A section of its own with the month in `?month=` like transactions; the switcher is the shared `MonthNav`.
 - Totals (budgeted, spent, left or over) and one row per budget, sorted by category name, with a bar: neutral below 80%, mustard from 80% (`BUDGET_WARNING_RATIO`), red when over; the line under it says the same in words ("3000 Ft left · 90%", "Over by 4000 Ft"), so the bar is decorative. Only shared expenses count.
 - The dialog (`/budgets/set`, with `?category=` when opened from a row) sets the amount from the month on screen; picking a category that has a budget prefills it. "Remove budget" sends a null amount from that month.
 - The overview shows `BudgetAlertsCard`: only this month's budgets at 80% or more, most used first, hidden when there are none.
+
+### Recurring payments
+
+- A section of its own between Budgets and Reports (`/h/:id/recurring`, lucide `Repeat`). Six phone tabs leave about 60 px each at 360 px, so Transactions shows as "Activity" there (`shortLabel` in `NAV_ITEMS`; the sidebar keeps the full name).
+- The page: the monthly total (`MoneyFlow`, household or your share; series gone quiet do not count), the viewer's series soonest first with "due in 3 days" or "No payment since 3 Jul. Cancelled?" last, a price change chip ("+11%", red up, green down), then Suggestions (Confirm, Not recurring with an undo toast that deletes the dismissal again) and Hidden ("Show again"). Due dates and states come from the browser's date through the shared helpers (`features/recurring/view.ts`); the API is time zone free.
+- "+ Add" (`/recurring/new`) and a row (`/recurring/$seriesId`) open `SeriesDialog`: name, amount, next or last payment, how often, category, who sees it (adding only), the text to match, "amount varies" and "remind me". The text follows the name (`suggestRecurringPattern`) until edited; `MatchPreview` under it asks `POST /recurring/preview` once typing settles (400 ms, settled as a string so the timer does not restart every render) and shows "Matches 6 past payments". A series shows its latest payments and "Stop tracking" (a `ConfirmDialog`).
+- "Make recurring" in an expense's dialog opens `/recurring/new?from=<transactionId>`, prefilled from it (the counterparty's `recurringKey` as the text, its visibility as the scope).
+- The import review labels rows that will count for a series ("Recurring: Spotify Duo", `seriesForRow`, shared series first like the API).
+- The overview's `UpcomingCard` lists series due within a week (or a few days late) and links "3 possible recurring payments found. Review"; hidden when neither.
+- Transaction and import writes invalidate the recurring queries (a new payment moves a due date). `RouteDialog` caps its height and scrolls, for dialogs taller than the window.
 
 ### Reports
 

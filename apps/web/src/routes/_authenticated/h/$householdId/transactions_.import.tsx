@@ -10,6 +10,7 @@ import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
 import { ImportPage } from '@/features/imports/components/import-page';
 import { importQueries } from '@/features/imports/queries';
+import { recurringQueries } from '@/features/recurring/queries';
 import { ruleQueries } from '@/features/rules/queries';
 import { useAuth } from '@/lib/auth-store';
 
@@ -23,6 +24,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/transaction
       queryClient.query(categoryQueries.list(householdId)),
       queryClient.query(importQueries.list(householdId)),
       queryClient.query(ruleQueries.list(householdId)),
+      queryClient.query(recurringQueries.list(householdId)),
     ]);
   },
   component: ImportRoute,
@@ -35,6 +37,7 @@ function ImportRoute() {
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
   const { data: rules } = useSuspenseQuery(ruleQueries.list(householdId));
+  const { data: recurring } = useSuspenseQuery(recurringQueries.list(householdId));
 
   return (
     <RevealPage>
@@ -53,6 +56,7 @@ function ImportRoute() {
           household={household}
           categories={categories}
           rules={rules}
+          series={recurring.series}
           viewerId={user?.id ?? ''}
         />
       </Reveal>

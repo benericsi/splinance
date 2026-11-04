@@ -2,8 +2,9 @@ import {
   type Category,
   type HouseholdDetail,
   type ImportResponse,
-  type Rule,
   parseStatement,
+  type RecurringSeries,
+  type Rule,
   STATEMENT_SOURCE_LABELS,
   StatementError,
   type StatementSource,
@@ -29,6 +30,7 @@ import { ImportHistory } from './import-history';
 import { ReviewList } from './review-list';
 import { RuleSuggestions } from './rule-suggestions';
 import { SampleExportButton } from '@/features/demo/components/sample-export-button';
+import { seriesForRow } from '@/features/recurring/match';
 
 interface Review {
   fileName: string;
@@ -58,11 +60,14 @@ export function ImportPage({
   household,
   categories,
   rules,
+  series,
   viewerId,
 }: {
   household: HouseholdDetail;
   categories: Category[];
   rules: Rule[];
+  /** The viewer's recurring payments: rows that will count for one say so. */
+  series: RecurringSeries[];
   viewerId: string;
 }) {
   // Rules whose category was archived since stay listed in settings but do nothing.
@@ -296,6 +301,20 @@ export function ImportPage({
           <ReviewList
             rows={review.rows}
             categories={categories}
+            seriesOf={(item) =>
+              seriesForRow(
+                series,
+                {
+                  kind: item.row.kind,
+                  visibility: item.visibility,
+                  amount: item.row.amount,
+                  occurredOn: item.row.occurredOn,
+                  counterparty: item.row.counterparty,
+                  description: item.description,
+                },
+                viewerId,
+              )
+            }
             onChange={(key, patch) => {
               setRows((rows) => rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
             }}

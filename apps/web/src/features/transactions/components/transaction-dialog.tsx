@@ -1,7 +1,8 @@
 import type { Category, HouseholdDetail, SplitMethod, Transaction } from '@splinance/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
-import { Lock, Trash2 } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { Lock, Repeat, Trash2 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ import { useAuth } from '@/lib/auth-store';
 import { ApiError } from '@/lib/http';
 import { COLLAPSE, TRANSITION_FAST } from '@/lib/motion';
 import { errorMessage } from '@/lib/query-client';
+import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
 import {
   editTransactionValues,
@@ -298,6 +300,19 @@ export function TransactionDialog({
             </form.Subscribe>
           )}
         </form.Field>
+
+        {base?.kind === 'expense' && (
+          <Link
+            to="/h/$householdId/recurring/new"
+            params={{ householdId: household.id }}
+            search={{ from: base.id }}
+            state={OPEN_MODAL_STATE}
+            className="text-link inline-flex items-center gap-1.5 text-sm hover:underline"
+          >
+            <Repeat className="size-3.5" aria-hidden />
+            Make recurring
+          </Link>
+        )}
 
         <div
           className={cn('flex items-center gap-2 pt-2', base ? 'justify-between' : 'justify-end')}

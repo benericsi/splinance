@@ -36,7 +36,8 @@ interface TextFieldProps {
   hideErrors?: boolean;
   /** Extra content under the input, linked via aria-describedby. */
   description?: ReactNode;
-  onValueChange?: () => void;
+  /** After each change, with the new value (the field's state may not have it yet). */
+  onValueChange?: (value: string) => void;
 }
 
 export function TextField({
@@ -83,7 +84,7 @@ export function TextField({
     onBlur: field.handleBlur,
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       field.handleChange(e.target.value);
-      onValueChange?.();
+      onValueChange?.(e.target.value);
     },
     'aria-required': required || undefined,
     'aria-invalid': invalid,
