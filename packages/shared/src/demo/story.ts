@@ -125,6 +125,8 @@ export interface DemoStory {
 }
 
 const RENT = 320_000;
+const NETFLIX_OLD_PRICE = 4_490;
+const NETFLIX_NEW_PRICE = 4_990;
 /** The visitor's part of the rent, in basis points. */
 const RENT_SHARE_YOU = 6_000;
 const EATING_OUT_BUDGET = 40_000;
@@ -386,7 +388,8 @@ function addMonth(
       {
         person: 'you',
         kind: 'expense',
-        amount: 4_490,
+        // The price went up three months ago: the recurring page shows the change.
+        amount: monthsAgo <= 2 ? NETFLIX_NEW_PRICE : NETFLIX_OLD_PRICE,
         occurredOn: date(7),
         description: 'Netflix',
         category: 'Entertainment',
@@ -463,6 +466,38 @@ function addMonth(
         share: EQUAL,
       },
       { move: 'card', party: 'Telekom' },
+    );
+  }
+
+  // The visitor's phone plan: private, so only they see it as a recurring payment. Due late
+  // in the month, so something is always coming up within a week.
+  if (happened(24)) {
+    b.add(
+      {
+        person: 'you',
+        kind: 'expense',
+        amount: 6_990,
+        occurredOn: date(24),
+        description: 'Phone plan',
+        category: 'Utilities',
+        share: PRIVATE,
+      },
+      { move: 'card', party: 'Yettel' },
+    );
+  }
+  // A shared gym membership they stopped four months ago: a recurring payment gone quiet.
+  if (monthsAgo >= 4 && happened(3)) {
+    b.add(
+      {
+        person: 'partner',
+        kind: 'expense',
+        amount: 14_900,
+        occurredOn: date(3),
+        description: 'Gym membership',
+        category: 'Health',
+        share: EQUAL,
+      },
+      { move: 'card', party: 'FITNESS PARK KFT' },
     );
   }
 

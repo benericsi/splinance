@@ -13,6 +13,7 @@ export * from './invites';
 export * from './money';
 export * from './oauth';
 export * from './password/rules';
+export * from './recurring';
 export * from './reports';
 export * from './rules';
 export * from './splits';

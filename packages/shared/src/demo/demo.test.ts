@@ -1,10 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CATEGORIES } from '../categories';
 import { EXCLUDED_BY_DEFAULT, parseStatement, type StatementFlag } from '../imports';
+import {
+  assignPayments,
+  detectRecurring,
+  nextDueOn,
+  type RecurringRow,
+  seriesTiming,
+} from '../recurring';
 import { PERCENT_SCALE } from '../splits';
 import { demoParseOptions, renderDemoBankFiles } from './bank-files';
 import { createRandom } from './random';
-import { buildDemoStory, DEMO_MONTHS, demoBalance, demoShares, type DemoStory } from './story';
+import {
+  buildDemoStory,
+  DEMO_MONTHS,
+  demoBalance,
+  type DemoPerson,
+  demoShares,
+  type DemoStory,
+} from './story';
 
 const TODAY = '2026-10-28';
 const story = buildDemoStory({ seed: 1, today: TODAY });
@@ -188,5 +202,78 @@ describe('renderDemoBankFiles', () => {
     // The 1 October BKK pass is booked on the 1st (today), not the 2nd.
     expect(lastFile).toContain('2026.10.01\t');
     expect(lastFile).not.toContain('2026.10.02');
+  });
+});
+
+describe('the story as recurring payments', () => {
+  /** What a person sees of the story, as the app would hold it after the imports. */
+  function seenBy(s: DemoStory, viewer: DemoPerson): RecurringRow[] {
+    const party = new Map(
+      s.bankRows.flatMap((r) =>
+        r.ref && 'transaction' in r.ref ? [[r.ref.transaction, r.party]] : [],
+      ),
+    );
+    return s.transactions
+      .filter((t) => t.share.visibility === 'shared' || t.person === viewer)
+      .map((t) => ({
+        id: t.id,
+        kind: t.kind,
+        visibility: t.share.visibility,
+        createdBy: t.person,
+        amount: t.amount,
+        occurredOn: t.occurredOn,
+        counterparty: party.get(t.id) ?? null,
+        description: t.description,
+        categoryId: null,
+      }));
+  }
+
+  const SHARED = ['kovacs ingatlan kft.', 'netflix', 'spotify', 'telekom'];
+  /** The gas and electricity bill swings with the seasons: found in some years, not others. */
+  const SOMETIMES = 'mvm next energiakereskedelmi zrt.';
+
+  it.each([
+    [1, '2026-10-28'],
+    [7, '2026-03-01'],
+    [42, '2028-02-29'],
+    [99, '2026-12-31'],
+  ])('finds the subscriptions and bills for seed %i on %s', (seed, today) => {
+    const s = buildDemoStory({ seed, today });
+    const keys = (viewer: DemoPerson) =>
+      detectRecurring(seenBy(s, viewer), { today })
+        .map((found) => `${found.scope}:${found.key}`)
+        .filter((key) => key !== `shared:${SOMETIMES}`)
+        .sort();
+    const shared = SHARED.map((key) => `shared:${key}`);
+    // Private ones only for their owner: the visitor's phone plan and pass, the partner's
+    // pass and bank fee. The gym stopped, so it is no suggestion for anyone.
+    expect(keys('you')).toEqual([...shared, 'private:bkk automata', 'private:yettel'].sort());
+    expect(keys('partner')).toEqual(
+      [...shared, 'private:account fee', 'private:bkk online'].sort(),
+    );
+  });
+
+  it('shows the Netflix price rise and the gym going quiet', () => {
+    const today = '2026-11-04';
+    const s = buildDemoStory({ seed: 1, today });
+    const rows = seenBy(s, 'you');
+    const netflix = detectRecurring(rows, { today }).find((found) => found.key === 'netflix');
+    expect(netflix).toMatchObject({ amount: 4_990, previousAmount: 4_990, amountVaries: true });
+
+    const gym = {
+      id: 'gym',
+      kind: 'expense' as const,
+      ownerId: null,
+      pattern: 'fitness park',
+      amount: 14_900,
+      amountVaries: false,
+      startsOn: null,
+    };
+    const payments = assignPayments([gym], rows).payments.get('gym') ?? [];
+    expect(payments).toHaveLength(8);
+    const lastPaidOn = payments[0]?.occurredOn ?? null;
+    expect(lastPaidOn).toBe('2026-07-03');
+    const next = nextDueOn({ anchorOn: '2025-12-03', cadence: 'monthly' }, lastPaidOn, today);
+    expect(seriesTiming(next, 'monthly', today).timing).toBe('lapsed');
   });
 });
