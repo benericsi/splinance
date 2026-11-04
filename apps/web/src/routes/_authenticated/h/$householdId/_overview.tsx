@@ -14,6 +14,8 @@ import { BudgetAlertsCard } from '@/features/budgets/components/budget-alerts-ca
 import { budgetQueries } from '@/features/budgets/queries';
 import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
+import { UpcomingCard } from '@/features/recurring/components/upcoming-card';
+import { recurringQueries } from '@/features/recurring/queries';
 import { currentMonth } from '@/features/transactions/dates';
 import { useAuth } from '@/lib/auth-store';
 
@@ -28,6 +30,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/_overview')
       queryClient.infiniteQuery(balanceQueries.settlements(householdId)),
       queryClient.query(budgetQueries.month(householdId, currentMonth())),
       queryClient.query(categoryQueries.list(householdId)),
+      queryClient.query(recurringQueries.list(householdId)),
     ]);
   },
   component: OverviewPage,
@@ -46,6 +49,7 @@ function OverviewPage() {
   const { data: balances } = useSuspenseQuery(balanceQueries.debts(householdId));
   const { data: budgets } = useSuspenseQuery(budgetQueries.month(householdId, currentMonth()));
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
+  const { data: recurring } = useSuspenseQuery(recurringQueries.list(householdId));
   const { user } = useAuth();
   const viewerId = user?.id ?? '';
 
@@ -61,9 +65,16 @@ function OverviewPage() {
           <BudgetAlertsCard householdId={householdId} data={budgets} categories={categories} />
         </Reveal>
         <Reveal index={2}>
-          <SettlementList household={household} viewerId={viewerId} />
+          <UpcomingCard
+            householdId={householdId}
+            data={recurring}
+            memberCount={household.members.length}
+          />
         </Reveal>
         <Reveal index={3}>
+          <SettlementList household={household} viewerId={viewerId} />
+        </Reveal>
+        <Reveal index={4}>
           <Card>
             <CardHeader>
               <CardTitle>Members</CardTitle>

@@ -1,12 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { balanceQueries } from '@/features/balances/queries';
 import { budgetQueries } from '@/features/budgets/queries';
+import { recurringQueries } from '@/features/recurring/queries';
 import { reportQueries } from '@/features/reports/queries';
 import { transactionQueries } from '@/features/transactions/queries';
 import { importsApi } from './api';
 import { importQueries } from './queries';
 
-/** An import or its undo changes transactions, balances and the import history. */
+/** An import or its undo changes transactions, balances, recurring payments and the import history. */
 function useInvalidateAfterImport() {
   const queryClient = useQueryClient();
   return (_data: unknown, { householdId }: { householdId: string }) =>
@@ -16,6 +17,7 @@ function useInvalidateAfterImport() {
       queryClient.invalidateQueries({ queryKey: budgetQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: reportQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: importQueries.household(householdId) }),
+      queryClient.invalidateQueries({ queryKey: recurringQueries.household(householdId) }),
     ]);
 }
 

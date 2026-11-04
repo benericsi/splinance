@@ -14,7 +14,8 @@ export const server = setupServer(
   http.get('/api/households/:id/categories', () => HttpResponse.json({ categories: [] })),
   // Settings and the import page list the household's rules.
   http.get('/api/households/:id/rules', () => HttpResponse.json({ rules: [] })),
-  // The overview, where most household tests land, shows balances, budgets and settlements.
+  // The overview, where most household tests land, shows balances, budgets, recurring
+  // payments and settlements; the import page also reads recurring payments.
   http.get('/api/households/:id/balances', () =>
     HttpResponse.json({ balances: { currency: 'HUF', debts: [] } }),
   ),
@@ -25,6 +26,11 @@ export const server = setupServer(
         currency: 'HUF',
         budgets: [],
       },
+    }),
+  ),
+  http.get('/api/households/:id/recurring', () =>
+    HttpResponse.json({
+      recurring: { currency: 'HUF', series: [], suggestions: [], dismissed: [] },
     }),
   ),
   http.get('/api/households/:id/settlements', () =>

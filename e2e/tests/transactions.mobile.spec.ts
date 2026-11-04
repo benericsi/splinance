@@ -15,7 +15,7 @@ test('transactions are added from a drawer on a phone', async ({ page }) => {
 
   await page
     .getByRole('navigation', { name: 'Household sections' })
-    .getByRole('link', { name: 'Transactions' })
+    .getByRole('link', { name: 'Activity' })
     .click();
   await expect(page.getByRole('heading', { name: 'Add your first transaction' })).toBeVisible();
 

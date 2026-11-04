@@ -2,10 +2,11 @@ import {
   type Category,
   CURRENCIES,
   type Currency,
+  type RecurringSeries,
   type StatementRow,
   type TransactionVisibility,
 } from '@splinance/shared';
-import { ChevronDown, Lock, Tags, Users, WandSparkles } from 'lucide-react';
+import { ChevronDown, Lock, Repeat, Tags, Users, WandSparkles } from 'lucide-react';
 import { useState } from 'react';
 import { Collapse } from '@/components/collapse';
 import { SegmentedControl } from '@/components/segmented-control';
@@ -52,6 +53,8 @@ const shortDate = (value: string) =>
 interface ListProps {
   rows: ReviewRow[];
   categories: Category[];
+  /** The recurring payment a picked row will count for, if any. */
+  seriesOf: (review: ReviewRow) => RecurringSeries | undefined;
   onChange: (key: string, patch: Partial<ReviewRow>) => void;
   onBulk: (
     patch: Partial<Pick<ReviewRow, 'categoryId' | 'visibility'>>,
@@ -64,7 +67,7 @@ interface ListProps {
  * row says why), "Ready to import" (picked, with bulk actions) and what cannot be imported,
  * folded away.
  */
-export function ReviewList({ rows, categories, onChange, onBulk }: ListProps) {
+export function ReviewList({ rows, categories, seriesOf, onChange, onBulk }: ListProps) {
   const inGroup = (group: ReviewGroup) => rows.filter((review) => review.group === group);
   const needsLook = inGroup('needs-look');
   const ready = inGroup('ready');
@@ -74,7 +77,7 @@ export function ReviewList({ rows, categories, onChange, onBulk }: ListProps) {
     <div className="space-y-6">
       {needsLook.length > 0 && (
         <Section title="Needs a look" count={needsLook.length}>
-          <Rows rows={needsLook} categories={categories} onChange={onChange} />
+          <Rows rows={needsLook} categories={categories} seriesOf={seriesOf} onChange={onChange} />
         </Section>
       )}
       {ready.length > 0 && (
@@ -83,7 +86,7 @@ export function ReviewList({ rows, categories, onChange, onBulk }: ListProps) {
           count={ready.length}
           actions={<BulkActions categories={categories} onBulk={onBulk} />}
         >
-          <Rows rows={ready} categories={categories} onChange={onChange} />
+          <Rows rows={ready} categories={categories} seriesOf={seriesOf} onChange={onChange} />
         </Section>
       )}
       {leftOut.length > 0 && <LeftOut rows={leftOut} />}
@@ -118,16 +121,24 @@ function Section({
 function Rows({
   rows,
   categories,
+  seriesOf,
   onChange,
 }: {
   rows: ReviewRow[];
   categories: Category[];
+  seriesOf: ListProps['seriesOf'];
   onChange: ListProps['onChange'];
 }) {
   return (
     <ul>
       {rows.map((review) => (
-        <ReviewItem key={review.key} review={review} categories={categories} onChange={onChange} />
+        <ReviewItem
+          key={review.key}
+          review={review}
+          categories={categories}
+          series={review.included ? seriesOf(review) : undefined}
+          onChange={onChange}
+        />
       ))}
     </ul>
   );
@@ -136,10 +147,12 @@ function Rows({
 function ReviewItem({
   review,
   categories,
+  series,
   onChange,
 }: {
   review: ReviewRow;
   categories: Category[];
+  series: RecurringSeries | undefined;
   onChange: ListProps['onChange'];
 }) {
   const { row } = review;
@@ -180,6 +193,12 @@ function ReviewItem({
           <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
             <WandSparkles className="size-3" aria-hidden />
             By rule "{review.rule.pattern}"
+          </p>
+        )}
+        {series && (
+          <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
+            <Repeat className="size-3" aria-hidden />
+            Recurring: {series.name}
           </p>
         )}
       </div>
