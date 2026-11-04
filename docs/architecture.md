@@ -34,9 +34,9 @@ apps/api          Express 5 REST API (Node 26, TypeScript, Drizzle, Postgres)
 apps/web          React 19 SPA (Vite 8, TanStack Router/Query/Form, shadcn/ui on Base UI, Tailwind v4)
 packages/shared   Zod schemas, password rules, brand palette: the contract between api and web
 e2e               Playwright end-to-end suite against the production builds (and the smoke suite against the images)
-deploy/           Web image (Caddy + both builds, Caddyfile), smoke stack, CSP check: see section 13
+deploy/           Web image (Caddy + both builds, Caddyfile), database roles (db/), backup job and restore drill (backup/), smoke stack, CSP check: see section 13 and deploy.md
 data/             Python data track (uv project, not a pnpm package): see data-track.md
-infra/            Terraform for AWS (state bucket, data lake, IAM, budgets): see data-track.md
+infra/            Terraform for AWS (state bucket, data lake, backups bucket, IAM, budgets): see data-track.md
 docs/             data-model.md, data-track.md, deploy.md (Railway setup and operations), architecture.md (this file)
 docker/           Postgres init scripts (test and demo databases, the data track's login)
 ```
@@ -67,6 +67,7 @@ Key files by concern:
 | URL-driven modals             | `apps/web/src/components/route-dialog.tsx`, `apps/web/src/lib/route-modal.ts`                                            |
 | Theme                         | `apps/web/src/lib/theme.ts` + inline script in `apps/web/index.html`                                                     |
 | Images, web server            | `apps/api/Dockerfile`, `deploy/web/Dockerfile`, `deploy/web/Caddyfile`, `.dockerignore`, `deploy/compose.smoke.yml`      |
+| Database roles, backups       | `deploy/db/*.sql`, `deploy/backup/*` (backup.sh, restore.sh, recipients.txt, compose.drill.yml), `infra/main/backups.tf` |
 | Brand                         | `packages/shared/src/brand.ts`, `apps/web/src/components/brand/*`, `apps/web/src/index.css`                              |
 
 `packages/shared` has no build step: its `package.json` exports `src/index.ts` directly. Every consumer compiles it (Vite in web, tsx in api dev, Vitest in tests) and tsdown inlines it into the production API bundle (`deps.alwaysBundle`).
