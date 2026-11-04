@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "start": "node src/bin.ts",
     "typecheck": "tsc",
     "test": "vitest run"
   },

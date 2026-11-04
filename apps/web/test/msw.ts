@@ -8,6 +8,8 @@ import { setupServer } from 'msw/node';
  * explicitly, or the request fails the test.
  */
 export const server = setupServer(
+  // /login and /register list the sign-in providers; none unless a test adds them.
+  http.get('/api/auth/providers', () => HttpResponse.json({ providers: [] })),
   // The settings page lists the household's categories.
   http.get('/api/households/:id/categories', () => HttpResponse.json({ categories: [] })),
   // Settings and the import page list the household's rules.

@@ -1,7 +1,10 @@
 import type { AuthResponse } from '@splinance/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { authStore } from '@/lib/auth-store';
 import { authApi } from './api';
+import { PROVIDER_VIEWS } from './providers';
+import { authQueries } from './queries';
 
 function startSession({ accessToken, user }: AuthResponse) {
   authStore.setSession(accessToken, user);
@@ -9,9 +12,18 @@ function startSession({ accessToken, user }: AuthResponse) {
 
 // Forms render these errors next to the fields, so the global toast stays quiet.
 export function useLogin() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: authApi.login,
-    onSuccess: startSession,
+    onSuccess: (response) => {
+      startSession(response);
+      if (response.linkedProvider) {
+        // The waiting link is used up (the API cleared its cookie).
+        queryClient.removeQueries({ queryKey: authQueries.pendingLink().queryKey });
+        const name = PROVIDER_VIEWS[response.linkedProvider]?.name ?? response.linkedProvider;
+        toast.success(`${name} is now connected. Next time, continue with ${name}.`);
+      }
+    },
     meta: { suppressErrorToast: true },
   });
 }

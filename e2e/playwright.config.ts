@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
-import { API_PORT, E2E_DATABASE_URL, WEB_PORT } from './support/env';
+import {
+  API_PORT,
+  E2E_DATABASE_URL,
+  FAKE_OIDC_CLIENT,
+  FAKE_OIDC_ISSUER,
+  FAKE_OIDC_PORT,
+  WEB_PORT,
+} from './support/env';
 
 const CI = Boolean(process.env.CI);
 
@@ -44,6 +51,18 @@ export default defineConfig({
   // /api/health/live does not touch the database.
   webServer: [
     {
+      // "Continue with Google" signs in at this fake provider (its "Sign in as" form).
+      command: 'pnpm --filter @splinance/fake-oidc start',
+      url: `${FAKE_OIDC_ISSUER}/.well-known/openid-configuration`,
+      env: {
+        PORT: String(FAKE_OIDC_PORT),
+        FAKE_OIDC_CLIENT_ID: FAKE_OIDC_CLIENT.id,
+        FAKE_OIDC_CLIENT_SECRET: FAKE_OIDC_CLIENT.secret,
+        FAKE_OIDC_ISSUER_HOST: '127.0.0.1',
+      },
+      reuseExistingServer: false,
+    },
+    {
       command: 'node dist/index.mjs',
       cwd: '../apps/api',
       url: `http://localhost:${String(API_PORT)}/api/health/live`,
@@ -55,6 +74,10 @@ export default defineConfig({
         JWT_ACCESS_SECRET: 'e2e-secret-that-is-at-least-32-characters',
         COOKIE_SECURE: 'false',
         RATE_LIMIT_DISABLED: 'true',
+        APP_ORIGIN: `http://localhost:${String(WEB_PORT)}`,
+        OAUTH_GOOGLE_CLIENT_ID: FAKE_OIDC_CLIENT.id,
+        OAUTH_GOOGLE_CLIENT_SECRET: FAKE_OIDC_CLIENT.secret,
+        OAUTH_GOOGLE_ISSUER: FAKE_OIDC_ISSUER,
       },
       reuseExistingServer: false,
       stdout: 'ignore',
