@@ -31,6 +31,11 @@ export interface FakeOidcOptions {
   clientSecret: string;
   /** 0 (default) picks a free port. */
   port?: number;
+  /**
+   * Host name in the issuer URL (default localhost). e2e uses 127.0.0.1, another site than
+   * the app on localhost, so the browser treats the round trip as cross-site like Google.
+   */
+  issuerHost?: string;
 }
 
 export interface FakeOidc {
@@ -235,7 +240,7 @@ export async function startFakeOidc(options: FakeOidcOptions): Promise<FakeOidc>
     server.listen(options.port ?? 0, '127.0.0.1', resolve);
   });
   const { port } = server.address() as AddressInfo;
-  issuer = `http://localhost:${String(port)}`;
+  issuer = `http://${options.issuerHost ?? 'localhost'}:${String(port)}`;
 
   return {
     issuer,

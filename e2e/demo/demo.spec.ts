@@ -71,6 +71,14 @@ test('the demo site has no login or registration', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Try the demo' })).toBeVisible();
 });
 
+test('the demo offers no provider sign-in', async ({ request }) => {
+  const providers = await request.get('/api/auth/providers');
+  expect(await providers.json()).toEqual({ providers: [] });
+  expect((await request.get('/api/auth/oauth/google/start', { maxRedirects: 0 })).status()).toBe(
+    404,
+  );
+});
+
 test('a sample export goes through the import', async ({ page }) => {
   const householdId = await tryDemo(page);
   await page.goto(`/h/${householdId}/transactions/import`);

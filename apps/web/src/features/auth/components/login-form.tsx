@@ -6,11 +6,23 @@ import { Button } from '@/components/ui/button';
 import { errorMessage } from '@/lib/query-client';
 import { useLogin } from '../hooks';
 
-export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
+interface LoginFormProps {
+  onSuccess: () => void;
+  /**
+   * A provider account waits to be connected to the account with this email
+   * (/login?oauth=link): the email is prefilled and the password field focused.
+   */
+  linkEmail?: string | undefined;
+  /** Under the password: a pointer for people who signed up with a provider. */
+  passwordHint?: string | undefined;
+}
+
+export function LoginForm({ onSuccess, linkEmail, passwordHint }: LoginFormProps) {
   const login = useLogin();
+  const linking = linkEmail !== undefined;
 
   const form = useForm({
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: linkEmail ?? '', password: '' },
     // Validate on submit first, then live while the user fixes errors.
     validationLogic: revalidateLogic(),
     validators: { onDynamic: loginInputSchema },
@@ -41,7 +53,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
             field={field}
             required
             label="Email"
-            autoFocus
+            autoFocus={!linking}
             type="email"
             placeholder="you@example.com"
             autoComplete="email"
@@ -56,9 +68,15 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
             field={field}
             required
             label="Password"
+            autoFocus={linking}
             type="password"
             placeholder="Enter your password"
             autoComplete="current-password"
+            description={
+              passwordHint ? (
+                <p className="text-muted-foreground text-xs">{passwordHint}</p>
+              ) : undefined
+            }
             onValueChange={login.reset}
           />
         )}
@@ -67,7 +85,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (
           <Button type="submit" size="lg" className="h-10 w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Logging in…' : 'Log in'}
+            {isSubmitting ? 'Logging in…' : linking ? 'Log in and connect' : 'Log in'}
           </Button>
         )}
       </form.Subscribe>

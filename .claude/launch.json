@@ -8,6 +8,30 @@
       "port": 3000
     },
     {
+      "name": "fake-oidc",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@splinance/fake-oidc", "start"],
+      "port": 3301,
+      "env": {
+        "PORT": "3301",
+        "FAKE_OIDC_CLIENT_ID": "dev-client",
+        "FAKE_OIDC_CLIENT_SECRET": "dev-secret",
+        "FAKE_OIDC_ISSUER_HOST": "127.0.0.1"
+      }
+    },
+    {
+      "name": "api-fake-google",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@splinance/api", "dev"],
+      "port": 3000,
+      "env": {
+        "APP_ORIGIN": "http://localhost:5173",
+        "OAUTH_GOOGLE_CLIENT_ID": "dev-client",
+        "OAUTH_GOOGLE_CLIENT_SECRET": "dev-secret",
+        "OAUTH_GOOGLE_ISSUER": "http://127.0.0.1:3301"
+      }
+    },
+    {
       "name": "web",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@splinance/web", "dev"],
