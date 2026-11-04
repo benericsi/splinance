@@ -516,6 +516,8 @@ _authenticated.tsx         pathless layout: if not authenticated -> redirect /lo
     _authenticated/h/$householdId/reports.tsx        /h/:id/reports?to=&month=&view=  trend and spending by category
     _authenticated/h/$householdId/transactions_.import.tsx  /h/:id/transactions/import  import page (own page, not nested)
 invite.tsx                 /invite#<token>  public invite landing page (logged in or out)
+privacy.tsx                /privacy  public privacy notice (GDPR Art. 13: controller, data / purpose / legal basis / retention,
+                           Google sign-in, processors, cookies, rights); linked from the auth screens; not on the demo site
 ```
 
 - Household shell (`HouseholdShell`): on desktop a sidebar with the logo, the household switcher and the section links; the account menu sits top right, level with the page heading (`PageHeader` leaves room for it). On phones a top bar holds the switcher and account menu, and the sections become a bottom tab bar. New sections are added to `NAV_ITEMS`.
@@ -809,6 +811,7 @@ Things that took real debugging or are easy to break. Read these before changing
 - Rate limits are per IP and in memory: they reset on restart and are not shared between instances (Redis is planned for Phase 6). The IP is `req.ip`, which follows `X-Forwarded-For` only through the `TRUST_PROXY` hops; set it to the number of proxies really in front of the API (1 behind Caddy), never more, or clients could pick their own IP.
 - Registration reveals whether an email exists (409). Avoiding this needs email verification, which is out of scope for now.
 - No email verification, password reset, account deletion or session list yet.
+- Railway's edge keeps its own HTTP logs (client IP, full path and query), before our redaction: a provider callback's code lands there. It is single use, already spent by then, and useless without the PKCE verifier and the client secret.
 - Provider sign-in: no settings page yet (connect, disconnect, set a password), one identity per provider and user. An account that signs in only with Google cannot recover on its own if that Google account is lost (an owner fixes it in the database).
 - Invite links are not bound to an email: whoever holds a valid link can join. Owners can list and revoke pending links; links expire after 7 days.
 - A removed member can rejoin through any other valid invite link they see; there is no ban list.

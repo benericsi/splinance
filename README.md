@@ -8,7 +8,7 @@
 
 Household expense tracker for personal spending and shared expenses with a partner, roommates or family.
 
-Live at [splinance.com](https://splinance.com) (registration by invitation) and as a public demo with seeded data at [demo.splinance.com](https://demo.splinance.com).
+Live at [splinance.com](https://splinance.com) (registration by invitation, with a password or Google; [privacy](https://splinance.com/privacy)) and as a public demo with seeded data at [demo.splinance.com](https://demo.splinance.com).
 
 ## Documentation
 

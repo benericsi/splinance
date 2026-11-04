@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as InviteRouteImport } from './routes/invite'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthenticatedHHouseholdIdRouteImport } from './routes/_authenticated/h/$householdId'
@@ -54,6 +55,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const InviteRoute = InviteRouteImport.update({
   id: '/invite',
   path: '/invite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
@@ -201,6 +207,7 @@ const AuthenticatedHHouseholdIdSettingsRulesNewRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/invite': typeof InviteRoute
+  '/privacy': typeof PrivacyRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
   '/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
@@ -228,6 +235,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/invite': typeof InviteRoute
+  '/privacy': typeof PrivacyRoute
   '/login': typeof AuthLoginRoute
   '/register': typeof AuthRegisterRoute
   '/h/$householdId': typeof AuthenticatedHHouseholdIdOverviewIndexRoute
@@ -257,6 +265,7 @@ export interface FileRoutesById {
   '/_auth': typeof AuthRouteWithChildren
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/invite': typeof InviteRoute
+  '/privacy': typeof PrivacyRoute
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/register': typeof AuthRegisterRoute
   '/_authenticated/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
@@ -287,6 +296,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/invite'
+    | '/privacy'
     | '/login'
     | '/register'
     | '/h/$householdId'
@@ -314,6 +324,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/invite'
+    | '/privacy'
     | '/login'
     | '/register'
     | '/h/$householdId'
@@ -342,6 +353,7 @@ export interface FileRouteTypes {
     | '/_auth'
     | '/_authenticated'
     | '/invite'
+    | '/privacy'
     | '/_auth/login'
     | '/_auth/register'
     | '/_authenticated/h/$householdId'
@@ -373,6 +385,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   InviteRoute: typeof InviteRoute
+  PrivacyRoute: typeof PrivacyRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -403,6 +416,13 @@ declare module '@tanstack/react-router' {
       path: '/invite'
       fullPath: '/invite'
       preLoaderRoute: typeof InviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_auth/login': {
@@ -723,6 +743,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   InviteRoute: InviteRoute,
+  PrivacyRoute: PrivacyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

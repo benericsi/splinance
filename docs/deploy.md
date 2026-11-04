@@ -111,20 +111,21 @@ For `postgres` and then `postgres-demo`:
 
 Variables (mark every password and secret as sealed):
 
-| Variable                 | `api`                                                                                  | `api-demo`                                                                                            |
-| ------------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`               | `production`                                                                           | `production`                                                                                          |
-| `PORT`                   | `3000` (fixed, so `web` knows where to reach it)                                       | `3000`                                                                                                |
-| `LOG_LEVEL`              | `info`                                                                                 | `info`                                                                                                |
-| `TRUST_PROXY`            | `1`                                                                                    | `1`                                                                                                   |
-| `DATABASE_URL`           | `postgresql://splinance_app:<app>@${{postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/splinance` | `postgresql://splinance_demo_app:<app>@${{postgres-demo.RAILWAY_PRIVATE_DOMAIN}}:5432/splinance_demo` |
-| `MIGRATE_DATABASE_URL`   | the same with `splinance_owner:<owner>`                                                | the same with `splinance_demo_owner:<owner>`                                                          |
-| `JWT_ACCESS_SECRET`      | random, 48 bytes                                                                       | random, different from production (otherwise a demo token would verify on production)                 |
-| `REGISTRATION`           | `allowlist`                                                                            | (unset: the demo closes registration itself)                                                          |
-| `REGISTRATION_ALLOWLIST` | your email, your partner's                                                             | -                                                                                                     |
-| `DEMO_MODE`              | -                                                                                      | `true`                                                                                                |
+| Variable                                                             | `api`                                                                                  | `api-demo`                                                                                            |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                                                           | `production`                                                                           | `production`                                                                                          |
+| `PORT`                                                               | `3000` (fixed, so `web` knows where to reach it)                                       | `3000`                                                                                                |
+| `LOG_LEVEL`                                                          | `info`                                                                                 | `info`                                                                                                |
+| `TRUST_PROXY`                                                        | `1`                                                                                    | `1`                                                                                                   |
+| `DATABASE_URL`                                                       | `postgresql://splinance_app:<app>@${{postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/splinance` | `postgresql://splinance_demo_app:<app>@${{postgres-demo.RAILWAY_PRIVATE_DOMAIN}}:5432/splinance_demo` |
+| `MIGRATE_DATABASE_URL`                                               | the same with `splinance_owner:<owner>`                                                | the same with `splinance_demo_owner:<owner>`                                                          |
+| `JWT_ACCESS_SECRET`                                                  | random, 48 bytes                                                                       | random, different from production (otherwise a demo token would verify on production)                 |
+| `REGISTRATION`                                                       | `allowlist`                                                                            | (unset: the demo closes registration itself)                                                          |
+| `REGISTRATION_ALLOWLIST`                                             | your email, your partner's                                                             | -                                                                                                     |
+| `DEMO_MODE`                                                          | -                                                                                      | `true`                                                                                                |
+| `APP_ORIGIN`, `OAUTH_GOOGLE_CLIENT_ID`, `OAUTH_GOOGLE_CLIENT_SECRET` | Sign in with Google, section 3.8                                                       | - (refused)                                                                                           |
 
-Production refuses to start with the example JWT secret, `RATE_LIMIT_DISABLED`, or `DEMO_MODE` on a database whose name does not end in `_demo`; registration is closed when `REGISTRATION` is missing.
+Production refuses to start with the example JWT secret, `RATE_LIMIT_DISABLED`, `DEMO_MODE` on a database whose name does not end in `_demo`, OAuth variables on the demo, or an http `APP_ORIGIN` or issuer; registration is closed when `REGISTRATION` is missing.
 
 ### 3.4 The web service
 
@@ -212,6 +213,34 @@ Each backup is `<UTC stamp>.dump.age` plus `<UTC stamp>.manifest.txt.age` (size,
 
 Set up and drilled on 2026-11-04 (drill log in section 5): since then production may hold real data.
 
+### 3.8 Sign in with Google
+
+"Continue with Google" needs a Google Cloud OAuth client and three variables on `api` (never `api-demo`, which refuses them). Until the variables are set the button does not exist. Takes about 30-45 minutes, plus waiting if Google asks to verify the domain.
+
+1. **Project**: [console.cloud.google.com](https://console.cloud.google.com) -> new project `splinance` (no billing account needed).
+2. **Google Auth Platform -> Get started**: app name `Splinance`, a user support email, audience **External**, a developer contact email.
+3. **Branding**: home page `https://splinance.com`, privacy policy `https://splinance.com/privacy`, authorized domain `splinance.com`. No logo for now (uploading one starts a brand verification). If Google asks to verify the domain (Search Console, a DNS TXT record), that is a Cloudflare change: add the TXT record it shows (`cf` CLI), then verify.
+4. **Data access**: only `openid`, `.../auth/userinfo.email` and `.../auth/userinfo.profile`. They are non-sensitive, so the app needs no Google review. Never add more: the API only reads the ID token.
+5. **Clients -> Create client -> Web application**, two clients, so a leaked development secret never touches production:
+   - `splinance-prod`: authorized redirect URI `https://splinance.com/api/auth/oauth/google/callback`. No JavaScript origins (the flow runs on the server).
+   - `splinance-dev` (optional, only to try the real Google locally; tests use the fake provider): `http://localhost:5173/api/auth/oauth/google/callback`.
+
+   Copy each client secret into the password manager when it is shown (Google may show it only once). It never goes into the repository, a chat or a log.
+
+6. **Audience -> Publish app** ("In production"). Testing mode would also work for two people (only listed test users can sign in), but the allowlist already decides who may sign up.
+7. **Railway, `api`** (production secret sealed):
+
+   | Variable                     | Value                              | Sealed |
+   | ---------------------------- | ---------------------------------- | ------ |
+   | `APP_ORIGIN`                 | `https://splinance.com`            | no     |
+   | `OAUTH_GOOGLE_CLIENT_ID`     | the `splinance-prod` client id     | no     |
+   | `OAUTH_GOOGLE_CLIENT_SECRET` | the `splinance-prod` client secret | yes    |
+
+   Saving them redeploys `api`. Nothing else changes: no CSP change on `web` (the button is a link, the logo is part of the bundle, Google's pages are top-level navigations), no variable on `web` or `api-demo`.
+
+8. **Local** (optional): the `splinance-dev` values plus `APP_ORIGIN=http://localhost:5173` in `apps/api/.env` (gitignored). Without Google at all, the `fake-oidc` and `api-fake-google` launch configurations run the whole flow against the fake provider.
+9. Run checklist item 9 (section 4).
+
 ## 4. First-deploy checklist
 
 1. **Headers:** `curl -I https://splinance.com/login` shows HSTS, CSP (`script-src 'self' 'sha256-...'`), `nosniff`, `Referrer-Policy: no-referrer`, no `Server` from Caddy (`Server: railway-hikari` is added by Railway's edge and cannot be removed); `curl -I https://splinance.com/api/health/ready` shows Helmet's headers. Same for the demo.
@@ -222,6 +251,12 @@ Set up and drilled on 2026-11-04 (drill log in section 5): since then production
 6. **Pre-deploy gate:** a deploy whose migration fails stops before going live (read one deploy log, or try it on a throwaway branch environment).
 7. **Restore drill:** both databases from S3 with `restore.sh`, and the Railway path once (section 5); results into the drill log. Until it has passed, production holds no real data. (Passed 2026-11-04.)
 8. **Networking:** `postgres` has no public URL; `railway connect postgres` works anyway (it tunnels over SSH).
+9. **Sign in with Google** (after 3.8):
+   - `https://splinance.com/api/auth/providers` answers `{"providers":[{"id":"google"}]}`; on the demo `[]`, and `https://demo.splinance.com/api/auth/oauth/google/start` is 404.
+   - Sign up or connect in Chrome, Firefox and Safari (iOS if at hand); a reload keeps the session in each (the refresh cookie set on Google's redirect; e2e proves it only in Chromium).
+   - Devtools after the callback: no `__Host-splinance_oauth` cookie left, `refresh_token` with the same flags as item 3.
+   - `https://splinance.com/api/auth/oauth/google/callback?code=x&state=y` in a fresh tab lands on `/login` with "try again"; the `api` log line shows `callback?[redacted]`.
+   - A Google account whose email is not allowlisted gets "Sign-ups are invite-only for now".
 
 ## 5. Operating
 
@@ -291,5 +326,14 @@ Set up and drilled on 2026-11-04 (drill log in section 5): since then production
   | 2026-11-04 | `splinance_demo`                    | `20261104T114309Z` daily | 106,159 B      | 0 s                                 | 2 s (fetch 2 s) | PASSED, 14 of 14 tables match, app role ok                                     |
   | 2026-11-04 | `splinance_demo` over `railway ssh` | `20261104T114309Z` daily | 106,159 B      | under 11 s, SSH passphrase included | -               | PASSED, users 2, households 1, transactions 247, splits 314 as in the manifest |
 
-- **Secrets:** rotating `JWT_ACCESS_SECRET` signs everyone out within 15 minutes (access tokens), refresh cookies keep working. Role passwords: `ALTER ROLE ... PASSWORD` over `railway ssh`, then the variable, then redeploy.
+- **Secrets:** rotating `JWT_ACCESS_SECRET` signs everyone out within 15 minutes (access tokens), refresh cookies keep working; Google sign-ins in progress (10 minutes) fail with "try again". Role passwords: `ALTER ROLE ... PASSWORD` over `railway ssh`, then the variable, then redeploy. The Google client secret: Google Auth Platform -> Clients -> `splinance-prod` -> add a secret, put it into `OAUTH_GOOGLE_CLIENT_SECRET`, wait for the redeploy, then disable and delete the old one.
+- **An account that only signs in with Google and lost that Google account** cannot recover on its own (no password, no reset by mail). After confirming who it is, give it a password from a local shell in `apps/api` (bash; Argon2id like the app; the hash goes to the clipboard, never a chat; clear the history line afterwards, `history -d`):
+
+  ```bash
+  node -e "import('@node-rs/argon2').then(async (a) => console.log(await a.hash(process.argv[1])))" '<new password>' | clip
+  ```
+
+  then over `railway connect postgres` as the owner: `UPDATE users SET password_hash = '<hash>' WHERE email = '<email>';` and `DELETE FROM user_identities WHERE user_id = (SELECT id FROM users WHERE email = '<email>');` (the old Google link). The person logs in with the password and can connect a new Google account from the login page.
+
+- **Privacy and retention:** what Google sign-in sends and what is stored is on `/privacy` (`apps/web/src/routes/privacy.tsx`); change it with the setup (a new provider, region or processor) and bump its date. Account deletion is by email request for now (no self-service yet): remove the person's email, password hash, identities and sessions, keep the shared entries other members' balances depend on (the page says so). Backups keep the old data until they expire (daily 35 days, monthly 13 months), and a restore from an older backup brings it back, so after a restore apply such deletions again (keep a list of deletion requests in the password manager, never in the repository).
 - **Data track:** when the pipeline reads the deployed demo (D5 switch), enable the TCP proxy on `postgres-demo` only, connect as `splinance_demo_analytics` with `sslmode=verify-ca` and the server's certificate pinned (the image's certificate is self-signed); see [data-track.md](data-track.md).
