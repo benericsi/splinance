@@ -33,6 +33,11 @@ test('a visitor tries the demo and finds a year of shared money', async ({ page 
 
   await page.getByRole('button', { name: 'Account menu' }).click();
   await expect(page.getByText('Demo account')).toBeVisible();
+  // Nothing to manage on a demo account: no settings item, and the page sends you home.
+  await expect(page.getByRole('menuitem', { name: 'Account settings' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.goto('/account');
+  await expect(page).toHaveURL(`/h/${householdId}`);
 });
 
 test('Start over swaps the household for a fresh one', async ({ page }) => {

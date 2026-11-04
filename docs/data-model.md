@@ -34,16 +34,16 @@ Deliberately not stored: first/last name, phone number. No feature needs them ye
 
 One row per login (device). The refresh token rotates in place.
 
-| Column              | Type                                  | Notes                                    |
-| ------------------- | ------------------------------------- | ---------------------------------------- |
-| id                  | uuid PK                               | Also the `sid` claim of access tokens    |
-| user_id             | uuid FK -> users, `ON DELETE CASCADE` | indexed                                  |
-| token_hash          | text, unique                          | SHA-256 of the current refresh token     |
-| previous_token_hash | text, nullable                        | The token it replaced; indexed           |
-| rotated_at          | timestamptz                           | Last rotation, used for the grace window |
-| expires_at          | timestamptz                           | Sliding: 30 days from the last rotation  |
-| revoked_at          | timestamptz, nullable                 | Logout or reuse detection                |
-| created_at          | timestamptz                           |                                          |
+| Column              | Type                                  | Notes                                                                                                                    |
+| ------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| id                  | uuid PK                               | Also the `sid` claim of access tokens                                                                                    |
+| user_id             | uuid FK -> users, `ON DELETE CASCADE` | indexed                                                                                                                  |
+| token_hash          | text, unique                          | SHA-256 of the current refresh token                                                                                     |
+| previous_token_hash | text, nullable                        | The token it replaced; indexed                                                                                           |
+| rotated_at          | timestamptz                           | Last rotation, used for the grace window                                                                                 |
+| expires_at          | timestamptz                           | Sliding: 30 days from the last rotation                                                                                  |
+| revoked_at          | timestamptz, nullable                 | Logout or reuse detection                                                                                                |
+| created_at          | timestamptz                           | The sign-in; refresh never moves it, so it also decides whether a sign-in is recent enough for account changes (step-up) |
 
 Expired sessions, and revoked ones after 7 days, are deleted by the maintenance job (`modules/maintenance`, at API start and daily, one instance at a time through an advisory lock). Nothing references sessions.
 

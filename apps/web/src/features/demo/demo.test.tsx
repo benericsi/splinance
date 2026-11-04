@@ -135,6 +135,8 @@ describe('the demo site', () => {
     await user.click(await screen.findByRole('button', { name: 'Account menu' }));
     expect(await screen.findByText('Demo account')).toBeVisible();
     expect(screen.queryByRole('menuitem', { name: 'Log out' })).not.toBeInTheDocument();
+    // Demo accounts have nothing to manage (no password, no providers, fixed names).
+    expect(screen.queryByRole('menuitem', { name: 'Account settings' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('menuitem', { name: 'End demo' }));
     const dialog = await screen.findByRole('alertdialog', { name: 'End the demo?' });
     await user.click(within(dialog).getByRole('button', { name: 'End demo' }));

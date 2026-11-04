@@ -1,3 +1,9 @@
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -5,9 +11,19 @@ import { themeStore } from '@/lib/theme';
 import { renderWithQuery, testUser } from '../../../../test/utils';
 import { UserMenu } from './user-menu';
 
+/** The menu links to /account, so it needs a router around it. */
+async function renderMenu() {
+  const router = createRouter({
+    routeTree: createRootRoute({ component: () => <UserMenu user={testUser} /> }),
+    history: createMemoryHistory(),
+  });
+  renderWithQuery(<RouterProvider router={router} />);
+  await screen.findByRole('button', { name: 'Account menu' });
+}
+
 describe('UserMenu keyboard access', () => {
   it('opens with Enter and closes with Escape, returning focus to the trigger', async () => {
-    renderWithQuery(<UserMenu user={testUser} />);
+    await renderMenu();
     const user = userEvent.setup();
 
     await user.tab();
@@ -16,11 +32,9 @@ describe('UserMenu keyboard access', () => {
 
     await user.keyboard('{Enter}');
     expect(await screen.findByRole('menu')).toBeVisible();
+    // Focus lands on the first item, Account settings.
+    expect(screen.getByRole('menuitem', { name: 'Account settings' })).toHaveFocus();
 
-    // Focus lands on the theme toggle, which shows its tooltip. Escape dismisses the
-    // innermost layer first (tooltip), then the menu: standard nested-popup behavior.
-    await user.keyboard('{Escape}');
-    expect(screen.getByRole('menu')).toBeInTheDocument();
     await user.keyboard('{Escape}');
     await waitFor(() => {
       expect(screen.queryByRole('menu')).not.toBeInTheDocument();
@@ -30,14 +44,15 @@ describe('UserMenu keyboard access', () => {
 
   it('lets keyboard users change the theme inside the menu', async () => {
     themeStore.setPreference('light');
-    renderWithQuery(<UserMenu user={testUser} />);
+    await renderMenu();
     const user = userEvent.setup();
 
     await user.tab();
     await user.keyboard('{Enter}');
     await screen.findByRole('menu');
 
-    // The theme toggle is the first focusable control in the menu.
+    // The theme toggle is the next focusable control after Account settings.
+    await user.tab();
     expect(screen.getByRole('button', { name: 'Light' })).toHaveFocus();
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('button', { name: 'Dark' })).toHaveFocus();
@@ -52,14 +67,24 @@ describe('UserMenu keyboard access', () => {
     expect(screen.getByRole('button', { name: 'Account menu' })).toHaveFocus();
   });
 
-  it('reaches Log out with Tab and closes from there with Escape', async () => {
-    renderWithQuery(<UserMenu user={testUser} />);
+  it('links to the account settings', async () => {
+    await renderMenu();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    expect(await screen.findByRole('menuitem', { name: 'Account settings' })).toHaveAttribute(
+      'href',
+      '/account',
+    );
+  });
+
+  it('reaches Log out with the arrow keys and closes from there with Escape', async () => {
+    await renderMenu();
     const user = userEvent.setup();
 
     await user.tab();
     await user.keyboard('{Enter}');
     await screen.findByRole('menu');
-    await user.tab();
+    await user.keyboard('{ArrowDown}');
     expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveFocus();
 
     await user.keyboard('{Escape}');

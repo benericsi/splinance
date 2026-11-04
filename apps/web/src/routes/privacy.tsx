@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Logo } from '@/components/logo';
 import { PageTitle } from '@/components/page-title';
 import { useAuth } from '@/lib/auth-store';
+import { CONTACT_EMAIL } from '@/lib/contact';
 
 /**
  * The privacy notice (GDPR Article 13) of splinance.com, public. It describes the deployed
@@ -18,7 +19,6 @@ export const Route = createFileRoute('/privacy')({
 });
 
 const IN_EFFECT_FROM = '2026-11-04';
-const CONTACT_EMAIL = 'bene.richard24@gmail.com';
 
 interface DataRow {
   data: string;

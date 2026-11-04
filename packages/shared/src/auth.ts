@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, PASSWORD_RULES } from './password/rules';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, requiredPasswordIssues } from './password/rules';
 
 // Normalized before validation so "Anna@Example.com " and "anna@example.com" are the same account.
 export const emailSchema = z
@@ -28,11 +28,8 @@ export const registerInputSchema = z
   })
   .superRefine(({ password, email, displayName }, ctx) => {
     // Length is covered by passwordSchema; the remaining required rules need the other fields.
-    for (const rule of PASSWORD_RULES) {
-      if (!rule.required || rule.id === 'minLength') continue;
-      if (!rule.test(password, { email, displayName })) {
-        ctx.addIssue({ code: 'custom', path: ['password'], message: rule.message });
-      }
+    for (const message of requiredPasswordIssues(password, { email, displayName })) {
+      ctx.addIssue({ code: 'custom', path: ['password'], message });
     }
   });
 

@@ -1,3 +1,4 @@
+export * from './account';
 export * from './api-error';
 export * from './auth';
 export * from './balances';
