@@ -1,0 +1,73 @@
+import type { en } from '../en';
+import type { Messages } from '../../types';
+
+export const households: Messages<typeof en.households> = {
+  settings: {
+    pageTitle: 'Beállítások · {{household}}',
+    title: 'Háztartás beállításai',
+    description: 'Adatok, tagok, kategóriák és szabályok.',
+  },
+  details: {
+    created: '{{currency}} · létrehozva: {{date}}',
+    rename: 'Átnevezés',
+    renameForm: 'Háztartás átnevezése',
+    renamed: 'Háztartás átnevezve',
+  },
+  name: 'Név',
+  namePlaceholder: 'Otthon, Albérlet, Balatoni nyaralás',
+  create: 'Háztartás létrehozása',
+  creating: 'Létrehozás…',
+  newTitle: 'Új háztartás',
+  newDescription: 'Közös tér a kiadásoknak. Ha kész, meghívhatsz másokat.',
+  members: {
+    title: 'Tagok',
+    invite: 'Meghívás',
+    you: '(te)',
+    owner: 'Tulajdonos',
+    member: 'Tag',
+    actionsFor: '{{name}}: műveletek',
+    makeOwner: 'Tulajdonossá tétel',
+    makeMember: 'Taggá tétel',
+    nowOwner: '{{name}} mostantól tulajdonos',
+    nowMember: '{{name}} mostantól tag',
+    remove: 'Eltávolítás a háztartásból',
+    removeTitle: 'Eltávolítod: {{name}}?',
+    removeDescription:
+      'Nem fér hozzá többé a háztartáshoz és a kiadásaihoz. Később újra meghívhatod.',
+    removeConfirm: 'Eltávolítás',
+    removing: 'Eltávolítás…',
+    removed: '{{name}} eltávolítva',
+  },
+  danger: {
+    title: 'Veszélyzóna',
+    leaveTitle: 'Kilépés a háztartásból',
+    leaveDescription: 'Nem látod többé a kiadásait. Valaki újra meghívhat.',
+    leave: 'Kilépés',
+    leaving: 'Kilépés…',
+    leaveConfirmTitle: 'Kilépsz innen: {{household}}?',
+    onlyOwnerTitle: 'Te vagy az egyetlen tulajdonos',
+    onlyOwnerDescription:
+      'Egy háztartásnak mindig kell tulajdonos. Előbb tegyél meg mást tulajdonosnak, vagy archiváld a háztartást.',
+    left: 'Kiléptél innen: {{household}}',
+    archiveTitle: 'Háztartás archiválása',
+    archiveDescription: 'Minden tag elől elrejti. Az előzményei megmaradnak.',
+    archive: 'Archiválás',
+    archiving: 'Archiválás…',
+    archiveConfirmTitle: 'Archiválod: {{household}}?',
+    archiveConfirmDescription:
+      'Minden tagnál eltűnik. A kiadások és az előzmények megmaradnak, de senki nem nyithatja meg többé.',
+    typeName: 'Megerősítéshez írd be: {{household}}',
+    nameMismatch: 'A név nem egyezik.',
+    archived: '{{household}} archiválva',
+  },
+  switcher: {
+    switch: ', háztartás váltása',
+    switchLabel: '{{household}}, háztartás váltása',
+    households: 'Háztartások',
+    current: 'Jelenlegi háztartás',
+    new: 'Új háztartás',
+    settings: 'Háztartás beállításai',
+    search: 'Háztartások keresése',
+    noMatch: 'Nincs ilyen háztartás',
+  },
+};

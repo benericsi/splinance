@@ -1,15 +1,17 @@
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { Logo } from '@/components/logo';
 import { PageTitle } from '@/components/page-title';
 import { useAuth } from '@/lib/auth-store';
 import { CONTACT_EMAIL } from '@/lib/contact';
 
 /**
- * The privacy notice (GDPR Article 13) of splinance.com, public. It describes the deployed
- * setup (docs/deploy.md): change it together with the setup (a new provider, region,
- * processor or retention) and move IN_EFFECT_FROM. The demo site has no accounts and its own
- * landing page, so it has no such page.
+ * The privacy notice (GDPR Article 13) of splinance.com, public, in English and Hungarian
+ * (`privacy` catalogs). It describes the deployed setup (docs/deploy.md): change both
+ * languages together with the setup (a new provider, region, processor or retention) and
+ * move IN_EFFECT_FROM. The demo site has no accounts and its own landing page, so it has no
+ * such page.
  */
 export const Route = createFileRoute('/privacy')({
   beforeLoad: () => {
@@ -18,69 +20,12 @@ export const Route = createFileRoute('/privacy')({
   component: PrivacyPage,
 });
 
-const IN_EFFECT_FROM = '2026-11-04';
+const IN_EFFECT_FROM = '2026-11-05';
 
-interface DataRow {
-  data: string;
-  purpose: string;
-  basis: string;
-  kept: string;
-}
-
-const CONTRACT = 'Contract (Art. 6(1)(b))';
-const LEGITIMATE_INTEREST = 'Legitimate interest (Art. 6(1)(f))';
-
-const DATA_ROWS: DataRow[] = [
-  {
-    data: 'Account: email, display name, a password hash (Argon2id) or your Google account id',
-    purpose: 'Your account and signing in',
-    basis: CONTRACT,
-    kept: 'Until the account is deleted; the Google account id until you disconnect Google in account settings',
-  },
-  {
-    data: 'Household data: members and roles, transactions, splits, payments, categories, rules, budgets, edit history',
-    purpose: 'The service itself',
-    basis: CONTRACT,
-    kept: 'While the household exists; shared entries stay for the other members after you leave, because their balances depend on them',
-  },
-  {
-    data: "Bank imports: the rows you import and the file's name",
-    purpose: 'Adding transactions',
-    basis: CONTRACT,
-    kept: 'Like household data; the file itself is never stored',
-  },
-  {
-    data: 'Sessions: a hashed token per device',
-    purpose: 'Keeping you signed in',
-    basis: CONTRACT,
-    kept: '30 days after last use',
-  },
-  {
-    data: 'Invite links: a hashed token',
-    purpose: 'Joining a household',
-    basis: CONTRACT,
-    kept: '7 days',
-  },
-  {
-    data: "Request logs: the hosting provider's records of each request (IP address, address requested, time); our own logs leave tokens out and hold no IP",
-    purpose: 'Security, abuse limits, fixing errors',
-    basis: LEGITIMATE_INTEREST,
-    kept: 'Visible for 7 days on our plan; Railway may keep them longer',
-  },
-  {
-    data: 'Backups: the database without sessions, encrypted',
-    purpose: 'Recovery after a failure',
-    basis: LEGITIMATE_INTEREST,
-    kept: 'Daily copies 35 days, monthly copies 13 months',
-  },
-];
-
-const COLUMNS: { key: keyof DataRow; label: string }[] = [
-  { key: 'data', label: 'Data' },
-  { key: 'purpose', label: 'Purpose' },
-  { key: 'basis', label: 'Legal basis' },
-  { key: 'kept', label: 'Kept' },
-];
+const ROWS = ['account', 'household', 'imports', 'sessions', 'invites', 'logs', 'backups'] as const;
+/** Logs and backups rest on legitimate interest; everything else on the contract. */
+const LEGITIMATE_INTEREST_ROWS = new Set<(typeof ROWS)[number]>(['logs', 'backups']);
+const COLUMNS = ['data', 'purpose', 'basis', 'kept'] as const;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -93,35 +38,45 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 /** A table on wider screens; on phones each row becomes a card with its labels. */
 function DataTable() {
+  const { t } = useTranslation('privacy');
+  const cell = (row: (typeof ROWS)[number], column: (typeof COLUMNS)[number]) =>
+    column === 'basis'
+      ? LEGITIMATE_INTEREST_ROWS.has(row)
+        ? t('legitimateInterest')
+        : t('contract')
+      : t(`rows.${row}.${column}`);
+
   return (
-    <div role="table" aria-label="Data, purpose, legal basis and retention" className="text-sm">
+    <div role="table" aria-label={t('tableLabel')} className="text-sm">
       <div role="rowgroup" className="hidden md:block">
         <div
           role="row"
           className="text-foreground grid grid-cols-[1.4fr_0.9fr_1.1fr_1.1fr] gap-4 border-b pb-2 font-medium"
         >
           {COLUMNS.map((column) => (
-            <span key={column.key} role="columnheader">
-              {column.label}
+            <span key={column} role="columnheader">
+              {t(`columns.${column}`)}
             </span>
           ))}
         </div>
       </div>
       <div role="rowgroup">
-        {DATA_ROWS.map((row) => (
+        {ROWS.map((row) => (
           <div
-            key={row.data}
+            key={row}
             role="row"
             className="grid gap-1 border-b py-3 md:grid-cols-[1.4fr_0.9fr_1.1fr_1.1fr] md:gap-4"
           >
             {COLUMNS.map((column) => (
               <span
-                key={column.key}
+                key={column}
                 role="cell"
-                className={column.key === 'data' ? 'text-foreground' : undefined}
+                className={column === 'data' ? 'text-foreground' : undefined}
               >
-                <span className="text-foreground font-medium md:hidden">{column.label}: </span>
-                {row[column.key]}
+                <span className="text-foreground font-medium md:hidden">
+                  {t(`columns.${column}`)}:{' '}
+                </span>
+                {cell(row, column)}
               </span>
             ))}
           </div>
@@ -132,11 +87,12 @@ function DataTable() {
 }
 
 function PrivacyPage() {
+  const { t } = useTranslation('privacy');
   const { status } = useAuth();
 
   return (
     <>
-      <PageTitle title="Privacy" />
+      <PageTitle title={t('pageTitle')} />
       <div className="mx-auto flex min-h-svh w-full max-w-3xl flex-col px-6 py-6 sm:px-10">
         <header className="flex items-center justify-between gap-4">
           <Logo />
@@ -144,110 +100,74 @@ function PrivacyPage() {
             to={status === 'authenticated' ? '/' : '/login'}
             className="text-link text-sm font-medium underline-offset-4 hover:underline"
           >
-            {status === 'authenticated' ? 'Back to Splinance' : 'Log in'}
+            {status === 'authenticated' ? t('backToApp') : t('logIn')}
           </Link>
         </header>
 
         <main className="flex-1 space-y-8 py-12">
           <div className="space-y-2">
-            <h1 className="font-heading text-3xl font-extrabold tracking-tight">Privacy notice</h1>
-            <p className="text-muted-foreground">
-              How Splinance handles personal data, under Article 13 of the EU General Data
-              Protection Regulation (GDPR).
+            <h1 className="font-heading text-3xl font-extrabold tracking-tight">{t('title')}</h1>
+            <p className="text-muted-foreground">{t('intro')}</p>
+            <p className="text-muted-foreground text-xs">
+              {t('inEffect', { date: IN_EFFECT_FROM })}
             </p>
-            <p className="text-muted-foreground text-xs">In effect from {IN_EFFECT_FROM}</p>
           </div>
 
-          <Section title="1. Who is responsible">
+          <Section title={t('s1.title')}>
             <p>
-              Richárd Bene, private individual, Hungary,{' '}
-              <a
-                href={`mailto:${CONTACT_EMAIL}`}
-                className="text-link underline-offset-4 hover:underline"
-              >
-                {CONTACT_EMAIL}
-              </a>
-              . Splinance is a personal project, invite-only and free; there is no business behind
-              it.
+              <Trans
+                t={t}
+                i18nKey="s1.body"
+                values={{ email: CONTACT_EMAIL }}
+                components={{
+                  a: (
+                    <a
+                      href={`mailto:${CONTACT_EMAIL}`}
+                      className="text-link underline-offset-4 hover:underline"
+                    />
+                  ),
+                }}
+              />
             </p>
           </Section>
 
-          <Section title="2. What, why, on what basis, how long">
+          <Section title={t('s2.title')}>
             <DataTable />
-            <p>
-              Other members of a household see your display name, role and the shared entries, never
-              your email. Private entries are visible only to you.
-            </p>
+            <p>{t('s2.body')}</p>
           </Section>
 
-          <Section title="3. Signing in with Google">
-            <p>
-              If you choose it, Google sends us your Google account id, your email, whether Google
-              verified it, and your name. We keep the id to recognize you; a new account takes the
-              email and the name. We don&apos;t receive your picture, contacts or Google tokens, and
-              we can&apos;t act in your Google account. Google acts as an independent controller and
-              learns that you signed in to Splinance.
-            </p>
+          <Section title={t('s3.title')}>
+            <p>{t('s3.body')}</p>
           </Section>
 
-          <Section title="4. Who processes data for us">
+          <Section title={t('s4.title')}>
             <ul className="list-disc space-y-1 pl-5">
-              <li>
-                Railway: hosting and the database, in its EU West region (Amsterdam). Railway is a
-                US company; transfers are covered by the EU Standard Contractual Clauses in its data
-                processing addendum.
-              </li>
-              <li>
-                Amazon Web Services: the encrypted backups, in Frankfurt. Only the controller holds
-                the key to decrypt them.
-              </li>
-              <li>Cloudflare: the domain&apos;s DNS only, no personal data.</li>
+              <li>{t('s4.railway')}</li>
+              <li>{t('s4.aws')}</li>
+              <li>{t('s4.cloudflare')}</li>
             </ul>
-            <p>Nothing is sold, shared for advertising, or used to train AI models.</p>
+            <p>{t('s4.nothingSold')}</p>
           </Section>
 
-          <Section title="5. Cookies and storage">
-            <p>
-              Only what signing in needs: the session cookie (30 days) and, during a Google sign-in,
-              two short-lived cookies (10 minutes). Your browser also remembers the theme, the last
-              household you opened and your bank choice for imports. No analytics, no trackers, no
-              third-party fonts or scripts, so there is no cookie banner.
-            </p>
+          <Section title={t('s5.title')}>
+            <p>{t('s5.body')}</p>
           </Section>
 
-          <Section title="6. Security">
-            <p>
-              HTTPS everywhere, passwords hashed with Argon2id, database roles with the fewest
-              rights they need, and backups encrypted before they leave the server.
-            </p>
+          <Section title={t('s6.title')}>
+            <p>{t('s6.body')}</p>
           </Section>
 
-          <Section title="7. Automated decisions">
-            <p>None, and no profiling. Category rules only do what you set them up to do.</p>
+          <Section title={t('s7.title')}>
+            <p>{t('s7.body')}</p>
           </Section>
 
-          <Section title="8. Your rights">
-            <p>
-              You can delete your account yourself in Account settings: your sign-in, name, email
-              and private transactions are erased at once, and households only you were ever in are
-              deleted. Shared entries stay for the other members, who need them for their balances,
-              under &quot;Former member&quot; with nothing that identifies you. You can also ask for
-              access to your data, its correction or deletion, restricted processing, a copy in a
-              portable format, and object to processing based on legitimate interest. Write to the
-              email above; requests are answered within one month. Deleted data leaves the backups
-              as they expire.
-            </p>
-            <p>
-              You can complain to the Hungarian data protection authority (NAIH, 1055 Budapest, Falk
-              Miksa utca 9-11, ugyfelszolgalat@naih.hu, naih.hu) or go to court.
-            </p>
+          <Section title={t('s8.title')}>
+            <p>{t('s8.body')}</p>
+            <p>{t('s8.complaint')}</p>
           </Section>
 
-          <Section title="9. Other">
-            <p>
-              Splinance is for people aged 16 and over. Changes to this notice appear on this page
-              with a new date.
-            </p>
+          <Section title={t('s9.title')}>
+            <p>{t('s9.body')}</p>
           </Section>
         </main>
       </div>

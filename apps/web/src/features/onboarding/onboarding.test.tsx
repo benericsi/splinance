@@ -75,7 +75,7 @@ describe('onboarding: create a household', () => {
     await user.click(screen.getByRole('button', { name: 'Create household' }));
 
     expect(await screen.findByRole('heading', { name: 'Invite your partner' })).toBeVisible();
-    expect(api.createdWith()).toEqual({ name: 'Otthon' });
+    expect(api.createdWith()).toEqual({ name: 'Otthon', locale: 'en' });
     expect(router.state.location.pathname).toBe('/welcome/invite');
     expect(router.state.location.search).toEqual({ household: testHousehold.id });
 

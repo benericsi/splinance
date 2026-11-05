@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import { CreateHouseholdForm } from '@/features/households/components/create-household-form';
 import { BackLink } from '@/features/onboarding/components/back-link';
 import { OnboardingLayout } from '@/features/onboarding/components/onboarding-layout';
@@ -9,14 +10,15 @@ export const Route = createFileRoute('/_authenticated/welcome/household')({
 });
 
 function HouseholdStep() {
+  const { t } = useTranslation('onboarding');
   const navigate = useNavigate();
 
   return (
     <OnboardingLayout
       step={2}
       steps={4}
-      title="Name your household"
-      description="Pick something everyone recognizes. You can rename it later."
+      title={t('household.title')}
+      description={t('household.description')}
       footer={<BackLink />}
     >
       <CreateHouseholdForm

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BRAND_COLORS, type BrandColor } from './brand';
+import type { Locale } from './i18n/locales';
 import { msg } from './i18n/validation';
 
 export const CATEGORY_KINDS = ['expense', 'income'] as const;
@@ -111,3 +112,35 @@ export const DEFAULT_CATEGORIES: readonly CreateCategoryInput[] = [
   { name: 'Salary', kind: 'income', icon: 'briefcase', color: 'green' },
   { name: 'Other income', kind: 'income', icon: 'banknote', color: 'mustard' },
 ];
+
+/**
+ * The default categories' names in each UI language, in `DEFAULT_CATEGORIES` order. Names
+ * are data once created (people rename them), so a household keeps the language it was
+ * created in; nothing is translated on display.
+ */
+const DEFAULT_CATEGORY_NAMES: Record<Exclude<Locale, 'en'>, readonly string[]> = {
+  hu: [
+    'Élelmiszer',
+    'Lakhatás',
+    'Rezsi',
+    'Étterem',
+    'Közlekedés',
+    'Egészség',
+    'Vásárlás',
+    'Szórakozás',
+    'Utazás',
+    'Egyéb',
+    'Fizetés',
+    'Egyéb bevétel',
+  ],
+};
+
+/** The categories a new household starts with, named in `locale`. */
+export function defaultCategories(locale: Locale = 'en'): CreateCategoryInput[] {
+  if (locale === 'en') return [...DEFAULT_CATEGORIES];
+  const names = DEFAULT_CATEGORY_NAMES[locale];
+  return DEFAULT_CATEGORIES.map((category, index) => ({
+    ...category,
+    name: names[index] ?? category.name,
+  }));
+}

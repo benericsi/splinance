@@ -1,5 +1,6 @@
 import { Check, Copy } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { QrCode } from '@/components/qr-code';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { inviteLink } from '../pending-invite';
  * create call, the only time the raw token is known (invite dialog and onboarding).
  */
 export function InviteLinkCard({ token, householdName }: { token: string; householdName: string }) {
+  const { t } = useTranslation('invites');
   const link = inviteLink(token);
   const [copied, setCopied] = useState(false);
 
@@ -28,14 +30,14 @@ export function InviteLinkCard({ token, householdName }: { token: string; househ
     <div className="space-y-4">
       <QrCode
         value={link}
-        label={`QR code for the invite to ${householdName}`}
+        label={t('qr', { household: householdName })}
         className="mx-auto size-44"
       />
       <div className="flex gap-2">
         <Input
           readOnly
           value={link}
-          aria-label="Invite link"
+          aria-label={t('link')}
           className="h-10 font-mono text-xs"
           onFocus={(e) => {
             e.currentTarget.select();
@@ -49,18 +51,16 @@ export function InviteLinkCard({ token, householdName }: { token: string; househ
                 setCopied(true);
               },
               () => {
-                toast.error("Couldn't copy. Select the link and copy it.");
+                toast.error(t('copyFailed'));
               },
             );
           }}
         >
           {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('copied') : t('copy')}
         </Button>
       </div>
-      <p className="text-muted-foreground text-sm">
-        This link is shown only now. Send it, or let them scan the code.
-      </p>
+      <p className="text-muted-foreground text-sm">{t('shownOnce')}</p>
     </div>
   );
 }

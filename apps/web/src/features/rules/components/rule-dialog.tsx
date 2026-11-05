@@ -1,6 +1,7 @@
 import { type Category, type Rule, ruleInputSchema, rulePatternSchema } from '@splinance/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { firstError } from '@/components/form/first-error';
@@ -10,6 +11,7 @@ import { RouteDialog } from '@/components/route-dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { CategoryPicker } from '@/features/categories/components/category-picker';
+import { i18n } from '@/i18n';
 import { ApiError } from '@/lib/http';
 import { errorMessage } from '@/lib/query-client';
 import { useApplyRule, useCreateRule, useUpdateRule } from '../hooks';
@@ -18,12 +20,9 @@ import { ruleQueries } from '../queries';
 /** The form's own schema: a category must be picked (the shared one only knows uuids). */
 const ruleFormSchema = z.object({
   pattern: rulePatternSchema,
-  categoryId: z.string().min(1, 'Choose a category'),
+  categoryId: z.string().min(1, { error: () => i18n.t('rules:chooseCategory') }),
   markShared: z.boolean(),
 });
-
-const transactionCount = (count: number) =>
-  `${String(count)} earlier ${count === 1 ? 'transaction' : 'transactions'}`;
 
 /**
  * Add or edit a rule: the text to look for, the category, and whether imported matches start
@@ -42,6 +41,7 @@ export function RuleDialog({
   rule?: Rule | undefined;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(['rules', 'common', 'errors']);
   const queryClient = useQueryClient();
   const create = useCreateRule();
   const update = useUpdateRule();
@@ -68,7 +68,7 @@ export function RuleDialog({
       try {
         if (rule) {
           await update.mutateAsync({ householdId, ruleId: rule.id, input });
-          toast.success('Rule saved');
+          toast.success(t('saved'));
           onClose();
           return;
         }
@@ -76,12 +76,12 @@ export function RuleDialog({
         onClose();
         // Offer the earlier matches right away; the toast outlives the dialog.
         const count = await queryClient.query(ruleQueries.matches(householdId, created.id));
-        toast.success('Rule added', {
+        toast.success(t('added'), {
           ...(count > 0 && {
-            description: `It matches ${transactionCount(count)} without a category.`,
+            description: t('matches', { count }),
             duration: 10_000,
             action: {
-              label: 'Apply',
+              label: t('apply'),
               onClick: () => {
                 apply.mutate({ householdId, ruleId: created.id });
               },
@@ -98,7 +98,7 @@ export function RuleDialog({
   const formError = mutation.error && !taken ? errorMessage(mutation.error) : undefined;
 
   return (
-    <RouteDialog title={rule ? 'Edit rule' : 'Add rule'} onClose={onClose}>
+    <RouteDialog title={rule ? t('editTitle') : t('newTitle')} onClose={onClose}>
       <form
         noValidate
         className="min-w-0 space-y-5"
@@ -114,11 +114,11 @@ export function RuleDialog({
             <TextField
               field={field}
               required
-              label="When the merchant or description contains"
+              label={t('pattern')}
               placeholder="tesco"
               maxLength={60}
               autoFocus={!rule}
-              serverError={taken ? 'There is a rule for this text already' : undefined}
+              serverError={taken ? t('errors:codes.RULE_PATTERN_TAKEN') : undefined}
               onValueChange={mutation.reset}
             />
           )}
@@ -129,7 +129,7 @@ export function RuleDialog({
             const error = firstError(field.state.meta.errors);
             return (
               <div className="space-y-1.5">
-                <Label htmlFor="rule-category">Use category</Label>
+                <Label htmlFor="rule-category">{t('category')}</Label>
                 <CategoryPicker
                   id="rule-category"
                   categories={active}
@@ -154,14 +154,14 @@ export function RuleDialog({
                 }}
                 className="accent-primary size-4"
               />
-              Mark imported matches as shared
+              {t('markShared')}
             </label>
           )}
         </form.Field>
 
         {rule && matches.data !== undefined && matches.data > 0 && (
           <div className="bg-muted/50 flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-sm">
-            <span>It matches {transactionCount(matches.data)} without a category.</span>
+            <span>{t('matches', { count: matches.data })}</span>
             <Button
               type="button"
               variant="outline"
@@ -171,7 +171,7 @@ export function RuleDialog({
                 apply.mutate({ householdId, ruleId: rule.id });
               }}
             >
-              {apply.isPending ? 'Applying…' : 'Apply to them'}
+              {apply.isPending ? t('applying') : t('applyToThem')}
             </Button>
           </div>
         )}
@@ -180,7 +180,7 @@ export function RuleDialog({
           {(isSubmitting) => (
             <div className="flex justify-end pt-1">
               <Button type="submit" size="lg" className="min-w-28" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving…' : rule ? 'Save' : 'Add rule'}
+                {isSubmitting ? t('common:saving') : rule ? t('common:save') : t('add')}
               </Button>
             </div>
           )}

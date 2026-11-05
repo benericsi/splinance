@@ -227,7 +227,7 @@ describe('new household modal (?modal=new-household)', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/h/${created.id}`);
     });
-    expect(body).toEqual({ name: 'Flat' });
+    expect(body).toEqual({ name: 'Flat', locale: 'en' });
     expect(router.state.location.search).toEqual({});
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

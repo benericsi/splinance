@@ -4,8 +4,9 @@ import {
   CATEGORY_ICONS,
   type CategoryIcon,
 } from '@splinance/shared';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
-import { COLOR_NAMES, COLORS, iconName } from '../appearance';
+import { COLORS, colorName, iconName } from '../appearance';
 import { CATEGORY_ICON_COMPONENTS } from './category-tile';
 
 /*
@@ -20,9 +21,10 @@ export function ColorPicker({
   value: BrandColor;
   onChange: (color: BrandColor) => void;
 }) {
+  const { t } = useTranslation('categories');
   return (
     <fieldset>
-      <legend className="mb-2 text-sm font-medium">Color</legend>
+      <legend className="mb-2 text-sm font-medium">{t('color')}</legend>
       <div className="flex flex-wrap gap-2.5">
         {COLORS.map((color) => (
           <label key={color} className="relative cursor-pointer">
@@ -36,7 +38,7 @@ export function ColorPicker({
               }}
               className="peer sr-only"
             />
-            <span className="sr-only">{COLOR_NAMES[color]}</span>
+            <span className="sr-only">{colorName(color)}</span>
             <span
               aria-hidden
               className="ring-offset-background peer-checked:ring-foreground peer-focus-visible:ring-ring/60 block size-8 rounded-full border border-black/10 ring-offset-2 peer-checked:ring-2 peer-focus-visible:ring-3 dark:border-white/15"
@@ -56,9 +58,10 @@ export function IconPicker({
   value: CategoryIcon;
   onChange: (icon: CategoryIcon) => void;
 }) {
+  const { t } = useTranslation('categories');
   return (
     <fieldset>
-      <legend className="mb-2 text-sm font-medium">Icon</legend>
+      <legend className="mb-2 text-sm font-medium">{t('icon')}</legend>
       <div className="grid grid-cols-7 gap-1.5 sm:grid-cols-9">
         {CATEGORY_ICONS.map((icon) => {
           const Icon = CATEGORY_ICON_COMPONENTS[icon];

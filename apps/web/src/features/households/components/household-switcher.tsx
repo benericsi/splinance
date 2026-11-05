@@ -2,8 +2,9 @@ import type { Household } from '@splinance/shared';
 import { Combobox as ComboboxPrimitive } from '@base-ui/react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { useState } from 'react';
 import { Check, ChevronsUpDown, type LucideIcon, Plus, Settings } from 'lucide-react';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { HouseholdAvatar } from '@/components/household-avatar';
 import {
   Combobox,
@@ -39,11 +40,12 @@ const triggerClass =
   'hover:bg-accent data-popup-open:bg-accent focus-visible:ring-ring/50 flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left outline-none focus-visible:ring-[3px]';
 
 function TriggerContent({ current }: { current: CurrentHousehold }) {
+  const { t } = useTranslation('households');
   return (
     <>
       <HouseholdAvatar household={current} size={28} decorative />
       <span className="min-w-0 flex-1 truncate font-medium">{current.name}</span>
-      <span className="sr-only">, switch household</span>
+      <span className="sr-only">{t('switcher.switch')}</span>
     </>
   );
 }
@@ -73,6 +75,7 @@ function MenuSwitcher({
   households: Household[];
   className?: string | undefined;
 }) {
+  const { t } = useTranslation('households');
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className={cn(triggerClass, className)}>
@@ -81,7 +84,7 @@ function MenuSwitcher({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-60">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Households</DropdownMenuLabel>
+          <DropdownMenuLabel>{t('switcher.households')}</DropdownMenuLabel>
           {households.map((household) => (
             <DropdownMenuItem
               key={household.id}
@@ -89,7 +92,7 @@ function MenuSwitcher({
             >
               <HouseholdAvatar household={household} size={20} decorative />
               <span className="min-w-0 flex-1 truncate">{household.name}</span>
-              {household.id === current.id && <Check aria-label="Current household" />}
+              {household.id === current.id && <Check aria-label={t('switcher.current')} />}
             </DropdownMenuItem>
           ))}
         </DropdownMenuGroup>
@@ -104,13 +107,13 @@ function MenuSwitcher({
           }
         >
           <Plus aria-hidden />
-          New household
+          {t('switcher.new')}
         </DropdownMenuItem>
         <DropdownMenuItem
           render={<Link to="/h/$householdId/settings" params={{ householdId: current.id }} />}
         >
           <Settings aria-hidden />
-          Household settings
+          {t('switcher.settings')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -137,6 +140,7 @@ function SearchableSwitcher({
   households: Household[];
   className?: string | undefined;
 }) {
+  const { t } = useTranslation('households');
   const navigate = useNavigate();
   // Accent and case insensitive (Intl.Collator), the same matching as the category picker.
   const { contains } = ComboboxPrimitive.useFilter();
@@ -149,8 +153,8 @@ function SearchableSwitcher({
     household,
   }));
   const actions: Option[] = [
-    { type: 'action', id: 'new', name: 'New household', icon: Plus },
-    { type: 'action', id: 'settings', name: 'Household settings', icon: Settings },
+    { type: 'action', id: 'new', name: t('switcher.new'), icon: Plus },
+    { type: 'action', id: 'settings', name: t('switcher.settings'), icon: Settings },
   ];
   const groups: OptionGroup[] = [
     { value: 'Households', items: householdOptions },
@@ -193,24 +197,24 @@ function SearchableSwitcher({
     >
       <ComboboxTrigger
         className={cn(triggerClass, '[&>svg]:hidden', className)}
-        aria-label={`${current.name}, switch household`}
+        aria-label={t('switcher.switchLabel', { household: current.name })}
       >
         <TriggerContent current={current} />
         <ChevronsUpDown className="text-muted-foreground size-4 shrink-0" aria-hidden />
       </ComboboxTrigger>
       <ComboboxContent className="min-w-64">
-        <ComboboxSearchInput placeholder="Search households" aria-label="Search households" />
+        <ComboboxSearchInput placeholder={t('switcher.search')} aria-label={t('switcher.search')} />
         {/* The actions never filter out, so the list is never empty: say so explicitly. */}
         {noMatch && (
           <p role="status" className="text-muted-foreground px-3 pt-2 text-sm">
-            No households match
+            {t('switcher.noMatch')}
           </p>
         )}
         <ComboboxList>
           {(group: OptionGroup) => (
             <ComboboxGroup key={group.value} items={group.items}>
               {group.value === 'Households' ? (
-                <ComboboxLabel>Households</ComboboxLabel>
+                <ComboboxLabel>{t('switcher.households')}</ComboboxLabel>
               ) : (
                 <ComboboxSeparator />
               )}

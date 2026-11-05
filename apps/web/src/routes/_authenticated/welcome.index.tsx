@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ChevronRight, HousePlus, Link2, type LucideIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { OnboardingLayout } from '@/features/onboarding/components/onboarding-layout';
 import { useAuth } from '@/lib/auth-store';
 
@@ -9,27 +10,28 @@ export const Route = createFileRoute('/_authenticated/welcome/')({
 });
 
 function WelcomePage() {
+  const { t } = useTranslation('onboarding');
   const { user } = useAuth();
 
   return (
     <OnboardingLayout
       step={1}
       steps={4}
-      title={`Welcome, ${user?.displayName ?? ''}`}
-      description="Splinance keeps shared expenses fair. It all happens in a household."
+      title={t('welcome.title', { name: user?.displayName ?? '' })}
+      description={t('welcome.description')}
     >
       <div className="space-y-3">
         <Choice
           to="/welcome/household"
           icon={HousePlus}
-          title="Create a household"
-          description="For you and the people you share costs with."
+          title={t('welcome.create')}
+          description={t('welcome.createDescription')}
         />
         <Choice
           to="/welcome/join"
           icon={Link2}
-          title="Join with an invite link"
-          description="Someone already invited you."
+          title={t('welcome.join')}
+          description={t('welcome.joinDescription')}
         />
       </div>
     </OnboardingLayout>

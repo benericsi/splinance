@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   createCategoryInputSchema,
   DEFAULT_CATEGORIES,
+  defaultCategories,
   updateCategoryInputSchema,
 } from './categories';
+import { LOCALES } from './i18n/locales';
 
 describe('category schemas', () => {
   const valid = { name: '  Pets ', kind: 'expense', icon: 'paw-print', color: 'orange' };
@@ -32,11 +34,15 @@ describe('category schemas', () => {
     });
   });
 
-  it('ships valid defaults with unique names per kind', () => {
-    for (const category of DEFAULT_CATEGORIES) {
+  it.each(LOCALES)('ships valid defaults with unique names per kind (%s)', (locale) => {
+    const defaults = defaultCategories(locale);
+    expect(defaults).toHaveLength(DEFAULT_CATEGORIES.length);
+    for (const [index, category] of defaults.entries()) {
       expect(createCategoryInputSchema.parse(category)).toEqual(category);
+      // Only the name changes with the language.
+      expect({ ...category, name: '' }).toEqual({ ...DEFAULT_CATEGORIES[index], name: '' });
     }
-    const keys = DEFAULT_CATEGORIES.map((c) => `${c.kind}:${c.name.toLowerCase()}`);
+    const keys = defaults.map((c) => `${c.kind}:${c.name.toLowerCase()}`);
     expect(new Set(keys).size).toBe(keys.length);
   });
 });

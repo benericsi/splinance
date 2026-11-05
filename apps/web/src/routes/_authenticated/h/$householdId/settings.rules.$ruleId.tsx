@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { categoryQueries } from '@/features/categories/queries';
 import { RuleDialog } from '@/features/rules/components/rule-dialog';
 import { ruleQueries } from '@/features/rules/queries';
+import { i18n } from '@/i18n';
 import { useCloseModal } from '@/lib/route-modal';
 
 /** Child route: the edit dialog renders over the settings page. */
@@ -12,7 +13,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/settings/ru
   loader: async ({ context: { queryClient }, params: { householdId, ruleId } }) => {
     const rules = await queryClient.query(ruleQueries.list(householdId));
     if (!rules.some((rule) => rule.id === ruleId)) {
-      toast.error('That rule does not exist any more.');
+      toast.error(i18n.t('rules:gone'));
       throw redirect({ to: '/h/$householdId/settings', params: { householdId }, replace: true });
     }
   },

@@ -4,6 +4,7 @@ import { balanceQueries } from '@/features/balances/queries';
 import { budgetQueries } from '@/features/budgets/queries';
 import { reportQueries } from '@/features/reports/queries';
 import { transactionQueries } from '@/features/transactions/queries';
+import { i18n } from '@/i18n';
 import { rulesApi } from './api';
 import { ruleQueries } from './queries';
 
@@ -53,9 +54,7 @@ export function useApplyRule() {
   return useMutation({
     mutationFn: rulesApi.apply,
     onSuccess: (updated, { householdId }) => {
-      toast.success(
-        `${String(updated)} ${updated === 1 ? 'transaction' : 'transactions'} categorized`,
-      );
+      toast.success(i18n.t('rules:categorized', { count: updated }));
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: ruleQueries.household(householdId) }),
         queryClient.invalidateQueries({ queryKey: transactionQueries.household(householdId) }),
