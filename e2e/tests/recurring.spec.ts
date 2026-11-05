@@ -110,9 +110,12 @@ test('the bell tells about what the other person did and about renewals', async 
 
   // Opening it goes to the transaction and marks it read.
   await item.click();
-  await expect(page.getByRole('dialog', { name: 'Edit transaction' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible();
+  const edit = page.getByRole('dialog', { name: 'Edit transaction' });
+  await expect(edit).toBeVisible();
+  // The page behind a modal is hidden from assistive tech: check the badge once it closes.
   await page.keyboard.press('Escape');
+  await expect(edit).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible();
 
   // A renewal two days away reminds both of them.
   await openRecurring(page, householdId);
