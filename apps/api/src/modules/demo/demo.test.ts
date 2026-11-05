@@ -7,6 +7,7 @@ import {
   demoStatusResponseSchema,
   householdDetailResponseSchema,
   meResponseSchema,
+  notificationListResponseSchema,
   recurringListResponseSchema,
   renderDemoBankFiles,
 } from '@splinance/shared';
@@ -168,6 +169,18 @@ describe('POST /api/demo', { timeout: 30_000 }, () => {
     );
     expect(series.find((s) => s.name === 'Spotify Duo')?.paymentCount).toBe(6);
     expect(series.find((s) => s.name === 'Gym membership')?.paymentCount).toBe(8);
+
+    // The bell on first visit: Jane's last few days and the budget alert, not her whole year.
+    const bellRes = await request(app)
+      .get('/api/notifications')
+      .set('Authorization', auth)
+      .expect(200);
+    const bell = notificationListResponseSchema.parse(bellRes.body).notifications;
+    expect(bell.some((n) => n.type === 'import_added' && n.actor?.displayName === 'Jane Doe')).toBe(
+      true,
+    );
+    expect(bell.some((n) => n.type === 'budget_near' && n.subjectName === 'Eating out')).toBe(true);
+    expect(bell.length).toBeLessThan(10);
   });
 
   it('gives demo accounts no usable password', async () => {
@@ -225,6 +238,7 @@ describe('deleteDemo', { timeout: 30_000 }, () => {
       'category_rules',
       'budgets',
       'recurring_series',
+      'notifications',
       'household_invites',
     ]) {
       expect(after[table], table).toBe(0);

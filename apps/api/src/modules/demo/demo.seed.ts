@@ -13,6 +13,8 @@ import { setBudget } from '../budgets/budgets.service';
 import { listCategories } from '../categories/categories.service';
 import { createHousehold } from '../households/households.service';
 import { createImport } from '../imports/imports.service';
+import { withoutActivity } from '../notifications/activity';
+import { syncNotifications } from '../notifications/sync';
 import { acceptInvite, createInvite } from '../invites/invites.service';
 import { confirmSuggestion, createSeries } from '../recurring/recurring.service';
 import { createRule } from '../rules/rules.service';
@@ -96,6 +98,14 @@ export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<st
     };
   };
 
+  // A year of the partner's changes would bury the visitor's bell: the history goes in
+  // without activity notifications, except what the partner did in the last few days (this
+  // month's import, recent dinners and payments), which reads like a real week.
+  const recentFrom = daysBefore(story.today, RECENT_ACTIVITY_DAYS);
+  const thisMonth = story.today.slice(0, 7);
+  const quietly = <T>(loud: boolean, work: () => Promise<T>) =>
+    loud ? work() : withoutActivity(work);
+
   const transactionsById = new Map(story.transactions.map((t) => [t.id, t]));
   const rowsById = new Map(story.bankRows.map((row) => [row.id, row]));
 
@@ -121,23 +131,31 @@ export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<st
     if (rows.length === 0) continue;
     // The same contract the import route enforces.
     const input = importInputSchema.parse({ source: file.source, fileName: file.fileName, rows });
-    await createImport(scopeOf(file.person), input);
+    await quietly(file.person === 'partner' && file.month === thisMonth, () =>
+      createImport(scopeOf(file.person), input),
+    );
   }
 
   for (const transaction of story.transactions) {
     if (transaction.source === 'manual') {
-      await createTransaction(scopeOf(transaction.person), toInput(transaction));
+      const loud = transaction.person === 'partner' && transaction.occurredOn >= recentFrom;
+      await quietly(loud, () =>
+        createTransaction(scopeOf(transaction.person), toInput(transaction)),
+      );
     }
   }
 
   for (const settlement of story.settlements) {
-    await createSettlement(scopeOf(settlement.from), {
-      fromUserId: people[settlement.from],
-      toUserId: people[settlement.to],
-      amount: settlement.amount,
-      settledOn: settlement.settledOn,
-      note: settlement.note,
-    });
+    const loud = settlement.from === 'partner' && settlement.settledOn >= recentFrom;
+    await quietly(loud, () =>
+      createSettlement(scopeOf(settlement.from), {
+        fromUserId: people[settlement.from],
+        toUserId: people[settlement.to],
+        amount: settlement.amount,
+        settledOn: settlement.settledOn,
+        note: settlement.note,
+      }),
+    );
   }
 
   // Recurring payments last: detection and matching look at the transactions above. Dates
@@ -169,5 +187,17 @@ export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<st
     );
   }
 
+  // The bell's renewals and budget alerts, as of the story's day.
+  await syncNotifications(householdId, { today: story.today });
+
   return householdId;
+}
+
+/** How far back the partner's changes notify the visitor in a fresh demo. */
+const RECENT_ACTIVITY_DAYS = 3;
+
+function daysBefore(date: string, days: number): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() - days);
+  return value.toISOString().slice(0, 10);
 }

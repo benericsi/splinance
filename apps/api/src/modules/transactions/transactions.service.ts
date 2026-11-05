@@ -45,6 +45,7 @@ import {
   type Membership,
   requireMembership,
 } from '../households/households.service';
+import { recordTransactionActivity } from '../notifications/activity';
 
 export const transactionNotFound = () =>
   new HttpError(404, 'Transaction not found', 'TRANSACTION_NOT_FOUND');
@@ -419,6 +420,8 @@ async function recordAudit(
     before,
     after,
   });
+  // Same transaction as the change: what others in it hear about it.
+  await recordTransactionActivity(tx, scope, action, before, after);
 }
 
 /** Every write: household lock (shared), membership, then the change and its audit entry. */

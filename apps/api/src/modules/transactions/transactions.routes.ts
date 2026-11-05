@@ -21,6 +21,7 @@ import {
   transactionNotFound,
   updateTransaction,
 } from './transactions.service';
+import { syncAfterChange } from '../notifications/sync';
 
 function transactionScope(req: Request) {
   return {
@@ -44,6 +45,7 @@ export function createTransactionsRouter() {
     const scope = householdScope(req);
     const input = transactionInputSchema.parse(req.body);
     const body: TransactionResponse = { transaction: await createTransaction(scope, input) };
+    await syncAfterChange(scope.householdId);
     res.status(201).json(body);
   });
 
@@ -67,18 +69,21 @@ export function createTransactionsRouter() {
     const scope = transactionScope(req);
     const input = updateTransactionInputSchema.parse(req.body);
     const body: TransactionResponse = { transaction: await updateTransaction(scope, input) };
+    await syncAfterChange(scope.householdId);
     res.json(body);
   });
 
   router.delete('/:transactionId', async (req, res) => {
-    await deleteTransaction(transactionScope(req));
+    const scope = transactionScope(req);
+    await deleteTransaction(scope);
+    await syncAfterChange(scope.householdId);
     res.status(204).end();
   });
 
   router.post('/:transactionId/restore', async (req, res) => {
-    const body: TransactionResponse = {
-      transaction: await restoreTransaction(transactionScope(req)),
-    };
+    const scope = transactionScope(req);
+    const body: TransactionResponse = { transaction: await restoreTransaction(scope) };
+    await syncAfterChange(scope.householdId);
     res.json(body);
   });
 

@@ -7,6 +7,7 @@ import {
   householdMembers,
   households,
   importBatches,
+  notifications,
   recurringSeries,
   sessions,
   transactionSplits,
@@ -185,6 +186,7 @@ async function erase(
   await tx.delete(budgets).where(eq(budgets.userId, user.id));
   // Private recurring payments hold their names and the merchants they match.
   await tx.delete(recurringSeries).where(eq(recurringSeries.userId, user.id));
+  await tx.delete(notifications).where(eq(notifications.userId, user.id));
   await tx.delete(userIdentities).where(eq(userIdentities.userId, user.id));
   await tx.delete(sessions).where(eq(sessions.userId, user.id));
   await tx

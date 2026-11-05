@@ -19,6 +19,7 @@ import { createDemoRouter } from './modules/demo/demo.routes';
 import type { DemoConfig } from './modules/demo/demo.service';
 import { createInvitesRouter } from './modules/invites/invites.routes';
 import { createHealthRouter, type HealthDeps } from './routes/health';
+import { createNotificationsRouter } from './modules/notifications/notifications.routes';
 
 export interface AppDeps extends HealthDeps {
   /** Set on the demo instance only: mounts /api/demo and closes registration and joining. */
@@ -88,6 +89,7 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
   api.get('/me', requireAuth, getMe);
   api.use('/account', createAccountRouter({ demo, oauth: deps.oauth }));
   api.use('/households', createHouseholdsRouter());
+  api.use('/notifications', requireAuth, createNotificationsRouter());
   api.use('/invites', createInvitesRouter({ demo }));
   if (deps.demo) api.use('/demo', createDemoRouter(deps.demo));
   app.use('/api', api);

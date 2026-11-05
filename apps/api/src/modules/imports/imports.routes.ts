@@ -15,6 +15,7 @@ import {
   listImports,
   undoImport,
 } from './imports.service';
+import { syncAfterChange } from '../notifications/sync';
 
 /** Mounted at /households/:id/imports (behind requireAuth). */
 export function createImportsRouter() {
@@ -39,12 +40,14 @@ export function createImportsRouter() {
     const scope = householdScope(req);
     const input = importInputSchema.parse(req.body);
     const body: ImportResponse = await createImport(scope, input);
+    await syncAfterChange(scope.householdId);
     res.status(201).json(body);
   });
 
   router.delete('/:importId', async (req, res) => {
     const scope = householdScope(req);
     await undoImport({ ...scope, importId: idParam(req, 'importId', importNotFound) });
+    await syncAfterChange(scope.householdId);
     res.status(204).end();
   });
 

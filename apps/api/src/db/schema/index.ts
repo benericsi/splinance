@@ -8,6 +8,7 @@ export * from './household-invites';
 export * from './household-members';
 export * from './import-batches';
 export * from './households';
+export * from './notifications';
 export * from './recurring-series';
 export * from './sessions';
 export * from './settlements';

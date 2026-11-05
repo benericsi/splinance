@@ -26,6 +26,7 @@ import { db, type Db } from '../../db/client';
 import { isUniqueViolation } from '../../db/errors';
 import {
   categories,
+  notifications,
   recurringSeries,
   type RecurringSeriesRow,
   transactionSplits,
@@ -279,6 +280,18 @@ async function buildSeriesList(
     .map((series) => ({ series, next: nextDueOn(series, series.lastPaidOn, today) }))
     .sort((a, b) => a.next.localeCompare(b.next) || a.series.name.localeCompare(b.series.name))
     .map(({ series }) => series);
+}
+
+/**
+ * A member's series with their payments, soonest first, for the notification sync. No
+ * membership check: the caller decides who is a member.
+ */
+export async function seriesForMember(
+  executor: Db,
+  scope: HouseholdScope,
+  today: string,
+): Promise<RecurringSeries[]> {
+  return buildSeriesList(executor, scope, await compute(executor, scope, today), today);
 }
 
 /**
@@ -583,6 +596,10 @@ export async function deleteSeries(
       .set({ archivedAt: new Date() })
       .where(eq(recurringSeries.id, existing.id));
   } else {
-    await db.delete(recurringSeries).where(eq(recurringSeries.id, existing.id));
+    await db.transaction(async (tx) => {
+      // Its notifications would point at nothing.
+      await tx.delete(notifications).where(eq(notifications.subjectId, existing.id));
+      await tx.delete(recurringSeries).where(eq(recurringSeries.id, existing.id));
+    });
   }
 }

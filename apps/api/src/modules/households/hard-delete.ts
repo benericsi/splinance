@@ -9,6 +9,7 @@ import {
   householdMembers,
   households,
   importBatches,
+  notifications,
   recurringSeries,
   settlements,
   transactionSplits,
@@ -35,6 +36,7 @@ export async function deleteHouseholdContents(tx: Db, householdIds: string[]): P
     .orderBy(households.id)
     .for('update');
   for (const table of [
+    notifications,
     auditLog,
     transactionSplits,
     transactions,
