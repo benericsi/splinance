@@ -37,7 +37,7 @@ export function BudgetList({
 
   return (
     <div className="space-y-4">
-      <dl className="grid grid-cols-3 gap-3">
+      <dl className="grid gap-2 max-sm:grid-cols-[repeat(3,auto)] sm:grid-cols-3 sm:gap-3">
         <Total label={t('totals.budgeted')} minor={budgeted} currency={data.currency} />
         <Total label={t('totals.spent')} minor={spent} currency={data.currency} />
         <Total
@@ -112,9 +112,9 @@ function Total({
   className?: string | undefined;
 }) {
   return (
-    <div className="bg-muted/50 min-w-0 rounded-lg px-2.5 py-2.5 sm:px-3">
+    <div className="bg-muted/50 min-w-0 rounded-lg px-2 py-2.5 sm:px-3">
       <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className={cn('truncate text-sm font-semibold tabular-nums sm:text-lg', className)}>
+      <dd className={cn('truncate text-[13px]/5 font-semibold tabular-nums sm:text-lg', className)}>
         <MoneyFlow minor={minor} currency={currency} />
       </dd>
     </div>

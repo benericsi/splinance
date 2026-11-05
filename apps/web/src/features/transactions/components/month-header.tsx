@@ -11,7 +11,8 @@ export function MonthHeader({ month, summary }: { month: string; summary: Transa
   return (
     <div className="mb-6 space-y-4">
       <MonthNav month={month} page="/h/$householdId/transactions" />
-      <dl className="grid grid-cols-3 gap-3">
+      {/* On phones the columns size to their amounts: "+1 690 000 Ft" needs more than a third. */}
+      <dl className="grid gap-2 max-sm:grid-cols-[repeat(3,auto)] sm:grid-cols-3 sm:gap-3">
         <Stat
           label={t('stats.spent')}
           value={<MoneyFlow minor={summary.expenses} currency={summary.currency} />}
@@ -40,9 +41,9 @@ function Stat({
   className?: string | undefined;
 }) {
   return (
-    <div className="bg-muted/50 min-w-0 rounded-lg px-3 py-2.5">
+    <div className="bg-muted/50 min-w-0 rounded-lg px-2 py-2.5 sm:px-3">
       <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className={cn('truncate text-base font-semibold tabular-nums sm:text-lg', className)}>
+      <dd className={cn('truncate text-[13px]/5 font-semibold tabular-nums sm:text-lg', className)}>
         {value}
       </dd>
     </div>
