@@ -196,6 +196,7 @@ async function erase(
       // `.invalid` never resolves (RFC 2606), like demo accounts; the real address is free.
       email: `deleted-${user.id}@deleted.invalid`,
       passwordHash: null,
+      locale: null,
       deletedAt: now,
     })
     .where(eq(users.id, user.id));

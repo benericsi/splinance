@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { UserAvatar } from '@/components/user-avatar';
 import { useAuth } from '@/lib/auth-store';
+import { i18n } from '@/i18n';
 import { errorMessage } from '@/lib/query-client';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { useRemoveMember, useUpdateMemberRole } from '../hooks';
@@ -131,7 +132,11 @@ function MemberActions({ householdId, member }: { householdId: string; member: H
         pendingLabel="Removing…"
         destructive
         pending={remove.isPending}
-        error={remove.error ? errorMessage(remove.error) : undefined}
+        error={
+          remove.error
+            ? errorMessage(remove.error, { UNSETTLED_BALANCE: i18n.t('errors:unsettled.remove') })
+            : undefined
+        }
         onConfirm={() => {
           remove.mutate(
             { householdId, userId: member.userId },

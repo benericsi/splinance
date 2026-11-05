@@ -1,5 +1,6 @@
 import { checkPassword, type PasswordContext, type PasswordRuleResult } from '@splinance/shared';
 import { Check, Circle, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
 interface PasswordRequirementsProps {
@@ -10,6 +11,7 @@ interface PasswordRequirementsProps {
 }
 
 function RuleItem({ result, showFailure }: { result: PasswordRuleResult; showFailure: boolean }) {
+  const { t } = useTranslation();
   const { rule, passed } = result;
   const failed = !passed && showFailure && rule.required;
   const Icon = passed ? Check : rule.required ? X : Circle;
@@ -25,7 +27,7 @@ function RuleItem({ result, showFailure }: { result: PasswordRuleResult; showFai
     >
       <Icon className={cn('size-4 shrink-0', !passed && !rule.required && 'size-3')} aria-hidden />
       <span>{rule.label}</span>
-      <span className="sr-only">{passed ? '(met)' : '(not met)'}</span>
+      <span className="sr-only">{passed ? t('password.met') : t('password.notMet')}</span>
     </li>
   );
 }
@@ -36,22 +38,23 @@ export function PasswordRequirements({
   context,
   showFailures,
 }: PasswordRequirementsProps) {
+  const { t } = useTranslation();
   const results = checkPassword(password, context);
   const required = results.filter((r) => r.rule.required);
   const recommended = results.filter((r) => !r.rule.required);
 
   return (
     <div className="space-y-3 pt-1">
-      <ul aria-label="Password requirements" className="space-y-1.5">
+      <ul aria-label={t('password.requirements')} className="space-y-1.5">
         {required.map((r) => (
           <RuleItem key={r.rule.id} result={r} showFailure={showFailures} />
         ))}
       </ul>
       <div className="space-y-1.5">
         <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-          Makes it stronger
+          {t('password.stronger')}
         </p>
-        <ul aria-label="Password recommendations" className="space-y-1.5">
+        <ul aria-label={t('password.recommendations')} className="space-y-1.5">
           {recommended.map((r) => (
             <RuleItem key={r.rule.id} result={r} showFailure={false} />
           ))}

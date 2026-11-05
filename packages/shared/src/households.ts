@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { msg } from './i18n/validation';
 
 export const HOUSEHOLD_ROLES = ['owner', 'member'] as const;
 export const householdRoleSchema = z.enum(HOUSEHOLD_ROLES);
@@ -15,8 +16,8 @@ export type Currency = z.infer<typeof currencySchema>;
 export const householdNameSchema = z
   .string()
   .trim()
-  .min(1, 'Name is required')
-  .max(60, 'Name must be at most 60 characters');
+  .min(1, msg('name.required'))
+  .max(60, msg('name.tooLong', 60));
 
 export const createHouseholdInputSchema = z.object({
   name: householdNameSchema,

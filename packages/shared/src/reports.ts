@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { currencySchema } from './households';
 import { monthSchema } from './transactions';
+import { msg } from './i18n/validation';
 
 /** The longest range one report covers. */
 export const REPORT_MAX_MONTHS = 24;
@@ -22,9 +23,9 @@ export function monthsBetween(from: string, to: string): string[] {
 
 export const reportQuerySchema = z
   .object({ from: monthSchema, to: monthSchema })
-  .refine(({ from, to }) => from <= to, { message: '`from` must not be after `to`', path: ['to'] })
+  .refine(({ from, to }) => from <= to, { ...msg('report.order'), path: ['to'] })
   .refine(({ from, to }) => monthsBetween(from, to).length <= REPORT_MAX_MONTHS, {
-    message: `At most ${String(REPORT_MAX_MONTHS)} months`,
+    ...msg('report.tooLong', REPORT_MAX_MONTHS),
     path: ['from'],
   });
 

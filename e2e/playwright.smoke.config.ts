@@ -16,6 +16,8 @@ export default defineConfig({
     ? [['github'], ['html', { open: 'never', outputFolder: 'playwright-report/smoke' }]]
     : [['list'], ['html', { open: 'never', outputFolder: 'playwright-report/smoke' }]],
   use: {
+    // The suites read English text; without this the browser follows the machine's language.
+    locale: 'en-US',
     baseURL: process.env.SMOKE_URL ?? 'http://localhost:8080',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

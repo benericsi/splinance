@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 import { FormError } from '@/components/form/form-error';
 import {
@@ -44,6 +45,7 @@ export function ConfirmDialog({
   children,
   onConfirm,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -54,7 +56,7 @@ export function ConfirmDialog({
         <FormError message={error} />
         {children}
         <AlertDialogFooter>
-          <AlertDialogCancel>{confirmLabel ? 'Cancel' : 'Close'}</AlertDialogCancel>
+          <AlertDialogCancel>{confirmLabel ? t('cancel') : t('close')}</AlertDialogCancel>
           {confirmLabel && (
             <Button
               variant={destructive ? 'destructive' : 'default'}

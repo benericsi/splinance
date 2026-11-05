@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Currency } from './households';
+import { msg } from './i18n/validation';
 
 /** Digits after the decimal point. HUF has no fillér in practice, so amounts are whole forints. */
 export const CURRENCY_EXPONENTS: Record<Currency, number> = { HUF: 0, EUR: 2 };
@@ -14,6 +15,6 @@ export const MAX_AMOUNT_MINOR = 1_000_000_000_000;
 /** A positive amount in minor units: always an integer, never a float. */
 export const amountMinorSchema = z
   .number()
-  .int('Amount must be a whole number of minor units')
-  .positive('Amount must be greater than zero')
-  .max(MAX_AMOUNT_MINOR, 'Amount is too large');
+  .int(msg('amount.whole'))
+  .positive(msg('amount.positive'))
+  .max(MAX_AMOUNT_MINOR, msg('amount.tooLarge'));

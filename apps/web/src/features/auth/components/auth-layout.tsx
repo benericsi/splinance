@@ -1,7 +1,9 @@
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BrandPanel } from '@/components/brand/brand-panel';
 import { Logo } from '@/components/logo';
+import { LanguageSwitch } from '@/features/account/components/language-switch';
 
 interface AuthLayoutProps {
   title: string;
@@ -13,6 +15,7 @@ interface AuthLayoutProps {
 
 /** Split auth screen: poster wall on the left (lg+), form on the right. */
 export function AuthLayout({ title, description, aside, children }: AuthLayoutProps) {
+  const { t } = useTranslation();
   return (
     <div className="bg-muted/40 grid min-h-svh gap-3 p-3 lg:grid-cols-2">
       <BrandPanel />
@@ -29,11 +32,12 @@ export function AuthLayout({ title, description, aside, children }: AuthLayoutPr
           </div>
           {children}
         </div>
-        <p className="text-muted-foreground text-center text-xs">
+        <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-3 text-xs">
           <Link to="/privacy" className="underline-offset-4 hover:underline">
-            Privacy
+            {t('privacy')}
           </Link>
-        </p>
+          <LanguageSwitch variant="plain" />
+        </div>
       </main>
     </div>
   );

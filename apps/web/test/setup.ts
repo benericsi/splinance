@@ -3,7 +3,11 @@ import { cleanup, configure } from '@testing-library/react';
 import { MotionGlobalConfig } from 'motion/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { resetSessionRestore } from '@/features/auth/session';
+// The app's i18next instance, in English (bundled, initialized synchronously): tests read
+// the English text. A test that switches language switches back in its own cleanup.
+import '@/i18n';
 import { resetAuthStore } from '@/lib/auth-store';
+import { LOCALE_STORAGE_KEY, localeStore } from '@/lib/locale';
 import { server } from './msw';
 
 // jsdom has no matchMedia; tests run as a light-mode OS by default.
@@ -55,11 +59,14 @@ beforeAll(() => {
   server.listen({ onUnhandledFrame: 'error' });
 });
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
   server.resetHandlers();
   resetAuthStore();
   resetSessionRestore();
+  // Every test starts in English, with no language remembered on the device.
+  localStorage.removeItem(LOCALE_STORAGE_KEY);
+  if (localeStore.getState() !== 'en') await localeStore.setLocale('en', { persist: false });
 });
 
 afterAll(async () => {

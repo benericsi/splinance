@@ -146,7 +146,10 @@ export async function getAccount(
 export async function updateProfile(userId: string, input: UpdateProfileInput): Promise<User> {
   const [user] = await db
     .update(users)
-    .set({ displayName: input.displayName })
+    .set({
+      ...(input.displayName !== undefined && { displayName: input.displayName }),
+      ...(input.locale !== undefined && { locale: input.locale }),
+    })
     .where(eq(users.id, userId))
     .returning();
   if (!user) throw sessionEnded();

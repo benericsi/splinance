@@ -16,6 +16,7 @@ export const testUser: User = {
   id: '01a112be-f8eb-73bb-b534-400e393821c3',
   email: 'anna@example.com',
   displayName: 'Anna',
+  locale: null,
   createdAt: '2026-10-06T19:44:27.880Z',
 };
 

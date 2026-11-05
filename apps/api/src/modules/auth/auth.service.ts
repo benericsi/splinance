@@ -50,6 +50,7 @@ export function toUser(row: UserRow): User {
     id: row.id,
     email: row.email,
     displayName: row.displayName,
+    locale: row.locale,
     createdAt: row.createdAt.toISOString(),
   };
 }

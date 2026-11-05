@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { PROVIDER_VIEWS, providerStartHref } from '../providers';
@@ -10,6 +11,7 @@ import { useSignInProviders } from '../use-sign-in-providers';
  * the API, which redirects to the provider.
  */
 export function ProviderButtons({ redirect }: { redirect: string | undefined }) {
+  const { t } = useTranslation('auth');
   const providers = useSignInProviders();
   if (providers.length === 0) return null;
 
@@ -29,14 +31,14 @@ export function ProviderButtons({ redirect }: { redirect: string | undefined }) 
               )}
             >
               <view.Logo className="size-4" />
-              Continue with {view.name}
+              {t('provider.continueWith', { provider: view.name })}
             </a>
           );
         })}
       </div>
       <div className="text-muted-foreground flex items-center gap-3 text-xs">
         <span className="bg-border h-px flex-1" aria-hidden />
-        or with email
+        {t('provider.orWithEmail')}
         <span className="bg-border h-px flex-1" aria-hidden />
       </div>
     </div>

@@ -87,6 +87,7 @@ describe('where login leads after the session ended', () => {
     id: '01a1216a-b248-781c-9cc6-cd68276fcdfc',
     email: 'nora@example.com',
     displayName: 'Nora',
+    locale: null,
     createdAt: '2026-10-09T16:06:43.492Z',
   };
   const norasHome = {

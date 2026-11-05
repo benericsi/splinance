@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
@@ -37,6 +38,7 @@ export function AccountLayout({ children }: { children: ReactNode }) {
  * without a household (onboarding) back to `/`, which leads to onboarding.
  */
 function BackLink({ userId }: { userId: string | undefined }) {
+  const { t } = useTranslation();
   const { data: households } = useQuery({ ...householdQueries.list(), enabled: !!userId });
   const last = userId ? readLastHousehold(userId) : undefined;
   const household = households?.find((h) => h.id === last) ?? households?.[0];
@@ -45,12 +47,12 @@ function BackLink({ userId }: { userId: string | undefined }) {
   return household ? (
     <Link to="/h/$householdId" params={{ householdId: household.id }} className={className}>
       <ArrowLeft aria-hidden />
-      <span className="truncate">Back to {household.name}</span>
+      <span className="truncate">{t('backTo', { name: household.name })}</span>
     </Link>
   ) : (
     <Link to="/" className={className}>
       <ArrowLeft aria-hidden />
-      Back
+      {t('back')}
     </Link>
   );
 }

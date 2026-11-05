@@ -1,9 +1,12 @@
 import { z } from 'zod';
+import { msg } from './i18n/validation';
 
 export const INVITE_TTL_DAYS = 7;
 
 /** 32 random bytes, base64url without padding. Anything else cannot be a real token. */
-export const inviteTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'Invalid invite token');
+export const inviteTokenSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9_-]{43}$/, msg('invite.invalidToken'));
 
 export const inviteSchema = z.object({
   id: z.uuid(),

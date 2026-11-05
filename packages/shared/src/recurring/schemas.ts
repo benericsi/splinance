@@ -3,6 +3,7 @@ import { currencySchema } from '../households';
 import { amountMinorSchema } from '../money';
 import { matchKey } from '../rules';
 import { occurredOnSchema } from '../transactions';
+import { msg } from '../i18n/validation';
 
 export const RECURRING_CADENCES = ['weekly', 'monthly', 'quarterly', 'yearly'] as const;
 export const recurringCadenceSchema = z.enum(RECURRING_CADENCES);
@@ -29,18 +30,18 @@ export type RecurringScope = z.infer<typeof recurringScopeSchema>;
 export const recurringNameSchema = z
   .string()
   .trim()
-  .min(1, 'Name is required')
-  .max(60, 'Keep it under 60 characters');
+  .min(1, msg('name.required'))
+  .max(60, msg('text.max', 60));
 
 /** The text a series matches in the bank's counterparty or the description (like a rule). */
 export const recurringPatternSchema = z
   .string()
   .trim()
-  .min(2, 'Enter at least 2 characters')
-  .max(60, 'Keep it under 60 characters')
+  .min(2, msg('text.min', 2))
+  .max(60, msg('text.max', 60))
   .refine(
     (pattern) => matchKey(pattern).replace(/[^\p{L}\p{N}]/gu, '').length >= 2,
-    'Enter at least 2 letters or digits',
+    msg('pattern.letters'),
   );
 
 /** A detected series' key as `recurringKey` makes it: already a match key. */
@@ -48,7 +49,7 @@ export const recurringKeySchema = z
   .string()
   .min(2)
   .max(60)
-  .refine((key) => key === matchKey(key), 'Not a recurring key');
+  .refine((key) => key === matchKey(key), msg('recurring.invalidKey'));
 
 const seriesFields = z.object({
   name: recurringNameSchema,
@@ -73,7 +74,7 @@ const startsBeforeAnchor = (value: {
   anchorOn?: string | undefined;
 }) => !value.startsOn || !value.anchorOn || value.startsOn <= value.anchorOn;
 const STARTS_AFTER_ANCHOR = {
-  message: 'The first payment cannot be after this date',
+  ...msg('recurring.startsAfterAnchor'),
   path: ['startsOn'],
 };
 

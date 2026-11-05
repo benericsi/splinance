@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { msg, vm } from './i18n/validation';
 import { categoryKindSchema } from './categories';
 import { currencySchema } from './households';
 import { amountMinorSchema } from './money';
@@ -17,20 +18,17 @@ export const splitMethodSchema = z.enum(SPLIT_METHODS);
 
 /** A calendar date (`YYYY-MM-DD`), within a sane range for household bookkeeping. */
 export const occurredOnSchema = z.iso
-  .date('Enter a valid date')
-  .refine(
-    (date) => date >= '2000-01-01' && date <= '2099-12-31',
-    'Enter a date between 2000 and 2099',
-  );
+  .date(msg('date.invalid'))
+  .refine((date) => date >= '2000-01-01' && date <= '2099-12-31', msg('date.range'));
 
 /** A calendar month, `YYYY-MM`. */
-export const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use YYYY-MM');
+export const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, msg('month.format'));
 
 export const descriptionSchema = z
   .string()
   .trim()
-  .min(1, 'Description is required')
-  .max(120, 'Description must be at most 120 characters');
+  .min(1, msg('description.required'))
+  .max(120, msg('description.tooLong', 120));
 
 /** How the person entering a shared transaction divided it (mirrors `SplitSpec`). */
 export const splitInputSchema = z.discriminatedUnion('method', [
@@ -54,13 +52,8 @@ export const splitInputSchema = z.discriminatedUnion('method', [
 
 export type SplitInput = z.infer<typeof splitInputSchema>;
 
-export const SPLIT_PROBLEM_MESSAGES: Record<SplitProblem, string> = {
-  'no-members': 'Choose at least one person',
-  'duplicate-member': 'Each person can appear only once',
-  'invalid-value': 'Every share must be greater than zero',
-  'percentage-total': 'Percentages must add up to 100%',
-  'fixed-total': 'Amounts must add up to the total',
-};
+/** Why a split does not add up, in the current language. */
+export const splitProblemMessage = (problem: SplitProblem): string => vm(`split.${problem}`);
 
 const baseInput = {
   kind: transactionKindSchema,
@@ -88,7 +81,7 @@ export const transactionInputSchema = z
     if (input.visibility !== 'shared') return;
     const problem = splitProblem(input.amount, input.split);
     if (problem)
-      ctx.addIssue({ code: 'custom', path: ['split'], message: SPLIT_PROBLEM_MESSAGES[problem] });
+      ctx.addIssue({ code: 'custom', path: ['split'], message: splitProblemMessage(problem) });
   });
 
 export type TransactionInput = z.infer<typeof transactionInputSchema>;

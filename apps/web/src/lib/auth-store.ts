@@ -43,7 +43,7 @@ export interface AuthStore {
  * Access token and current user, kept in memory only (never localStorage).
  * Lives outside React so the HTTP client, router guards and loaders can read it.
  */
-function createAuthStore(): AuthStore & { reset: () => void } {
+export function createAuthStore(): AuthStore & { reset: () => void } {
   let state = initialState;
   const listeners = new Set<() => void>();
 

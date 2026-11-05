@@ -166,6 +166,44 @@ describe('PATCH /api/account', () => {
     expect(members.map((m) => m.displayName)).toEqual(['Anna K.']);
   });
 
+  it('saves the UI language alone, keeps the name, and clears it with null', async () => {
+    const annaDevice = await registerAnna(app);
+    const me = () =>
+      request(app)
+        .get('/api/me')
+        .set('Authorization', annaDevice.auth)
+        .expect(200)
+        .then((res) => profileResponseSchema.parse(res.body).user);
+    expect((await me()).locale).toBeNull();
+
+    const res = await request(app)
+      .patch('/api/account')
+      .set('Authorization', annaDevice.auth)
+      .send({ locale: 'hu' })
+      .expect(200);
+    expect(profileResponseSchema.parse(res.body).user).toMatchObject({
+      locale: 'hu',
+      displayName: 'Anna',
+    });
+    expect((await me()).locale).toBe('hu');
+
+    await request(app)
+      .patch('/api/account')
+      .set('Authorization', annaDevice.auth)
+      .send({ locale: null })
+      .expect(200);
+    expect((await me()).locale).toBeNull();
+
+    for (const body of [{ locale: 'de' }, {}]) {
+      const bad = await request(app)
+        .patch('/api/account')
+        .set('Authorization', annaDevice.auth)
+        .send(body)
+        .expect(400);
+      expect(errorCode(bad)).toBe('VALIDATION_ERROR');
+    }
+  });
+
   it('validates the name', async () => {
     const annaDevice = await registerAnna(app);
     for (const displayName of ['   ', 'x'.repeat(51)]) {

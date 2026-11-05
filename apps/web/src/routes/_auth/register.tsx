@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from 'react-i18next';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { AuthLayout } from '@/features/auth/components/auth-layout';
 import { ProviderButtons } from '@/features/auth/components/provider-buttons';
@@ -15,26 +16,30 @@ export const Route = createFileRoute('/_auth/register')({
 });
 
 function RegisterPage() {
+  const { t } = useTranslation('auth');
   const { redirect: target } = Route.useSearch();
   const navigate = useNavigate();
 
   return (
     <>
-      <PageTitle title="Create account" />
+      <PageTitle title={t('register.pageTitle')} />
       <AuthLayout
-        title="Create your account"
-        description="Track personal and shared expenses in one place."
+        title={t('register.title')}
+        description={t('register.description')}
         aside={
-          <>
-            Already have an account?{' '}
-            <Link
-              to="/login"
-              search={{ redirect: target }}
-              className="text-link font-medium underline-offset-4 hover:underline"
-            >
-              Log in
-            </Link>
-          </>
+          <Trans
+            t={t}
+            i18nKey="register.haveAccount"
+            components={{
+              a: (
+                <Link
+                  to="/login"
+                  search={{ redirect: target }}
+                  className="text-link font-medium underline-offset-4 hover:underline"
+                />
+              ),
+            }}
+          />
         }
       >
         <ProviderButtons redirect={target} />

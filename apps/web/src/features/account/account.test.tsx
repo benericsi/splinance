@@ -150,7 +150,7 @@ describe('account page', () => {
         'Your only way to sign in. Set a password first, then you can disconnect Google.',
       ),
     ).toBeVisible();
-    expect(methods.getByText(/^Connected Nov 4, 2026 · Last used /)).toBeVisible();
+    expect(methods.getByText(/^Connected 4 Nov 2026 · Last used /)).toBeVisible();
   });
 
   it('renames inline and updates the signed-in user', async () => {
@@ -406,7 +406,7 @@ describe('last used', () => {
     try {
       expect(formatLastUsed('2026-11-04T08:00:00')).toBe('today');
       expect(formatLastUsed('2026-11-03T23:00:00')).toBe('yesterday');
-      expect(formatLastUsed('2026-10-20T12:00:00')).toBe('Oct 20, 2026');
+      expect(formatLastUsed('2026-10-20T12:00:00')).toBe('20 Oct 2026');
     } finally {
       vi.useRealTimers();
     }

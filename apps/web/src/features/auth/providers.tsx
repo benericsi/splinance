@@ -1,6 +1,7 @@
 import type { OAuthErrorCode } from '@splinance/shared';
 import type { ComponentType } from 'react';
 import { GoogleMark } from '@/components/brand/provider-logos';
+import { i18n } from '@/i18n';
 
 interface ProviderView {
   /** As in "Google is now connected". */
@@ -23,17 +24,8 @@ export function providerStartHref(providerId: string, redirect: string | undefin
   return redirect ? `${base}?${new URLSearchParams({ redirect }).toString()}` : base;
 }
 
-/** Why a provider sign-in came back to /login (`?oauth_error=`). */
-export const OAUTH_ERROR_MESSAGES: Record<OAuthErrorCode, string> = {
-  cancelled: 'Google sign-in was cancelled.',
-  not_allowed: 'Sign-ups are invite-only for now.',
-  email_unverified:
-    "Your Google account's email isn't verified. Verify it with Google, or use a password.",
-  expired: 'That sign-in took too long or was started in another tab. Try again.',
-  conflict: 'This email is connected to another sign-in. Log in with your password.',
-  unavailable: "Google sign-in isn't available right now. Use your password or try again later.",
-  failed: "Google sign-in didn't work. Try again.",
-  // Only from account settings, which shows its own messages; listed for completeness.
-  taken: 'This Google account is already used by another Splinance account.',
-  wrong_account: "Google sign-in didn't work. Try again.",
-};
+/** Why a provider sign-in came back to /login (`?oauth_error=`), in the UI language. */
+export function oauthErrorMessage(code: OAuthErrorCode): string {
+  // Only Google exists today; a second provider would carry its id in the error too.
+  return i18n.t(`auth:oauthError.${code}`, { provider: 'Google' });
+}

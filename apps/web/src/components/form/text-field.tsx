@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { AnyFieldApi } from '@tanstack/react-form';
 import { Eye, EyeOff } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -54,6 +55,7 @@ export function TextField({
   description,
   onValueChange,
 }: TextFieldProps) {
+  const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
 
   // AnyFieldApi types name and value as any; this component only handles string fields.
@@ -108,7 +110,7 @@ export function TextField({
           <InputGroupAddon align="inline-end">
             <InputGroupButton
               size="icon-xs"
-              aria-label={revealed ? 'Hide password' : 'Show password'}
+              aria-label={revealed ? t('password.hide') : t('password.show')}
               aria-pressed={revealed}
               onClick={() => {
                 setRevealed((r) => !r);

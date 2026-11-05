@@ -1,5 +1,7 @@
 import { MutationCache, QueryClient } from '@tanstack/react-query';
+import { API_ERROR_CODES, type ApiErrorCode } from '@splinance/shared';
 import { toast } from 'sonner';
+import { i18n } from '@/i18n';
 import { ApiError } from './http';
 
 const MAX_RETRIES = 2;
@@ -13,9 +15,26 @@ declare module '@tanstack/react-query' {
   }
 }
 
-export function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) return error.message;
-  return 'Something went wrong. Please try again.';
+const isApiErrorCode = (code: string): code is ApiErrorCode =>
+  (API_ERROR_CODES as readonly string[]).includes(code);
+
+/**
+ * What to tell people about a failed request, in the UI language: the text for the API's
+ * error code (the API's own message is English, for logs). Never the raw message, which
+ * would show English in a Hungarian UI.
+ */
+export function errorMessage(
+  error: unknown,
+  /** Words for a code in this place, e.g. UNSETTLED_BALANCE while leaving a household. */
+  overrides: Partial<Record<ApiErrorCode, string>> = {},
+): string {
+  if (error instanceof ApiError) {
+    if (isApiErrorCode(error.code)) {
+      return overrides[error.code] ?? i18n.t(`errors:codes.${error.code}`);
+    }
+    if (error.code === 'NETWORK_ERROR') return i18n.t('errors:network');
+  }
+  return i18n.t('errors:generic');
 }
 
 export function createQueryClient() {

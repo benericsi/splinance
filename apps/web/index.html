@@ -9,21 +9,30 @@
     <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Splinance</title>
-    <!-- Applies the saved theme before first paint (no light flash in dark mode).
-         Mirrors src/lib/theme.ts. The CSP in deploy/web/Caddyfile allows it by hash:
+    <!-- Applies the saved theme and language before first paint (no light flash in dark
+         mode, the splash in the right language). Mirrors src/lib/theme.ts and
+         src/lib/locale.ts (detectLocale). The CSP in deploy/web/Caddyfile allows it by hash:
          change it and update the hash (deploy/scripts/check-csp.mjs prints it). -->
     <script>
       (function () {
+        var root = document.documentElement;
         var dark = false;
+        var lang = '';
         try {
           var p = localStorage.getItem('splinance-theme');
           dark =
             p === 'dark' || (p !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+          lang = localStorage.getItem('splinance-locale') || '';
         } catch (e) {
           dark = matchMedia('(prefers-color-scheme: dark)').matches;
         }
-        document.documentElement.classList.toggle('dark', dark);
-        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        root.classList.toggle('dark', dark);
+        root.style.colorScheme = dark ? 'dark' : 'light';
+        var tags = navigator.languages || [navigator.language];
+        for (var i = 0; lang !== 'en' && lang !== 'hu' && i < tags.length; i++) {
+          lang = String(tags[i]).slice(0, 2).toLowerCase();
+        }
+        root.lang = lang === 'hu' ? 'hu' : 'en';
       })();
     </script>
     <!-- Zod 4 without its JIT: it probes for `new Function` while the app's modules load, and
@@ -57,6 +66,11 @@
       .splash a {
         color: inherit;
       }
+      /* One splash text per language; the script above sets <html lang>. */
+      html:lang(hu) .splash [lang='en'],
+      html:not(:lang(hu)) .splash [lang='hu'] {
+        display: none;
+      }
       /* If the app never boots (script error, stale deploy), offer a way out. CSS only. */
       .splash-slow {
         visibility: hidden;
@@ -66,6 +80,15 @@
         to {
           visibility: visible;
         }
+      }
+      /* Read by screen readers, not shown (the pulsing logo says it). */
+      .splash-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
       }
       .splash img {
         width: 40px;
@@ -88,9 +111,14 @@
   <body>
     <div id="root">
       <!-- Shown until main.tsx has restored the session and loaded the first route. -->
-      <div class="splash" role="status" aria-label="Loading Splinance">
+      <div class="splash" role="status">
         <img src="/favicon.svg" alt="" />
-        <p class="splash-slow">Taking longer than expected. <a href="">Reload the page</a></p>
+        <span lang="en" class="splash-label">Loading Splinance</span>
+        <span lang="hu" class="splash-label">A Splinance betöltése</span>
+        <p class="splash-slow">
+          <span lang="en">Taking longer than expected. <a href="">Reload the page</a></span>
+          <span lang="hu">A vártnál tovább tart. <a href="">Az oldal újratöltése</a></span>
+        </p>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

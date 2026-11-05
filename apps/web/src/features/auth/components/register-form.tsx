@@ -1,5 +1,6 @@
 import { PASSWORD_MAX_LENGTH, registerInputSchema } from '@splinance/shared';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { useTranslation } from 'react-i18next';
 import { FormError } from '@/components/form/form-error';
 import { TextField } from '@/components/form/text-field';
 import { Button } from '@/components/ui/button';
@@ -8,14 +9,15 @@ import { errorMessage } from '@/lib/query-client';
 import { useRegister } from '../hooks';
 import { PasswordRequirements } from './password-requirements';
 
-// API errors that are about the email, shown next to the field.
-const EMAIL_ERRORS: Partial<Record<string, string>> = {
-  EMAIL_TAKEN: 'An account with this email already exists',
-  // Production lets only allowlisted emails sign up.
-  REGISTRATION_CLOSED: 'Sign-ups are invite-only for now',
+// API errors that are about the email, shown next to the field (production lets only
+// allowlisted emails sign up: REGISTRATION_CLOSED).
+const EMAIL_ERRORS: Partial<Record<string, 'register.emailTaken' | 'register.closed'>> = {
+  EMAIL_TAKEN: 'register.emailTaken',
+  REGISTRATION_CLOSED: 'register.closed',
 };
 
 export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
+  const { t } = useTranslation('auth');
   const register = useRegister();
 
   const form = useForm({
@@ -34,7 +36,8 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
 
   // Field-specific API errors go next to the field; everything else above the form.
   const code = register.error instanceof ApiError ? register.error.code : undefined;
-  const emailError = EMAIL_ERRORS[code ?? ''];
+  const emailErrorKey = EMAIL_ERRORS[code ?? ''];
+  const emailError = emailErrorKey && t(emailErrorKey);
   const formError = register.error && !emailError ? errorMessage(register.error) : undefined;
 
   return (
@@ -53,9 +56,9 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
           <TextField
             field={field}
             required
-            label="Display name"
+            label={t('register.displayName')}
             autoFocus
-            placeholder="e.g. Anna"
+            placeholder={t('register.displayNamePlaceholder')}
             autoComplete="nickname"
           />
         )}
@@ -66,9 +69,9 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
           <TextField
             field={field}
             required
-            label="Email"
+            label={t('email')}
             type="email"
-            placeholder="you@example.com"
+            placeholder={t('emailPlaceholder')}
             autoComplete="email"
             serverError={emailError}
             onValueChange={register.reset}
@@ -89,9 +92,9 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
               <TextField
                 field={field}
                 required
-                label="Password"
+                label={t('password')}
                 type="password"
-                placeholder="Create a password"
+                placeholder={t('register.passwordPlaceholder')}
                 autoComplete="new-password"
                 maxLength={PASSWORD_MAX_LENGTH}
                 // The checklist below explains every password error.
@@ -112,7 +115,7 @@ export function RegisterForm({ onSuccess }: { onSuccess: () => void }) {
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (
           <Button type="submit" size="lg" className="h-10 w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating account…' : 'Create account'}
+            {isSubmitting ? t('register.submitting') : t('register.submit')}
           </Button>
         )}
       </form.Subscribe>

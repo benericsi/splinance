@@ -1,0 +1,51 @@
+export const auth = {
+  email: 'Email',
+  emailPlaceholder: 'you@example.com',
+  password: 'Password',
+  login: {
+    title: 'Log in',
+    description: 'Welcome back to Splinance.',
+    noAccount: 'No account yet? <a>Create one</a>',
+    passwordPlaceholder: 'Enter your password',
+    submit: 'Log in',
+    submitLink: 'Log in and connect',
+    submitting: 'Logging in…',
+    deleted: 'Your account has been deleted. Thanks for using Splinance.',
+    providerHint: 'Signed up with {{provider}}? Use the button above.',
+    tryDemo: 'Just looking? <a>Try the demo</a>',
+  },
+  register: {
+    pageTitle: 'Create account',
+    title: 'Create your account',
+    description: 'Track personal and shared expenses in one place.',
+    haveAccount: 'Already have an account? <a>Log in</a>',
+    displayName: 'Display name',
+    displayNamePlaceholder: 'e.g. Anna',
+    passwordPlaceholder: 'Create a password',
+    submit: 'Create account',
+    submitting: 'Creating account…',
+    emailTaken: 'An account with this email already exists',
+    closed: 'Sign-ups are invite-only for now',
+  },
+  provider: {
+    continueWith: 'Continue with {{provider}}',
+    orWithEmail: 'or with email',
+    linked: '{{provider}} is now connected. Next time, continue with {{provider}}.',
+    linkTitle: 'Connect your {{provider}} account',
+    linkDescription:
+      'This email already has a Splinance account. Log in with its password once to connect {{provider}}.',
+  },
+  oauthError: {
+    cancelled: '{{provider}} sign-in was cancelled.',
+    not_allowed: 'Sign-ups are invite-only for now.',
+    email_unverified:
+      "Your {{provider}} account's email isn't verified. Verify it with {{provider}}, or use a password.",
+    expired: 'That sign-in took too long or was started in another tab. Try again.',
+    conflict: 'This email is connected to another sign-in. Log in with your password.',
+    unavailable:
+      "{{provider}} sign-in isn't available right now. Use your password or try again later.",
+    failed: "{{provider}} sign-in didn't work. Try again.",
+    taken: 'This {{provider}} account is already used by another Splinance account.',
+    wrong_account: "{{provider}} sign-in didn't work. Try again.",
+  },
+};

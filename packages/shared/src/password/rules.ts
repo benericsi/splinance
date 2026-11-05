@@ -1,3 +1,4 @@
+import { vm } from '../i18n/validation';
 import { COMMON_PASSWORDS } from './common-passwords';
 
 export const PASSWORD_MIN_LENGTH = 10;
@@ -14,15 +15,15 @@ export type PasswordRuleId =
 
 export interface PasswordRule {
   id: PasswordRuleId;
-  /** Checklist text in the UI. */
-  label: string;
+  /** Checklist text in the UI, in the current language (a getter). */
+  readonly label: string;
   /**
    * Required rules block registration (enforced by the API too). Recommended rules
    * are hints only: NIST SP 800-63B advises against mandatory composition rules.
    */
   required: boolean;
-  /** Validation message when a required rule fails. */
-  message: string;
+  /** Validation message when a required rule fails, in the current language. */
+  readonly message: string;
   test: (password: string, context: PasswordContext) => boolean;
 }
 
@@ -39,16 +40,24 @@ function personalFragments({ email, displayName }: PasswordContext): string[] {
 export const PASSWORD_RULES: readonly PasswordRule[] = [
   {
     id: 'minLength',
-    label: `At least ${String(PASSWORD_MIN_LENGTH)} characters`,
+    get label() {
+      return vm('passwordRule.minLength', PASSWORD_MIN_LENGTH);
+    },
     required: true,
-    message: `Password must be at least ${String(PASSWORD_MIN_LENGTH)} characters`,
+    get message() {
+      return vm('password.tooShort', PASSWORD_MIN_LENGTH);
+    },
     test: (password) => password.length >= PASSWORD_MIN_LENGTH,
   },
   {
     id: 'notPersonal',
-    label: 'Does not contain your email or name',
+    get label() {
+      return vm('passwordRule.notPersonal');
+    },
     required: true,
-    message: 'Password must not contain your email or name',
+    get message() {
+      return vm('password.personal');
+    },
     test: (password, context) => {
       // Nothing typed yet is not a pass.
       if (password.length === 0) return false;
@@ -58,28 +67,38 @@ export const PASSWORD_RULES: readonly PasswordRule[] = [
   },
   {
     id: 'notCommon',
-    label: 'Not a commonly used password',
+    get label() {
+      return vm('passwordRule.notCommon');
+    },
     required: true,
-    message: 'This password is too common, choose another one',
+    get message() {
+      return vm('password.common');
+    },
     test: (password) => password.length > 0 && !COMMON_PASSWORDS.has(password.toLowerCase()),
   },
   {
     id: 'lowercase',
-    label: 'A lowercase letter',
+    get label() {
+      return vm('passwordRule.lowercase');
+    },
     required: false,
     message: '',
     test: (password) => /\p{Ll}/u.test(password),
   },
   {
     id: 'uppercase',
-    label: 'An uppercase letter',
+    get label() {
+      return vm('passwordRule.uppercase');
+    },
     required: false,
     message: '',
     test: (password) => /\p{Lu}/u.test(password),
   },
   {
     id: 'number',
-    label: 'A number',
+    get label() {
+      return vm('passwordRule.number');
+    },
     required: false,
     message: '',
     test: (password) => /\d/.test(password),
