@@ -33,6 +33,7 @@ export const auth: Messages<typeof en.auth> = {
   provider: {
     continueWith: 'Folytatás {{provider}}-fiókkal',
     orWithEmail: 'vagy e-maillel',
+    linked: 'A {{provider}}-fiók összekapcsolva. Legközelebb azzal is beléphetsz.',
     linkTitle: 'Kapcsold össze a {{provider}}-fiókod',
     linkDescription:
       'Ehhez az e-mail-címhez már tartozik Splinance-fiók. Jelentkezz be egyszer a jelszavával, és összekapcsoljuk a {{provider}}-fiókkal.',

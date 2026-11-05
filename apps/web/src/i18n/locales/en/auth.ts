@@ -30,6 +30,7 @@ export const auth = {
   provider: {
     continueWith: 'Continue with {{provider}}',
     orWithEmail: 'or with email',
+    linked: '{{provider}} is now connected. Next time, continue with {{provider}}.',
     linkTitle: 'Connect your {{provider}} account',
     linkDescription:
       'This email already has a Splinance account. Log in with its password once to connect {{provider}}.',

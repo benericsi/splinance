@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { i18n } from '@/i18n';
 import { errorMessage } from '@/lib/query-client';
 import { useArchiveHousehold, useLeaveHousehold } from '../hooks';
 
@@ -96,7 +97,11 @@ function LeaveButton({ household }: { household: HouseholdDetail }) {
           pendingLabel="Leaving…"
           destructive
           pending={leave.isPending}
-          error={leave.error ? errorMessage(leave.error) : undefined}
+          error={
+            leave.error
+              ? errorMessage(leave.error, { UNSETTLED_BALANCE: i18n.t('errors:unsettled.leave') })
+              : undefined
+          }
           onConfirm={() => {
             leave.mutate(
               { householdId: household.id },
@@ -149,7 +154,11 @@ function ArchiveButton({ household }: { household: HouseholdDetail }) {
         pendingLabel="Archiving…"
         destructive
         pending={archive.isPending}
-        error={archive.error ? errorMessage(archive.error) : undefined}
+        error={
+          archive.error
+            ? errorMessage(archive.error, { UNSETTLED_BALANCE: i18n.t('errors:unsettled.archive') })
+            : undefined
+        }
         onConfirm={() => {
           // A typed confirmation, because this affects everyone in the household.
           if (typed.trim() !== household.name) {

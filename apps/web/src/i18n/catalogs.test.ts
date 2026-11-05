@@ -16,9 +16,14 @@ function flatten(tree: Tree, prefix = ''): Map<string, string> {
   return entries;
 }
 
-/** What a translation must keep: {{variables}} and <tags>, in any order. */
-const placeholders = (text: string) =>
-  [...text.matchAll(/\{\{\s*(\w+)\s*\}\}|<\/?(\w+)>/g)].map((m) => m[0].replace(/\s/g, '')).sort();
+/** What a translation must keep: each {{variable}} and <tag>, in any order and count. */
+const placeholders = (text: string) => [
+  ...new Set(
+    [...text.matchAll(/\{\{\s*(\w+)\s*\}\}|<\/?(\w+)>/g)]
+      .map((m) => m[0].replace(/\s/g, ''))
+      .sort(),
+  ),
+];
 
 const english = flatten(en);
 const hungarian = flatten(hu);

@@ -23,9 +23,15 @@ const isApiErrorCode = (code: string): code is ApiErrorCode =>
  * error code (the API's own message is English, for logs). Never the raw message, which
  * would show English in a Hungarian UI.
  */
-export function errorMessage(error: unknown): string {
+export function errorMessage(
+  error: unknown,
+  /** Words for a code in this place, e.g. UNSETTLED_BALANCE while leaving a household. */
+  overrides: Partial<Record<ApiErrorCode, string>> = {},
+): string {
   if (error instanceof ApiError) {
-    if (isApiErrorCode(error.code)) return i18n.t(`errors:codes.${error.code}`);
+    if (isApiErrorCode(error.code)) {
+      return overrides[error.code] ?? i18n.t(`errors:codes.${error.code}`);
+    }
     if (error.code === 'NETWORK_ERROR') return i18n.t('errors:network');
   }
   return i18n.t('errors:generic');

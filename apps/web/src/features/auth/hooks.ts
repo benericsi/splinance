@@ -1,6 +1,7 @@
 import type { AuthResponse } from '@splinance/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { i18n } from '@/i18n';
 import { authStore } from '@/lib/auth-store';
 import { authApi } from './api';
 import { PROVIDER_VIEWS } from './providers';
@@ -21,7 +22,7 @@ export function useLogin() {
         // The waiting link is used up (the API cleared its cookie).
         queryClient.removeQueries({ queryKey: authQueries.pendingLink().queryKey });
         const name = PROVIDER_VIEWS[response.linkedProvider]?.name ?? response.linkedProvider;
-        toast.success(`${name} is now connected. Next time, continue with ${name}.`);
+        toast.success(i18n.t('auth:provider.linked', { provider: name }));
       }
     },
     meta: { suppressErrorToast: true },
