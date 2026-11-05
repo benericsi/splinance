@@ -19,7 +19,7 @@ export function DemoBanner() {
   return (
     <aside
       aria-label="Demo"
-      className="bg-muted/50 mb-6 flex items-center justify-between gap-3 rounded-lg border py-1.5 pr-1.5 pl-3 text-sm md:mr-28"
+      className="bg-muted/50 mb-6 flex items-center justify-between gap-3 rounded-lg border py-1.5 pr-1.5 pl-3 text-sm md:mr-28 min-[91rem]:mr-0"
     >
       <p className="flex min-w-0 items-center gap-2">
         <FlaskConical className="text-muted-foreground size-4 shrink-0" aria-hidden />
