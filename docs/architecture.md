@@ -703,7 +703,7 @@ invitee: opens /invite#<token>
 
 - `NotificationBell` sits left of the account menu in `HouseholdShell` (top right on desktop, in the phone top bar). The badge is the unread count (`GET /notifications/unread-count`, polled every 5 minutes and on window focus; "9+" above nine, brand red with white text). It opens a Base UI popover (`components/ui/popover.tsx`) on desktop and a drawer on phones: local state, not a URL-driven modal, since it is a menu-like panel.
 - The panel loads `GET /notifications` when it opens. `describeNotification` turns a row into words from the reader's side ("Jane added Groceries", "Your share 6200 Ft", "Netflix renews on Saturday", "Eating out is over budget"); names come from the API. Unread items have a dot, resolved ones are muted. Opening an item marks it read and goes to it (`notificationTarget`: the series dialog, the budgets month, the transaction, the transactions list or the overview); "Mark all as read" does all. The footer switches "What others change in <household>" for the current household.
-- Transaction, import, recurring and budget writes invalidate the notification queries, so a renewal or budget alert from one's own change shows without waiting for the poll. `PageHeader` and the demo banner leave `md:pr-28` / `md:mr-28` for the bell and the avatar.
+- Transaction, import, recurring and budget writes invalidate the notification queries, so a renewal or budget alert from one's own change shows without waiting for the poll. `PageHeader` and the demo banner leave `md:pr-28` / `md:mr-28` for the bell and the avatar where they would overlap the content column; from 91rem (1456 px) they sit beside it and the room goes (`min-[91rem]:pr-0`).
 
 ### Reports
 
