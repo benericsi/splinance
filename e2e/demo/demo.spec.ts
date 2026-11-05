@@ -40,6 +40,26 @@ test('a visitor tries the demo and finds a year of shared money', async ({ page 
   await expect(page).toHaveURL(`/h/${householdId}`);
 });
 
+test("the demo shows recurring payments and a bell with the partner's week", async ({ page }) => {
+  const householdId = await tryDemo(page);
+
+  // Confirmed and hand-added series, one gone quiet, and suggestions to try.
+  await page.goto(`/h/${householdId}/recurring`);
+  for (const name of ['Rent', 'Netflix', 'Internet', 'Spotify Duo', 'Gym membership']) {
+    await expect(page.getByRole('link', { name: new RegExp(`^${name}`) })).toBeVisible();
+  }
+  await expect(page.getByRole('link', { name: /^Gym membership/ })).toContainText('Cancelled?');
+  const suggestions = page.getByRole('region', { name: 'Suggestions' });
+  await expect(suggestions.getByRole('listitem').filter({ hasText: 'Phone plan' })).toBeVisible();
+
+  // The bell starts with Jane's last few days and the budget alert, not her whole year.
+  await page.getByRole('button', { name: /^Notifications, \d+ unread$/ }).click();
+  await expect(page.getByRole('button', { name: /Jane Doe imported/ })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Eating out is at \d+% of its budget/ }),
+  ).toBeVisible();
+});
+
 test('Start over swaps the household for a fresh one', async ({ page }) => {
   const first = await tryDemo(page);
 
