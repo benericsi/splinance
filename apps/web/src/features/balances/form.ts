@@ -5,6 +5,7 @@ import {
   type TransactionPerson,
 } from '@splinance/shared';
 import { z } from 'zod';
+import { i18n } from '@/i18n';
 import { today } from '@/features/transactions/dates';
 import {
   amountProblemMessage,
@@ -128,25 +129,32 @@ export function remainingHint(
   person: TransactionPerson,
   currency: Currency,
 ): { text: string; square: boolean } | undefined {
-  const amount = readAmount(values.amount, currency).minor;
-  if (amount === undefined) return undefined;
+  const paid = readAmount(values.amount, currency).minor;
+  if (paid === undefined) return undefined;
   // Positive: they owe the viewer. Their payment lowers it, the viewer's raises it.
-  const after = values.direction === 'they-paid' ? balance - amount : balance + amount;
+  const after = values.direction === 'they-paid' ? balance - paid : balance + paid;
   const name = person.displayName;
-  if (after === 0) return { text: "You're all square after this", square: true };
+  if (after === 0) return { text: i18n.t('balances:after.square'), square: true };
 
   const flips = balance !== 0 && Math.sign(after) !== Math.sign(balance);
-  const money = formatMoney(Math.abs(after), currency);
-  const state = after > 0 ? `${name} owes you ${money}` : `you owe ${name} ${money}`;
+  const amount = formatMoney(Math.abs(after), currency);
+  const state =
+    after > 0
+      ? i18n.t('balances:after.owesYou', { name, amount })
+      : i18n.t('balances:after.youOwe', { name, amount });
   // The overpaid part is exactly the new debt the other way round.
-  if (flips) return { text: `That's ${money} more than the debt: ${state}`, square: false };
+  if (flips) {
+    return { text: i18n.t('balances:after.overpaid', { amount, state }), square: false };
+  }
   // "Still" only while the same debt shrinks; a payment the other way makes it grow.
-  if (Math.abs(after) >= Math.abs(balance)) return { text: `After this, ${state}`, square: false };
+  if (Math.abs(after) >= Math.abs(balance)) {
+    return { text: i18n.t('balances:after.then', { state }), square: false };
+  }
   return {
     text:
       after > 0
-        ? `After this, ${name} still owes you ${money}`
-        : `After this, you still owe ${name} ${money}`,
+        ? i18n.t('balances:after.stillOwesYou', { name, amount })
+        : i18n.t('balances:after.stillYouOwe', { name, amount }),
     square: false,
   };
 }

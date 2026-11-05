@@ -1,14 +1,13 @@
 import type { Category, Currency, RecurringSuggestion } from '@splinance/shared';
 import { Lock } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { CategoryTile } from '@/features/categories/components/category-tile';
 import { formatMoney } from '@/features/transactions/money';
 import { useRevealRows } from '@/lib/reveal';
 import { useConfirmSuggestion, useDismissSuggestion } from '../hooks';
-import { CADENCE_LABELS, shortDate } from '../view';
-
-const payments = (count: number) => `${String(count)} ${count === 1 ? 'payment' : 'payments'}`;
+import { cadenceLabel, shortDate } from '../view';
 
 /**
  * What detection noticed and nobody decided on yet: Confirm makes it a series, Not
@@ -25,6 +24,7 @@ export function SuggestionList({
   categories: Category[];
   currency: Currency;
 }) {
+  const { t } = useTranslation('recurring');
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const confirm = useConfirmSuggestion();
   const dismiss = useDismissSuggestion();
@@ -54,13 +54,16 @@ export function SuggestionList({
                     {suggestion.scope === 'private' && (
                       <Lock
                         className="text-muted-foreground size-3 shrink-0"
-                        aria-label="Only you"
+                        aria-label={t('onlyYou')}
                       />
                     )}
                   </p>
                   <p className="text-muted-foreground truncate text-xs">
-                    {CADENCE_LABELS[suggestion.cadence]} · {payments(suggestion.occurrences)} since{' '}
-                    {shortDate(suggestion.firstOn)}
+                    {t('suggestion.detail', {
+                      cadence: cadenceLabel(suggestion.cadence),
+                      count: suggestion.occurrences,
+                      date: shortDate(suggestion.firstOn),
+                    })}
                   </p>
                 </div>
                 <span className="shrink-0 font-medium tabular-nums">
@@ -72,22 +75,22 @@ export function SuggestionList({
                   variant="outline"
                   size="sm"
                   disabled={busy}
-                  aria-label={`${suggestion.description} is not recurring`}
+                  aria-label={t('suggestion.notRecurringLabel', { name: suggestion.description })}
                   onClick={() => {
                     dismiss.mutate({ householdId, decision });
                   }}
                 >
-                  Not recurring
+                  {t('suggestion.notRecurring')}
                 </Button>
                 <Button
                   size="sm"
                   disabled={busy}
-                  aria-label={`Confirm ${suggestion.description}`}
+                  aria-label={t('suggestion.confirmLabel', { name: suggestion.description })}
                   onClick={() => {
                     confirm.mutate({ householdId, decision });
                   }}
                 >
-                  Confirm
+                  {t('suggestion.confirm')}
                 </Button>
               </div>
             </m.li>

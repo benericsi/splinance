@@ -2,6 +2,7 @@ import { addMonths, monthSchema, type ReportCategory } from '@splinance/shared';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { PageHeader } from '@/components/page-header';
 import { PageTitle } from '@/components/page-title';
@@ -51,16 +52,6 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/reports')({
   pendingComponent: ReportsSkeleton,
 });
 
-const VIEW_OPTIONS = [
-  { value: 'household', label: 'Household' },
-  { value: 'mine', label: 'Your share' },
-] as const;
-
-const PERIOD_OPTIONS = [
-  { value: 'month', label: 'Month' },
-  { value: 'year', label: 'Year' },
-] as const;
-
 type Search = z.infer<typeof searchSchema>;
 type SearchPatch = Partial<Search>;
 
@@ -82,6 +73,7 @@ function sumByCategory(rows: ReportCategory[]): Omit<ReportCategory, 'month'>[] 
 }
 
 function ReportsPage() {
+  const { t } = useTranslation(['reports', 'common']);
   const { householdId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -138,7 +130,9 @@ function ReportsPage() {
       range.year < thisYear ? { year: Number(range.year) + 1 } : undefined,
     ];
     breakdown = {
-      title: `By category · ${range.year}${range.year === thisYear ? ' so far' : ''}`,
+      title: t('byCategory', {
+        period: range.year === thisYear ? t('soFar', { year: range.year }) : range.year,
+      }),
       label: range.year,
       key: range.year,
       rows: sumByCategory(report.categories.filter((row) => inRange(row.month))),
@@ -155,7 +149,7 @@ function ReportsPage() {
       to < now ? { to: later, month: later } : undefined,
     ];
     breakdown = {
-      title: `By category · ${formatMonth(month)}`,
+      title: t('byCategory', { period: formatMonth(month) }),
       label: formatMonth(month),
       key: month,
       rows: report.categories.filter((row) => row.month === month),
@@ -171,22 +165,25 @@ function ReportsPage() {
 
   return (
     <RevealPage>
-      <PageTitle title={`Reports · ${household.name}`} />
-      <PageHeader title="Reports" />
+      <PageTitle title={t('pageTitle', { household: household.name })} />
+      <PageHeader title={t('title')} />
       <div className="space-y-6">
         {/* Side by side on a phone too: they share the width there. */}
         <Reveal index={0} className="flex gap-2">
           <SegmentedControl
-            label="Whose spending"
+            label={t('whose')}
             className="min-w-0 flex-[3] sm:w-52 sm:flex-none"
             value={view}
             onChange={(next) => {
               go({ view: next });
             }}
-            options={VIEW_OPTIONS}
+            options={[
+              { value: 'household', label: t('household') },
+              { value: 'mine', label: t('yourShare') },
+            ]}
           />
           <SegmentedControl
-            label="Period"
+            label={t('period')}
             className="min-w-0 flex-[2] sm:w-40 sm:flex-none"
             value={range.period}
             onChange={(next) => {
@@ -199,7 +196,10 @@ function ReportsPage() {
                 go({ period: undefined, year: undefined });
               }
             }}
-            options={PERIOD_OPTIONS}
+            options={[
+              { value: 'month', label: t('month') },
+              { value: 'year', label: t('year') },
+            ]}
           />
         </Reveal>
         <Reveal index={1}>
@@ -216,8 +216,8 @@ function ReportsPage() {
             <CardHeader>
               <CardTitle>{trendTitle}</CardTitle>
               <CardAction className="flex items-center">
-                {stepLink(isYear ? 'Previous year' : 'Earlier months', ChevronLeft, trendSteps[0])}
-                {stepLink(isYear ? 'Next year' : 'Later months', ChevronRight, trendSteps[1])}
+                {stepLink(isYear ? t('previousYear') : t('earlier'), ChevronLeft, trendSteps[0])}
+                {stepLink(isYear ? t('nextYear') : t('later'), ChevronRight, trendSteps[1])}
               </CardAction>
             </CardHeader>
             <CardContent>
@@ -243,8 +243,8 @@ function ReportsPage() {
               <CardTitle>{breakdown.title}</CardTitle>
               {breakdown.steps && (
                 <CardAction className="flex items-center">
-                  {stepLink('Previous month', ChevronLeft, breakdown.steps[0])}
-                  {stepLink('Next month', ChevronRight, breakdown.steps[1])}
+                  {stepLink(t('common:month.previous'), ChevronLeft, breakdown.steps[0])}
+                  {stepLink(t('common:month.next'), ChevronRight, breakdown.steps[1])}
                 </CardAction>
               )}
             </CardHeader>
@@ -268,9 +268,10 @@ function ReportsPage() {
 
 /** The switches, the four cards, the trend card and the category card. */
 function ReportsSkeleton() {
+  const { t } = useTranslation('reports');
   return (
     <PageSkeleton>
-      <PageHeader title="Reports" />
+      <PageHeader title={t('title')} />
       <div className="space-y-6">
         <div className="flex gap-2">
           <Skeleton className="h-9 flex-[3] rounded-lg sm:w-52 sm:flex-none" />

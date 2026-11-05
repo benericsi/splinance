@@ -5,6 +5,16 @@ export const common = {
   saving: 'Saving…',
   back: 'Back',
   backTo: 'Back to {{name}}',
+  loading: 'Loading…',
+  loadMore: 'Load more',
+  delete: 'Delete',
+  undo: 'Undo',
+  edit: 'Edit',
+  month: {
+    previous: 'Previous month',
+    next: 'Next month',
+    current: 'This month',
+  },
   tryAgain: 'Try again',
   backHome: 'Back to home',
   privacy: 'Privacy',
@@ -42,5 +52,7 @@ export const common = {
   date: {
     today: 'today',
     yesterday: 'yesterday',
+    todayHeading: 'Today, {{date}}',
+    yesterdayHeading: 'Yesterday, {{date}}',
   },
 };

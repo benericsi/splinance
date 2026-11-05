@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/page-header';
 import { PageTitle } from '@/components/page-title';
 import { PageSkeleton, Reveal, RevealPage } from '@/components/reveal';
@@ -32,6 +33,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/transaction
 });
 
 function ImportRoute() {
+  const { t } = useTranslation('transactions');
   const { householdId } = Route.useParams();
   const { user } = useAuth();
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
@@ -41,16 +43,16 @@ function ImportRoute() {
 
   return (
     <RevealPage>
-      <PageTitle title={`Import · ${household.name}`} />
+      <PageTitle title={t('importPage.pageTitle', { household: household.name })} />
       <Link
         to="/h/$householdId/transactions"
         params={{ householdId }}
         className={buttonVariants({ variant: 'ghost', size: 'sm', className: '-ml-2 mb-2' })}
       >
         <ArrowLeft aria-hidden />
-        Transactions
+        {t('title')}
       </Link>
-      <PageHeader title="Import from your bank" />
+      <PageHeader title={t('importPage.title')} />
       <Reveal index={0}>
         <ImportPage
           household={household}
@@ -66,10 +68,11 @@ function ImportRoute() {
 
 /** The back link and the file picker; the history only shows once there is one. */
 function ImportSkeleton() {
+  const { t } = useTranslation('transactions');
   return (
     <PageSkeleton>
       <Skeleton className="mb-2 h-7 w-32 rounded-lg" />
-      <PageHeader title="Import from your bank" />
+      <PageHeader title={t('importPage.title')} />
       <Skeleton className="h-40 rounded-xl" />
     </PageSkeleton>
   );

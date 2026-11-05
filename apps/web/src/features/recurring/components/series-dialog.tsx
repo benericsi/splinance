@@ -9,6 +9,7 @@ import {
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { Lock } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { firstError } from '@/components/form/first-error';
@@ -35,12 +36,7 @@ import { useAddSeries, useRemoveSeries, useUpdateSeries } from '../hooks';
 import { shortDate } from '../view';
 import { MatchPreview } from './match-preview';
 
-const CADENCE_OPTIONS: { value: RecurringCadence; label: string }[] = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'yearly', label: 'Yearly' },
-];
+const CADENCES: RecurringCadence[] = ['weekly', 'monthly', 'quarterly', 'yearly'];
 
 /**
  * Add a recurring payment by hand (or from a transaction), or look at one and edit it. The
@@ -65,6 +61,7 @@ export function SeriesDialog({
   initialValues?: SeriesFormValues | undefined;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(['recurring', 'common']);
   const add = useAddSeries();
   const update = useUpdateSeries();
   const remove = useRemoveSeries();
@@ -85,10 +82,10 @@ export function SeriesDialog({
         if (series) {
           // The scope rides along and the API ignores it: who a series belongs to stays.
           await update.mutateAsync({ householdId, seriesId: series.id, input });
-          toast.success('Recurring payment saved');
+          toast.success(t('dialog.saved'));
         } else {
           await add.mutateAsync({ householdId, input });
-          toast.success('Recurring payment added');
+          toast.success(t('dialog.added'));
         }
         onClose();
       } catch {
@@ -108,7 +105,7 @@ export function SeriesDialog({
       {
         onSuccess: () => {
           setStopping(false);
-          toast.success(`Stopped tracking ${series.name}`);
+          toast.success(t('dialog.stopped', { name: series.name }));
           onClose();
         },
       },
@@ -116,7 +113,7 @@ export function SeriesDialog({
   };
 
   return (
-    <RouteDialog title={series ? series.name : 'Add recurring payment'} onClose={onClose}>
+    <RouteDialog title={series ? series.name : t('dialog.addTitle')} onClose={onClose}>
       <form
         noValidate
         className="min-w-0 space-y-5"
@@ -132,8 +129,8 @@ export function SeriesDialog({
             <TextField
               field={field}
               required
-              label="Name"
-              placeholder="Spotify"
+              label={t('dialog.name')}
+              placeholder={t('dialog.namePlaceholder')}
               maxLength={60}
               autoFocus={!series && !initialValues}
               onValueChange={(name) => {
@@ -156,21 +153,22 @@ export function SeriesDialog({
             )}
           </form.Field>
           <form.Field name="anchorOn">
-            {(field) => (
-              <TextField field={field} required type="date" label="Next or last payment" />
-            )}
+            {(field) => <TextField field={field} required type="date" label={t('dialog.anchor')} />}
           </form.Field>
         </div>
 
         <form.Field name="cadence">
           {(field) => (
             <div className="space-y-1.5">
-              <Label>How often</Label>
+              <Label>{t('dialog.howOften')}</Label>
               <SegmentedControl<RecurringCadence>
-                label="How often"
+                label={t('dialog.howOften')}
                 value={field.state.value}
                 onChange={field.handleChange}
-                options={CADENCE_OPTIONS}
+                options={CADENCES.map((value) => ({
+                  value,
+                  label: t(`cadenceOption.${value}`),
+                }))}
               />
             </div>
           )}
@@ -179,7 +177,7 @@ export function SeriesDialog({
         <form.Field name="categoryId">
           {(field) => (
             <div className="space-y-1.5">
-              <Label htmlFor="series-category">Category</Label>
+              <Label htmlFor="series-category">{t('dialog.category')}</Label>
               <CategoryPicker
                 id="series-category"
                 categories={categories}
@@ -195,21 +193,21 @@ export function SeriesDialog({
           series.scope === 'private' && (
             <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
               <Lock className="size-3.5" aria-hidden />
-              Only you see this one.
+              {t('dialog.onlyYouSee')}
             </p>
           )
         ) : (
           <form.Field name="scope">
             {(field) => (
               <div className="space-y-1.5">
-                <Label>Who sees it</Label>
+                <Label>{t('dialog.whoSees')}</Label>
                 <SegmentedControl<RecurringScope>
-                  label="Who sees it"
+                  label={t('dialog.whoSees')}
                   value={field.state.value}
                   onChange={field.handleChange}
                   options={[
-                    { value: 'shared', label: 'The household' },
-                    { value: 'private', label: 'Only me' },
+                    { value: 'shared', label: t('dialog.household') },
+                    { value: 'private', label: t('dialog.onlyMe') },
                   ]}
                 />
               </div>
@@ -228,10 +226,10 @@ export function SeriesDialog({
                 <TextField
                   field={field}
                   required
-                  label="Matches bank text containing"
-                  placeholder="spotify"
+                  label={t('dialog.pattern')}
+                  placeholder={t('dialog.patternPlaceholder')}
                   maxLength={60}
-                  serverError={taken ? 'A recurring payment matches this text already' : undefined}
+                  serverError={taken ? t('dialog.taken') : undefined}
                   onValueChange={() => {
                     setPatternEdited(true);
                     mutation.reset();
@@ -258,7 +256,7 @@ export function SeriesDialog({
           <form.Field name="amountVaries">
             {(field) => (
               <Checkbox
-                label="The amount changes from payment to payment (gas, electricity)"
+                label={t('dialog.varies')}
                 checked={field.state.value}
                 onChange={field.handleChange}
               />
@@ -267,7 +265,7 @@ export function SeriesDialog({
           <form.Field name="remind">
             {(field) => (
               <Checkbox
-                label="Remind me 3 days before it is due"
+                label={t('dialog.remind')}
                 checked={field.state.value}
                 onChange={field.handleChange}
               />
@@ -278,7 +276,7 @@ export function SeriesDialog({
         {series && series.payments.length > 0 && (
           <section aria-labelledby="series-payments" className="space-y-2">
             <h3 id="series-payments" className="text-sm font-medium">
-              Payments found ({series.paymentCount})
+              {t('dialog.payments', { count: series.paymentCount })}
             </h3>
             <ul className="divide-y rounded-lg border text-sm">
               {series.payments.slice(0, 6).map((payment) => (
@@ -287,7 +285,7 @@ export function SeriesDialog({
                     {shortDate(payment.occurredOn)}
                   </span>
                   <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
-                    {payment.imported ? 'Imported' : 'Typed in'}
+                    {payment.imported ? t('dialog.imported') : t('dialog.typedIn')}
                   </span>
                   <span className="shrink-0 tabular-nums">
                     {formatMoney(payment.amount, currency)}
@@ -308,7 +306,7 @@ export function SeriesDialog({
                 setStopping(true);
               }}
             >
-              Stop tracking
+              {t('dialog.stop')}
             </Button>
           ) : (
             <span />
@@ -316,7 +314,7 @@ export function SeriesDialog({
           <form.Subscribe selector={(state) => state.isSubmitting}>
             {(isSubmitting) => (
               <Button type="submit" size="lg" className="min-w-28" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving…' : series ? 'Save' : 'Add'}
+                {isSubmitting ? t('common:saving') : series ? t('common:save') : t('dialog.add')}
               </Button>
             )}
           </form.Subscribe>
@@ -327,10 +325,10 @@ export function SeriesDialog({
         <ConfirmDialog
           open={stopping}
           onOpenChange={setStopping}
-          title={`Stop tracking ${series.name}?`}
-          description="It leaves the list and gets no more reminders. Its payments stay as they are."
-          confirmLabel="Stop tracking"
-          pendingLabel="Stopping…"
+          title={t('dialog.stopTitle', { name: series.name })}
+          description={t('dialog.stopDescription')}
+          confirmLabel={t('dialog.stop')}
+          pendingLabel={t('dialog.stopping')}
           destructive
           pending={remove.isPending}
           error={remove.error ? errorMessage(remove.error) : undefined}
@@ -354,11 +352,12 @@ function AmountField({
   currency: Currency;
   error: string | undefined;
 }) {
+  const { t } = useTranslation('recurring');
   const props = useAmountInput({ value, onChange, currency });
   return (
     <div className="space-y-1.5">
       <Label htmlFor="series-amount">
-        Amount
+        {t('dialog.amount')}
         <span aria-hidden className="text-destructive -ml-1">
           *
         </span>

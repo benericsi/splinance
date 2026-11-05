@@ -10,9 +10,35 @@ import {
   type TransactionVisibility,
 } from '@splinance/shared';
 import { formatDayHeading } from '@/features/transactions/dates';
+import { i18n } from '@/i18n';
 
 /** "Needs a look" first, then what is ready, then what cannot be imported. */
 export type ReviewGroup = 'needs-look' | 'ready' | 'left-out';
+
+/** Why a row is in its group, as data: the text follows the UI language (`reasonText`). */
+export type ReviewReason =
+  | { code: 'pending' }
+  | { code: 'currency'; currency: string }
+  | { code: 'imported' }
+  | { code: 'duplicate'; description: string; occurredOn: string }
+  | { code: 'deleted' }
+  | { code: 'own-transfer' }
+  | { code: 'cash' };
+
+/** "Already imported", "Maybe already added: "Groceries", Today, Sat 10 Oct". */
+export function reasonText(reason: ReviewReason): string {
+  switch (reason.code) {
+    case 'currency':
+      return i18n.t('imports:reasons.currency', { currency: reason.currency });
+    case 'duplicate':
+      return i18n.t('imports:reasons.duplicate', {
+        description: reason.description,
+        day: formatDayHeading(reason.occurredOn),
+      });
+    default:
+      return i18n.t(`imports:reasons.${reason.code}`);
+  }
+}
 
 /** A bank row on the review screen, with what the person chose for it. */
 export interface ReviewRow {
@@ -20,8 +46,8 @@ export interface ReviewRow {
   key: string;
   row: StatementRow;
   group: ReviewGroup;
-  /** Why it is in its group, in words; none for ordinary ready rows. */
-  reason: string | undefined;
+  /** Why it is in its group; none for ordinary ready rows. */
+  reason: ReviewReason | undefined;
   included: boolean;
   description: string;
   /** '' for no category. */
@@ -52,28 +78,25 @@ function classify(
   currency: string,
 ): Pick<ReviewRow, 'group' | 'reason'> {
   if (row.flags.includes('pending') || row.fingerprint === null) {
-    return { group: 'left-out', reason: 'Not booked yet: it comes in a later export' };
+    return { group: 'left-out', reason: { code: 'pending' } };
   }
   if (row.currency !== currency) {
-    return { group: 'left-out', reason: `In ${row.currency}: other currencies come later` };
+    return { group: 'left-out', reason: { code: 'currency', currency: row.currency } };
   }
-  if (result?.status === 'imported') return { group: 'left-out', reason: 'Already imported' };
+  if (result?.status === 'imported') return { group: 'left-out', reason: { code: 'imported' } };
 
   if (result?.status === 'possible-duplicate' && result.match) {
-    const day = formatDayHeading(result.match.occurredOn);
-    return {
-      group: 'needs-look',
-      reason: `Maybe already added: "${result.match.description}", ${day}`,
-    };
+    const { description, occurredOn } = result.match;
+    return { group: 'needs-look', reason: { code: 'duplicate', description, occurredOn } };
   }
   if (result?.status === 'deleted') {
-    return { group: 'needs-look', reason: 'You imported this before and deleted it' };
+    return { group: 'needs-look', reason: { code: 'deleted' } };
   }
   if (row.flags.includes('own-transfer')) {
-    return { group: 'needs-look', reason: 'Looks like a transfer between your own accounts' };
+    return { group: 'needs-look', reason: { code: 'own-transfer' } };
   }
   if (row.flags.includes('cash-withdrawal')) {
-    return { group: 'needs-look', reason: 'Cash withdrawal: not spending yet' };
+    return { group: 'needs-look', reason: { code: 'cash' } };
   }
   return { group: 'ready', reason: undefined };
 }

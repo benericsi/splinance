@@ -1,5 +1,6 @@
 import { FileUp } from 'lucide-react';
 import { type DragEvent, useId, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
 /**
@@ -13,6 +14,7 @@ export function FileDrop({
   onFile: (file: File) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation('imports');
   const id = useId();
   const [dragging, setDragging] = useState(false);
 
@@ -42,11 +44,9 @@ export function FileDrop({
     >
       <FileUp className="text-muted-foreground size-6" aria-hidden />
       <span>
-        Drop a CSV export here, or <span className="text-link">choose a file</span>
+        <Trans t={t} i18nKey="drop.prompt" components={{ a: <span className="text-link" /> }} />
       </span>
-      <span className="text-muted-foreground text-sm">
-        Revolut account statement or K&amp;H transaction history. The file stays on your device.
-      </span>
+      <span className="text-muted-foreground text-sm">{t('drop.hint')}</span>
       <input
         id={id}
         type="file"

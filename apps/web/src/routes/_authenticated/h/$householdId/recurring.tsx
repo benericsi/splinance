@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/page-header';
 import { PageTitle } from '@/components/page-title';
 import { PageSkeleton, Reveal, RevealPage } from '@/components/reveal';
@@ -30,6 +31,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/recurring')
 });
 
 function RecurringPage() {
+  const { t } = useTranslation('recurring');
   const { householdId } = Route.useParams();
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
@@ -59,18 +61,17 @@ function RecurringPage() {
 
   return (
     <RevealPage>
-      <PageTitle title={`Recurring · ${household.name}`} />
-      <PageHeader title="Recurring" actions={addLink('Add')} />
+      <PageTitle title={t('pageTitle', { household: household.name })} />
+      <PageHeader title={t('title')} actions={addLink(t('add'))} />
 
       {empty ? (
         <Reveal index={0}>
           <div className="rounded-xl border border-dashed px-6 py-12 text-center">
-            <h2 className="font-heading text-lg font-semibold">Track subscriptions and bills</h2>
+            <h2 className="font-heading text-lg font-semibold">{t('empty.title')}</h2>
             <p className="text-muted-foreground mx-auto mt-1 mb-5 max-w-sm">
-              Add the ones you pay regularly, or import your bank exports: payments that come back
-              every week, month or year show up here as suggestions.
+              {t('empty.description')}
             </p>
-            {addLink('Add a recurring payment')}
+            {addLink(t('addFirst'))}
           </div>
         </Reveal>
       ) : (
@@ -92,11 +93,9 @@ function RecurringPage() {
               <section aria-labelledby="suggestions-heading" className="space-y-3">
                 <div>
                   <h2 id="suggestions-heading" className="font-heading text-lg font-semibold">
-                    Suggestions
+                    {t('suggestionsTitle')}
                   </h2>
-                  <p className="text-muted-foreground text-sm">
-                    These look recurring. Confirm the ones you pay regularly.
-                  </p>
+                  <p className="text-muted-foreground text-sm">{t('suggestionsDescription')}</p>
                 </div>
                 <SuggestionList
                   householdId={householdId}
@@ -124,9 +123,10 @@ function RecurringPage() {
 
 /** The monthly total and a few rows, like the real list. */
 function RecurringSkeleton() {
+  const { t } = useTranslation('recurring');
   return (
     <PageSkeleton>
-      <PageHeader title="Recurring" actions={<SkeletonActions widths={['w-24']} />} />
+      <PageHeader title={t('title')} actions={<SkeletonActions widths={['w-24']} />} />
       <div className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>

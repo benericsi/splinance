@@ -12,12 +12,15 @@ import {
 import { Link } from '@tanstack/react-router';
 import { CircleCheck, FileSpreadsheet } from 'lucide-react';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { FormError } from '@/components/form/form-error';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { formatShortDate } from '@/features/transactions/dates';
+import { i18n } from '@/i18n';
 import { ApiError } from '@/lib/http';
 import { errorMessage } from '@/lib/query-client';
 import { readBankNames, rememberBankName } from '../bank-names';
@@ -46,10 +49,21 @@ type Stage =
   | ({ step: 'review' } & Review)
   | { step: 'done'; result: ImportResponse; imported: ReviewRow[] };
 
-const dayLabel = (value: string | undefined) =>
-  value
-    ? new Date(`${value}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-    : '';
+const dayLabel = (value: string | undefined) => (value ? formatShortDate(value) : '');
+
+/** A parse problem in the UI language, with the line it is on. */
+function statementProblem(error: StatementError): string {
+  const { problem } = error;
+  const message =
+    problem.code === 'missing-column'
+      ? i18n.t('imports:problems.missing-column', { bank: problem.bank, column: problem.column })
+      : problem.code === 'unreadable-amount' || problem.code === 'unreadable-date'
+        ? i18n.t(`imports:problems.${problem.code}`, { value: problem.value })
+        : i18n.t(`imports:problems.${problem.code}`);
+  return error.line === undefined
+    ? message
+    : i18n.t('imports:problems.line', { line: error.line, message });
+}
 
 /**
  * Pick a bank export, review its rows grouped by what needs a decision, import the picked
@@ -74,6 +88,7 @@ export function ImportPage({
   const activeRules = rules.filter((rule) =>
     categories.some((category) => category.id === rule.categoryId && category.archivedAt === null),
   );
+  const { t } = useTranslation(['imports', 'common']);
   const currency = household.baseCurrency;
   const nameId = useId();
   const [stage, setStage] = useState<Stage>({ step: 'pick' });
@@ -92,7 +107,9 @@ export function ImportPage({
     try {
       parsed = parseStatement(text, { ownNames: name.trim() ? [name] : [], currency });
     } catch (error) {
-      setProblem(error instanceof StatementError ? error.message : 'This file could not be read.');
+      setProblem(
+        error instanceof StatementError ? statementProblem(error) : t('problems.unreadable'),
+      );
       return;
     }
     if (parsed.accountHolder) {
@@ -100,7 +117,7 @@ export function ImportPage({
       setBankName(parsed.accountHolder);
     }
     if (parsed.rows.length === 0) {
-      setProblem('There are no transactions in this file.');
+      setProblem(t('problems.noRows'));
       return;
     }
 
@@ -144,14 +161,11 @@ export function ImportPage({
             <div className="flex items-center gap-3">
               <CircleCheck className="text-positive size-6 shrink-0" aria-hidden />
               <p className="font-heading text-lg font-semibold">
-                {batch.rowCount} {batch.rowCount === 1 ? 'transaction' : 'transactions'} imported
+                {t('done.imported', { count: batch.rowCount })}
               </p>
             </div>
             {skipped > 0 && (
-              <p className="text-muted-foreground">
-                {skipped} {skipped === 1 ? 'was' : 'were'} there already and{' '}
-                {skipped === 1 ? 'was' : 'were'} skipped.
-              </p>
+              <p className="text-muted-foreground">{t('done.skipped', { count: skipped })}</p>
             )}
             <RuleSuggestions
               householdId={household.id}
@@ -164,7 +178,7 @@ export function ImportPage({
                 params={{ householdId: household.id }}
                 className={buttonVariants({ size: 'lg' })}
               >
-                View transactions
+                {t('done.viewTransactions')}
               </Link>
               <Button
                 variant="outline"
@@ -175,14 +189,14 @@ export function ImportPage({
                     { householdId: household.id, importId: batch.id },
                     {
                       onSuccess: () => {
-                        toast.success('Import undone');
+                        toast.success(t('done.undone'));
                         setStage({ step: 'pick' });
                       },
                     },
                   );
                 }}
               >
-                {undo.isPending ? 'Undoing…' : 'Undo import'}
+                {undo.isPending ? t('done.undoing') : t('done.undo')}
               </Button>
               <Button
                 variant="ghost"
@@ -191,7 +205,7 @@ export function ImportPage({
                   setStage({ step: 'pick' });
                 }}
               >
-                Import another file
+                {t('done.another')}
               </Button>
             </div>
           </CardContent>
@@ -244,18 +258,22 @@ export function ImportPage({
             <div className="min-w-48 flex-1">
               <p className="truncate">{review.fileName}</p>
               <p className="text-muted-foreground text-sm">
-                {STATEMENT_SOURCE_LABELS[review.source]} · {review.rows.length} rows ·{' '}
-                {dayLabel(review.firstDay)} to {dayLabel(review.lastDay)}
+                {t('file.summary', {
+                  source: STATEMENT_SOURCE_LABELS[review.source],
+                  count: review.rows.length,
+                  from: dayLabel(review.firstDay),
+                  to: dayLabel(review.lastDay),
+                })}
               </p>
             </div>
             <div className="flex items-center gap-2">
               <Label htmlFor={nameId} className="text-muted-foreground font-normal">
-                Your name at the bank
+                {t('file.bankName')}
               </Label>
               <Input
                 id={nameId}
                 value={bankName}
-                placeholder="KOVÁCS ANNA"
+                placeholder={t('file.bankNamePlaceholder')}
                 className="h-8 w-40"
                 onChange={(event) => {
                   setBankName(event.target.value);
@@ -273,7 +291,7 @@ export function ImportPage({
                 setStage({ step: 'pick' });
               }}
             >
-              Choose another file
+              {t('file.another')}
             </Button>
           </CardContent>
         </Card>
@@ -292,7 +310,7 @@ export function ImportPage({
       <FormError message={problem} />
       {(reading || check.isPending) && (
         <p className="text-muted-foreground text-sm" aria-live="polite">
-          Checking the rows…
+          {t('file.checking')}
         </p>
       )}
 
@@ -331,7 +349,7 @@ export function ImportPage({
                   size="sm"
                   onClick={() => void analyze(review.text, review.fileName, bankName)}
                 >
-                  Check again
+                  {t('checkAgain')}
                 </Button>
               </div>
             ) : (
@@ -344,9 +362,7 @@ export function ImportPage({
                 onClick={() => void submit()}
                 className="max-sm:w-full"
               >
-                {create.isPending
-                  ? 'Importing…'
-                  : `Import ${String(picked)} ${picked === 1 ? 'transaction' : 'transactions'}`}
+                {create.isPending ? t('importing') : t('submit', { count: picked })}
               </Button>
             </div>
           </div>

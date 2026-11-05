@@ -8,6 +8,16 @@ export const common: Messages<typeof en.common> = {
   saving: 'Mentés…',
   back: 'Vissza',
   backTo: 'Vissza: {{name}}',
+  loading: 'Betöltés…',
+  loadMore: 'Továbbiak betöltése',
+  delete: 'Törlés',
+  undo: 'Visszavonás',
+  edit: 'Szerkesztés',
+  month: {
+    previous: 'Előző hónap',
+    next: 'Következő hónap',
+    current: 'Ez a hónap',
+  },
   tryAgain: 'Próbáld újra',
   backHome: 'Vissza a kezdőlapra',
   privacy: 'Adatvédelem',
@@ -45,5 +55,7 @@ export const common: Messages<typeof en.common> = {
   date: {
     today: 'ma',
     yesterday: 'tegnap',
+    todayHeading: 'Ma, {{date}}',
+    yesterdayHeading: 'Tegnap, {{date}}',
   },
 };

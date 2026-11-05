@@ -65,6 +65,7 @@ export const errors: Messages<typeof en.errors> = {
     remove: 'Eltávolítás előtt rendezzétek az egyenleget ezzel a taggal',
     archive: 'Archiválás előtt rendezzetek minden egyenleget',
   },
+  row: '{{row}}. sor: {{message}}',
   network: 'Nem érjük el a Splinance-t. Ellenőrizd a kapcsolatot, és próbáld újra.',
   generic: 'Valami hiba történt. Próbáld újra.',
 };

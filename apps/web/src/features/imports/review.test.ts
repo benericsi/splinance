@@ -1,7 +1,7 @@
 import type { ImportCheckResult, StatementRow } from '@splinance/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { readBankNames, rememberBankName } from './bank-names';
-import { buildReview, rowsToCheck, toImportInput, updatePicked } from './review';
+import { buildReview, reasonText, rowsToCheck, toImportInput, updatePicked } from './review';
 
 const row = (overrides: Partial<StatementRow>): StatementRow => ({
   line: 2,
@@ -73,13 +73,15 @@ describe('buildReview', () => {
       // Its import was undone: importing it again is the point.
       ['Salary', 'ready', true],
     ]);
-    expect(byDescription('Lidl')?.reason).toMatch(/^Maybe already added: "Groceries", /);
-    expect(byDescription('Revolut 1234')?.reason).toBe(
-      'Looks like a transfer between your own accounts',
-    );
+    const reason = (description: string) => {
+      const found = byDescription(description)?.reason;
+      return found && reasonText(found);
+    };
+    expect(reason('Lidl')).toMatch(/^Maybe already added: "Groceries", /);
+    expect(reason('Revolut 1234')).toBe('Looks like a transfer between your own accounts');
     expect(byDescription('Card hold')?.key).toBe('line:6');
-    expect(byDescription('Cafe Wien')?.reason).toBe('In EUR: other currencies come later');
-    expect(byDescription('Old one')?.reason).toBe('Already imported');
+    expect(reason('Cafe Wien')).toBe('In EUR: other currencies come later');
+    expect(reason('Old one')).toBe('Already imported');
   });
 
   it('starts private and without a category', () => {

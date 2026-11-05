@@ -10,11 +10,15 @@ export const shell = {
   sections: 'Household sections',
   nav: {
     overview: 'Overview',
+    overviewShort: 'Overview',
     transactions: 'Transactions',
     transactionsShort: 'Activity',
     budgets: 'Budgets',
     recurring: 'Recurring',
+    recurringShort: 'Recurring',
     reports: 'Reports',
+    reportsShort: 'Reports',
     settings: 'Settings',
+    settingsShort: 'Settings',
   },
 };

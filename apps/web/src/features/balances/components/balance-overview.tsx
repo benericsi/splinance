@@ -1,6 +1,7 @@
 import type { Balances, Debt, HouseholdDetail } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { CircleCheck } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAvatar } from '@/components/user-avatar';
@@ -22,6 +23,7 @@ function SettleLink({
   primary?: boolean;
   className?: string;
 }) {
+  const { t } = useTranslation('balances');
   return (
     <Link
       to="/h/$householdId/settle"
@@ -33,7 +35,7 @@ function SettleLink({
         className,
       )}
     >
-      Settle up
+      {t('settleUp')}
     </Link>
   );
 }
@@ -51,13 +53,14 @@ export function BalanceOverview({
   balances: Balances;
   viewerId: string;
 }) {
+  const { t } = useTranslation('balances');
   const { mine, others } = splitDebts(balances.debts, viewerId);
   const [hero, ...rest] = mine;
 
   return (
     <section aria-labelledby="balance-heading" className="space-y-4">
       <h2 id="balance-heading" className="sr-only">
-        Balance
+        {t('heading')}
       </h2>
       {hero ? (
         <HeroDebt
@@ -73,7 +76,7 @@ export function BalanceOverview({
       {rest.length + others.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Also in {household.name}</CardTitle>
+            <CardTitle>{t('alsoIn', { household: household.name })}</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="divide-y">
@@ -137,6 +140,7 @@ function HeroDebt({
   viewerId: string;
   currency: Balances['currency'];
 }) {
+  const { t } = useTranslation('balances');
   const person = counterpart(debt, viewerId);
   const owedToViewer = debt.to.userId === viewerId;
 
@@ -162,7 +166,7 @@ function HeroDebt({
             params={{ householdId }}
             className={buttonVariants({ variant: 'outline', size: 'lg' })}
           >
-            View transactions
+            {t('viewTransactions')}
           </Link>
         </div>
       </CardContent>
@@ -171,19 +175,20 @@ function HeroDebt({
 }
 
 function AllSquare({ household, othersOwe }: { household: HouseholdDetail; othersOwe: boolean }) {
+  const { t } = useTranslation('balances');
   const alone = household.members.length < 2;
   return (
     <Card>
       <CardContent className="flex items-start gap-3">
         <CircleCheck className="text-positive mt-0.5 size-6 shrink-0" aria-hidden />
         <div>
-          <p className="font-heading text-lg font-semibold">{"You're all square"}</p>
+          <p className="font-heading text-lg font-semibold">{t('allSquare')}</p>
           <p className="text-muted-foreground">
             {alone
-              ? 'Balances show up here once you share expenses with someone.'
+              ? t('alone')
               : othersOwe
-                ? "You don't owe anyone, and nobody owes you."
-                : `Nobody owes anybody in ${household.name}.`}
+                ? t('othersOwe')
+                : t('nobodyOwes', { household: household.name })}
           </p>
         </div>
       </CardContent>

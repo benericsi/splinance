@@ -2,6 +2,7 @@ import type { Category, Transaction } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { Lock } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { CategoryTile } from '@/features/categories/components/category-tile';
 import { useAuth } from '@/lib/auth-store';
 import { COLLAPSE } from '@/lib/motion';
@@ -104,6 +105,7 @@ function TransactionRow({
   transaction: Transaction;
   category: Category | undefined;
 }) {
+  const { t } = useTranslation('transactions');
   const { user } = useAuth();
   const share = viewerShare(transaction, user?.id);
   const income = transaction.kind === 'income';
@@ -121,7 +123,7 @@ function TransactionRow({
         <p className="flex items-center gap-1.5 truncate font-medium">
           <span className="truncate">{transaction.description}</span>
           {transaction.visibility === 'private' && (
-            <Lock className="text-muted-foreground size-3 shrink-0" aria-label="Private" />
+            <Lock className="text-muted-foreground size-3 shrink-0" aria-label={t('private')} />
           )}
         </p>
         <p className="text-muted-foreground truncate text-xs">
@@ -135,7 +137,7 @@ function TransactionRow({
         </p>
         {share !== undefined && transaction.split && transaction.split.shares.length > 1 && (
           <p className="text-muted-foreground text-xs">
-            you {formatMoney(share, transaction.currency)}
+            {t('yourPart', { amount: formatMoney(share, transaction.currency) })}
           </p>
         )}
       </div>

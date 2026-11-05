@@ -8,6 +8,7 @@ import {
 } from '@splinance/shared';
 import { ChevronDown, Lock, Repeat, Tags, Users, WandSparkles } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Collapse } from '@/components/collapse';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
@@ -22,10 +23,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { CategoryPicker } from '@/features/categories/components/category-picker';
-import { fromIsoDate } from '@/features/transactions/dates';
+import { formatShortDate as shortDate } from '@/features/transactions/dates';
 import { formatMoney, MONEY_LOCALE } from '@/features/transactions/money';
 import { cn } from '@/lib/utils';
-import type { ReviewGroup, ReviewRow } from '../review';
+import { type ReviewGroup, type ReviewReason, type ReviewRow, reasonText } from '../review';
 
 /** Signed, in the row's own currency (which may be one the app does not support yet). */
 function rowAmount(row: StatementRow): string {
@@ -40,15 +41,12 @@ function rowAmount(row: StatementRow): string {
   }).format(signed / 100);
 }
 
-/** "already imported", "not booked yet", "in another currency" for the folded summary. */
-function leftOutLabel(reason: string | undefined): string {
-  if (reason?.startsWith('Already')) return 'already imported';
-  if (reason?.startsWith('Not booked')) return 'not booked yet';
-  return 'in another currency';
+/** Which line of the folded summary a left-out row counts for. */
+function leftOutKind(reason: ReviewReason | undefined): 'imported' | 'pending' | 'currency' {
+  if (reason?.code === 'imported') return 'imported';
+  if (reason?.code === 'pending') return 'pending';
+  return 'currency';
 }
-
-const shortDate = (value: string) =>
-  fromIsoDate(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
 interface ListProps {
   rows: ReviewRow[];
@@ -68,6 +66,7 @@ interface ListProps {
  * folded away.
  */
 export function ReviewList({ rows, categories, seriesOf, onChange, onBulk }: ListProps) {
+  const { t } = useTranslation('imports');
   const inGroup = (group: ReviewGroup) => rows.filter((review) => review.group === group);
   const needsLook = inGroup('needs-look');
   const ready = inGroup('ready');
@@ -76,13 +75,13 @@ export function ReviewList({ rows, categories, seriesOf, onChange, onBulk }: Lis
   return (
     <div className="space-y-6">
       {needsLook.length > 0 && (
-        <Section title="Needs a look" count={needsLook.length}>
+        <Section title={t('review.needsLook')} count={needsLook.length}>
           <Rows rows={needsLook} categories={categories} seriesOf={seriesOf} onChange={onChange} />
         </Section>
       )}
       {ready.length > 0 && (
         <Section
-          title="Ready to import"
+          title={t('review.ready')}
           count={ready.length}
           actions={<BulkActions categories={categories} onBulk={onBulk} />}
         >
@@ -155,6 +154,7 @@ function ReviewItem({
   series: RecurringSeries | undefined;
   onChange: ListProps['onChange'];
 }) {
+  const { t } = useTranslation(['imports', 'transactions']);
   const { row } = review;
   const income = row.kind === 'income';
   const options = categories.filter((c) => c.kind === row.kind && c.archivedAt === null);
@@ -165,7 +165,7 @@ function ReviewItem({
       <input
         type="checkbox"
         checked={review.included}
-        aria-label={`Import ${row.description}`}
+        aria-label={t('review.importRow', { description: row.description })}
         onChange={(event) => {
           onChange(review.key, { included: event.target.checked });
         }}
@@ -177,7 +177,7 @@ function ReviewItem({
       <div className="min-w-0 flex-1 basis-48">
         {review.included ? (
           <Input
-            aria-label={`Description of ${row.description}`}
+            aria-label={t('review.descriptionOf', { description: row.description })}
             value={review.description}
             maxLength={120}
             onChange={(event) => {
@@ -188,17 +188,19 @@ function ReviewItem({
         ) : (
           <p className="text-muted-foreground truncate">{review.description}</p>
         )}
-        {review.reason && <p className="text-muted-foreground mt-0.5 text-xs">{review.reason}</p>}
+        {review.reason && (
+          <p className="text-muted-foreground mt-0.5 text-xs">{reasonText(review.reason)}</p>
+        )}
         {review.included && review.rule && review.rule.categoryId === review.categoryId && (
           <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
             <WandSparkles className="size-3" aria-hidden />
-            By rule "{review.rule.pattern}"
+            {t('review.byRule', { pattern: review.rule.pattern })}
           </p>
         )}
         {series && (
           <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
             <Repeat className="size-3" aria-hidden />
-            Recurring: {series.name}
+            {t('review.recurring', { name: series.name })}
           </p>
         )}
       </div>
@@ -207,7 +209,7 @@ function ReviewItem({
           <div className="w-40 shrink-0">
             <CategoryPicker
               id={`category-${review.key}`}
-              label={`Category of ${row.description}`}
+              label={t('review.categoryOf', { description: row.description })}
               compact
               categories={options}
               value={review.categoryId}
@@ -217,15 +219,15 @@ function ReviewItem({
             />
           </div>
           <SegmentedControl<TransactionVisibility>
-            label={`Who ${row.description} is for`}
+            label={t('review.whoFor', { description: row.description })}
             className="w-36 shrink-0"
             value={review.visibility}
             onChange={(visibility) => {
               onChange(review.key, { visibility });
             }}
             options={[
-              { value: 'shared', label: 'Shared' },
-              { value: 'private', label: 'Just me' },
+              { value: 'shared', label: t('transactions:dialog.shared') },
+              { value: 'private', label: t('transactions:dialog.justMe') },
             ]}
           />
         </>
@@ -250,6 +252,7 @@ function BulkActions({
   categories: Category[];
   onBulk: ListProps['onBulk'];
 }) {
+  const { t } = useTranslation(['imports', 'transactions']);
   const active = categories.filter((category) => category.archivedAt === null);
   const byKind = (kind: Category['kind']) => active.filter((category) => category.kind === kind);
 
@@ -263,7 +266,7 @@ function BulkActions({
         }}
       >
         <Users aria-hidden />
-        Mark picked shared
+        {t('review.markShared')}
       </Button>
       <Button
         variant="ghost"
@@ -273,12 +276,12 @@ function BulkActions({
         }}
       >
         <Lock aria-hidden />
-        Just me
+        {t('transactions:dialog.justMe')}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="sm" />}>
           <Tags aria-hidden />
-          Set category
+          {t('review.setCategory')}
           <ChevronDown aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="max-h-80 min-w-52 overflow-y-auto">
@@ -286,7 +289,7 @@ function BulkActions({
             <DropdownMenuGroup key={kind}>
               {index > 0 && <DropdownMenuSeparator />}
               <DropdownMenuLabel>
-                {kind === 'expense' ? 'For picked expenses' : 'For picked income'}
+                {kind === 'expense' ? t('review.forExpenses') : t('review.forIncome')}
               </DropdownMenuLabel>
               {byKind(kind).map((category) => (
                 <DropdownMenuItem
@@ -308,18 +311,19 @@ function BulkActions({
 
 /** Rows that cannot be imported, summed up in one line that opens the list. */
 function LeftOut({ rows }: { rows: ReviewRow[] }) {
+  const { t } = useTranslation('imports');
   const [open, setOpen] = useState(false);
-  const counts = new Map<string, number>();
+  const counts = new Map<ReturnType<typeof leftOutKind>, number>();
   for (const review of rows) {
-    const label = leftOutLabel(review.reason);
-    counts.set(label, (counts.get(label) ?? 0) + 1);
+    const kind = leftOutKind(review.reason);
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
   }
   const summary = [...counts.entries()]
-    .map(([label, count]) => `${String(count)} ${label}`)
+    .map(([kind, count]) => t(`leftOut.${kind}`, { count }))
     .join(', ');
 
   return (
-    <section aria-label="Left out">
+    <section aria-label={t('leftOut.label')}>
       <Button
         variant="ghost"
         size="sm"
@@ -330,7 +334,7 @@ function LeftOut({ rows }: { rows: ReviewRow[] }) {
         className="text-muted-foreground -ml-2"
       >
         <ChevronDown aria-hidden className={cn('transition-transform', !open && '-rotate-90')} />
-        Left out: {summary}
+        {t('leftOut.summary', { summary })}
       </Button>
       <Collapse open={open}>
         <ul className="mt-2 rounded-xl border px-4 py-1">
@@ -343,7 +347,7 @@ function LeftOut({ rows }: { rows: ReviewRow[] }) {
                 {shortDate(review.row.occurredOn)}
               </span>
               <span className="min-w-0 flex-1 truncate">{review.description}</span>
-              <span className="hidden sm:inline">{review.reason}</span>
+              <span className="hidden sm:inline">{review.reason && reasonText(review.reason)}</span>
               <span className="w-28 shrink-0 text-right tabular-nums">{rowAmount(review.row)}</span>
             </li>
           ))}

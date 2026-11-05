@@ -1,5 +1,6 @@
 import { BRAND_COLORS, type Category, type Currency, type ReportCategory } from '@splinance/shared';
 import { m, useReducedMotion } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { CategoryTile } from '@/features/categories/components/category-tile';
 import { formatMoney } from '@/features/transactions/money';
 import { REVEAL_ROW_STAGGER, TRANSITION, TRANSITION_GROW } from '@/lib/motion';
@@ -26,6 +27,7 @@ export function CategoryBreakdown({
   /** "October 2026", or "2026" for a year. */
   periodLabel: string;
 }) {
+  const { t } = useTranslation('reports');
   const reveal = useReveal();
   const reducedMotion = useReducedMotion();
   const grow = reveal.active && !reducedMotion;
@@ -43,22 +45,26 @@ export function CategoryBreakdown({
   const largest = items[0]?.amount ?? 0;
 
   if (items.length === 0) {
-    return <p className="text-muted-foreground py-6 text-center">No spending in {periodLabel}.</p>;
+    return (
+      <p className="text-muted-foreground py-6 text-center">
+        {t('noSpending', { period: periodLabel })}
+      </p>
+    );
   }
 
   return (
     <div className="space-y-3">
       <div className="flex items-baseline justify-between text-sm">
         <span className="text-muted-foreground">
-          {view === 'mine' ? 'Your share' : 'Household'} total
+          {view === 'mine' ? t('breakdown.yourTotal') : t('breakdown.householdTotal')}
         </span>
         <span className="font-medium tabular-nums">{formatMoney(total, currency)}</span>
       </div>
-      <ul aria-label={`Spending by category in ${periodLabel}`} className="space-y-2.5">
+      <ul aria-label={t('breakdown.label', { period: periodLabel })} className="space-y-2.5">
         {items.map((item, index) => {
           const name = item.uncategorized
-            ? 'No category'
-            : (item.category?.name ?? 'Unknown category');
+            ? t('noCategory')
+            : (item.category?.name ?? t('unknownCategory'));
           const share = Math.round((item.amount / total) * 100);
           const width = `${String((item.amount / largest) * 100)}%`;
           return (

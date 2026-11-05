@@ -1,5 +1,6 @@
 import type { Budget, Category, Currency } from '@splinance/shared';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { firstError } from '@/components/form/first-error';
@@ -11,6 +12,7 @@ import { CategoryPicker } from '@/features/categories/components/category-picker
 import { HeroAmountInput } from '@/features/transactions/components/amount-inputs';
 import { formatMonth } from '@/features/transactions/dates';
 import { amountProblemMessage, formatAmountInput, readAmount } from '@/features/transactions/money';
+import { i18n } from '@/i18n';
 import { errorMessage } from '@/lib/query-client';
 import { useSetBudget } from '../hooks';
 
@@ -23,7 +25,11 @@ interface BudgetFormValues {
 function budgetFormSchema(currency: Currency) {
   return z.custom<BudgetFormValues>().superRefine((values, ctx) => {
     if (!values.categoryId) {
-      ctx.addIssue({ code: 'custom', path: ['categoryId'], message: 'Choose a category' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['categoryId'],
+        message: i18n.t('budgets:dialog.chooseCategory'),
+      });
     }
     const amount = readAmount(values.amount, currency);
     if (amount.problem) {
@@ -59,6 +65,7 @@ export function BudgetDialog({
   initialCategoryId: string | undefined;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(['budgets', 'common']);
   const save = useSetBudget();
   const remove = useSetBudget();
   const budgetOf = (categoryId: string) => budgets.find((b) => b.categoryId === categoryId);
@@ -78,7 +85,7 @@ export function BudgetDialog({
           categoryId: value.categoryId,
           input: { amount: readAmount(value.amount, currency).minor ?? null, from: month },
         });
-        toast.success('Budget saved');
+        toast.success(t('dialog.saved'));
         onClose();
       } catch {
         // Rendered from the mutation error below.
@@ -89,7 +96,7 @@ export function BudgetDialog({
   const mutationError = save.error ?? remove.error;
 
   return (
-    <RouteDialog title={initial ? 'Change budget' : 'Set budget'} onClose={onClose}>
+    <RouteDialog title={initial ? t('dialog.changeTitle') : t('dialog.setTitle')} onClose={onClose}>
       <form
         noValidate
         className="min-w-0 space-y-5"
@@ -105,7 +112,7 @@ export function BudgetDialog({
             const error = firstError(field.state.meta.errors);
             return (
               <div className="space-y-1.5">
-                <Label htmlFor="budget-category">Category</Label>
+                <Label htmlFor="budget-category">{t('dialog.category')}</Label>
                 <CategoryPicker
                   id="budget-category"
                   categories={categories}
@@ -132,7 +139,7 @@ export function BudgetDialog({
             return (
               <div className="space-y-1.5">
                 <Label htmlFor="budget-amount" className="justify-center">
-                  Every month
+                  {t('dialog.everyMonth')}
                 </Label>
                 <HeroAmountInput
                   id="budget-amount"
@@ -154,7 +161,7 @@ export function BudgetDialog({
         </form.Field>
 
         <p className="text-muted-foreground text-center text-sm">
-          From {formatMonth(month)} on. Earlier months keep theirs.
+          {t('dialog.from', { month: formatMonth(month) })}
         </p>
 
         <form.Subscribe
@@ -173,20 +180,20 @@ export function BudgetDialog({
                       { householdId, categoryId, input: { amount: null, from: month } },
                       {
                         onSuccess: () => {
-                          toast.success('Budget removed');
+                          toast.success(t('dialog.removed'));
                           onClose();
                         },
                       },
                     );
                   }}
                 >
-                  Remove budget
+                  {t('dialog.remove')}
                 </Button>
               ) : (
                 <span />
               )}
               <Button type="submit" size="lg" className="min-w-28" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving…' : 'Save'}
+                {isSubmitting ? t('common:saving') : t('common:save')}
               </Button>
             </div>
           )}

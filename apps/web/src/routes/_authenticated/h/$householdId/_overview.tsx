@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/page-header';
 import { PageTitle } from '@/components/page-title';
 import { PageSkeleton, Reveal, RevealPage } from '@/components/reveal';
@@ -17,6 +18,7 @@ import { householdQueries } from '@/features/households/queries';
 import { UpcomingCard } from '@/features/recurring/components/upcoming-card';
 import { recurringQueries } from '@/features/recurring/queries';
 import { currentMonth } from '@/features/transactions/dates';
+import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth-store';
 
 /**
@@ -37,10 +39,10 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/_overview')
   pendingComponent: OverviewSkeleton,
 });
 
-function greeting(hour: number): string {
-  if (hour >= 5 && hour < 12) return 'Good morning';
-  if (hour >= 12 && hour < 18) return 'Good afternoon';
-  return 'Good evening';
+function greeting(hour: number, name: string): string {
+  if (hour >= 5 && hour < 12) return i18n.t('balances:overview.morning', { name });
+  if (hour >= 12 && hour < 18) return i18n.t('balances:overview.afternoon', { name });
+  return i18n.t('balances:overview.evening', { name });
 }
 
 function OverviewPage() {
@@ -51,12 +53,13 @@ function OverviewPage() {
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
   const { data: recurring } = useSuspenseQuery(recurringQueries.list(householdId));
   const { user } = useAuth();
+  const { t } = useTranslation('balances');
   const viewerId = user?.id ?? '';
 
   return (
     <RevealPage>
       <PageTitle title={household.name} />
-      <PageHeader title={`${greeting(new Date().getHours())}, ${user?.displayName ?? ''}`} />
+      <PageHeader title={greeting(new Date().getHours(), user?.displayName ?? '')} />
       <div className="space-y-6">
         <Reveal index={0}>
           <BalanceOverview household={household} balances={balances} viewerId={viewerId} />
@@ -77,7 +80,7 @@ function OverviewPage() {
         <Reveal index={4}>
           <Card>
             <CardHeader>
-              <CardTitle>Members</CardTitle>
+              <CardTitle>{t('overview.members')}</CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="flex flex-wrap gap-4">
@@ -105,9 +108,11 @@ function OverviewPage() {
 /** Balance card, settlements and members; the budget card only shows once it is known. */
 function OverviewSkeleton() {
   const { user } = useAuth();
+  // Re-renders on a language switch.
+  useTranslation('balances');
   return (
     <PageSkeleton>
-      <PageHeader title={`${greeting(new Date().getHours())}, ${user?.displayName ?? ''}`} />
+      <PageHeader title={greeting(new Date().getHours(), user?.displayName ?? '')} />
       <div className="space-y-6">
         <Card>
           <CardContent className="space-y-4">

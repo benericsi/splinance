@@ -5,6 +5,8 @@ export class HttpError extends Error {
     readonly status: number,
     message: string,
     readonly code: ApiErrorCode = 'HTTP_ERROR',
+    /** Sent as `error.details`: what the web needs to say it in the UI language. */
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'HttpError';

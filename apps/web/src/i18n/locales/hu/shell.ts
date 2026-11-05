@@ -13,11 +13,15 @@ export const shell: Messages<typeof en.shell> = {
   sections: 'Háztartás részei',
   nav: {
     overview: 'Áttekintés',
+    overviewShort: 'Főoldal',
     transactions: 'Tranzakciók',
     transactionsShort: 'Tételek',
     budgets: 'Keretek',
     recurring: 'Rendszeres',
+    recurringShort: 'Díjak',
     reports: 'Kimutatások',
+    reportsShort: 'Elemzés',
     settings: 'Beállítások',
+    settingsShort: 'Opciók',
   },
 };

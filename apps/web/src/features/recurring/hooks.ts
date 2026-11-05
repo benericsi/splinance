@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { notificationQueries } from '@/features/notifications/queries';
+import { i18n } from '@/i18n';
 import { recurringApi } from './api';
 import { recurringQueries } from './queries';
 
@@ -51,10 +52,10 @@ export function useDismissSuggestion() {
     mutationFn: recurringApi.dismiss,
     onSuccess: async (_data, { householdId, decision }) => {
       await queryClient.invalidateQueries({ queryKey: recurringQueries.household(householdId) });
-      toast('Hidden from suggestions', {
+      toast(i18n.t('recurring:suggestion.hidden'), {
         duration: 8000,
         action: {
-          label: 'Undo',
+          label: i18n.t('common:undo'),
           onClick: () => {
             const list = queryClient.getQueryData(recurringQueries.list(householdId).queryKey);
             const dismissal = list?.dismissed.find(

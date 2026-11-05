@@ -2,6 +2,7 @@ import { monthSchema } from '@splinance/shared';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { MonthNav } from '@/components/month-nav';
 import { PageHeader } from '@/components/page-header';
@@ -34,6 +35,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/budgets')({
 });
 
 function BudgetsPage() {
+  const { t } = useTranslation('budgets');
   const { householdId } = Route.useParams();
   const { month } = Route.useLoaderDeps();
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
@@ -55,8 +57,8 @@ function BudgetsPage() {
 
   return (
     <RevealPage>
-      <PageTitle title={`Budgets · ${household.name}`} />
-      <PageHeader title="Budgets" actions={setLink('Set budget')} />
+      <PageTitle title={t('pageTitle', { household: household.name })} />
+      <PageHeader title={t('title')} actions={setLink(t('set'))} />
       <Reveal index={0} className="mb-6">
         <MonthNav month={month} page="/h/$householdId/budgets" />
       </Reveal>
@@ -65,13 +67,12 @@ function BudgetsPage() {
         {data.budgets.length === 0 ? (
           <div className="rounded-xl border border-dashed px-6 py-12 text-center">
             <h2 className="font-heading text-lg font-semibold">
-              No budgets for {formatMonth(month)}
+              {t('empty.title', { month: formatMonth(month) })}
             </h2>
             <p className="text-muted-foreground mx-auto mt-1 mb-5 max-w-sm">
-              Give a category a monthly limit and see how shared spending compares. It holds every
-              month until you change it.
+              {t('empty.description')}
             </p>
-            {setLink('Set a budget')}
+            {setLink(t('setFirst'))}
           </div>
         ) : (
           <BudgetList
@@ -92,9 +93,10 @@ function BudgetsPage() {
 
 /** Month switcher, the totals and a few budget rows with their bars. */
 function BudgetsSkeleton() {
+  const { t } = useTranslation('budgets');
   return (
     <PageSkeleton>
-      <PageHeader title="Budgets" actions={<SkeletonActions widths={['w-32']} />} />
+      <PageHeader title={t('title')} actions={<SkeletonActions widths={['w-32']} />} />
       <div className="mb-6 flex h-8 items-center">
         <SkeletonLine line="h-7" className="w-48" />
       </div>

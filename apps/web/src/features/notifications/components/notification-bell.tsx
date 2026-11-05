@@ -11,6 +11,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { buttonVariants } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
@@ -31,7 +32,8 @@ export function NotificationBell({ household }: { household: { id: string; name:
   const isPhone = useMediaQuery(PHONE_QUERY);
   const [open, setOpen] = useState(false);
   const { data: unread = 0 } = useQuery(notificationQueries.unreadCount());
-  const label = unread > 0 ? `Notifications, ${String(unread)} unread` : 'Notifications';
+  const { t } = useTranslation('notifications');
+  const label = unread > 0 ? t('unreadLabel', { count: unread }) : t('title');
   // As tall as the avatar beside it, with a soft fill so it reads as a control, not a glyph.
   const triggerClass = cn(
     buttonVariants({ variant: 'ghost', size: 'icon' }),
@@ -51,7 +53,7 @@ export function NotificationBell({ household }: { household: { id: string; name:
       // The drawer has its own title; the popover's is the panel's first line.
       heading={
         isPhone ? null : (
-          <PopoverTitle className="font-heading text-sm font-semibold">Notifications</PopoverTitle>
+          <PopoverTitle className="font-heading text-sm font-semibold">{t('title')}</PopoverTitle>
         )
       }
       onOpenItem={() => {
@@ -77,7 +79,7 @@ export function NotificationBell({ household }: { household: { id: string; name:
         <Drawer open={open} onOpenChange={setOpen} showSwipeHandle>
           <DrawerContent>
             <DrawerHeader>
-              <DrawerTitle>Notifications</DrawerTitle>
+              <DrawerTitle>{t('title')}</DrawerTitle>
             </DrawerHeader>
             <div className="overflow-y-auto pb-[env(safe-area-inset-bottom)]">{panel}</div>
           </DrawerContent>
@@ -133,6 +135,7 @@ function NotificationPanel({
   heading: ReactNode;
   onOpenItem: () => void;
 }) {
+  const { t } = useTranslation(['notifications', 'common']);
   const { user } = useAuth();
   const navigate = useNavigate();
   const list = useQuery(notificationQueries.list());
@@ -162,21 +165,19 @@ function NotificationPanel({
               markRead.mutate({ input: { all: true } });
             }}
           >
-            Mark all as read
+            {t('markAll')}
           </button>
         )}
       </div>
 
       {list.isPending ? (
         <p className="text-muted-foreground px-4 py-6 text-center text-sm" role="status">
-          Loading…
+          {t('common:loading')}
         </p>
       ) : items.length === 0 ? (
-        <p className="text-muted-foreground px-4 py-6 text-center text-sm">
-          Nothing new. Renewals, budget alerts and what others change show up here.
-        </p>
+        <p className="text-muted-foreground px-4 py-6 text-center text-sm">{t('empty')}</p>
       ) : (
-        <ul aria-label="Notifications" className="border-t">
+        <ul aria-label={t('title')} className="border-t">
           {items.map((n) => {
             const { lead, rest, detail } = describeNotification(n, user?.id ?? '', now);
             const fresh = !n.readAt && !n.resolvedAt;
@@ -190,7 +191,7 @@ function NotificationPanel({
                   className="hover:bg-muted/60 focus-visible:ring-ring/50 flex w-full items-start gap-2.5 px-4 py-2.5 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-inset"
                 >
                   <span
-                    aria-label={fresh ? 'Unread' : undefined}
+                    aria-label={fresh ? t('unread') : undefined}
                     className={cn(
                       'mt-3 size-1.5 shrink-0 rounded-full',
                       fresh ? 'bg-link' : 'bg-transparent',
@@ -231,7 +232,7 @@ function NotificationPanel({
             }}
             className="accent-primary size-3.5"
           />
-          What others change in {household.name}
+          {t('activity', { household: household.name })}
         </label>
       )}
     </div>

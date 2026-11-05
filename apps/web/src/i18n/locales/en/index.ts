@@ -9,6 +9,13 @@ import { onboarding } from './onboarding';
 import { privacy } from './privacy';
 import { rules } from './rules';
 import { shell } from './shell';
+import { imports } from './imports';
+import { budgets } from './budgets';
+import { reports } from './reports';
+import { recurring } from './recurring';
+import { notifications } from './notifications';
+import { balances } from './balances';
+import { transactions } from './transactions';
 
 /** English, the source language: every other catalog has exactly these keys. */
 export const en = {
@@ -23,4 +30,11 @@ export const en = {
   categories,
   rules,
   privacy,
+  transactions,
+  balances,
+  imports,
+  budgets,
+  reports,
+  recurring,
+  notifications,
 };

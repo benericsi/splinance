@@ -1,4 +1,5 @@
 import type { Debt, TransactionPerson } from '@splinance/shared';
+import { i18n } from '@/i18n';
 
 /** The viewer's debts (owed or owing, largest first, as the API sorts them) and the rest. */
 export function splitDebts(debts: Debt[], viewerId: string): { mine: Debt[]; others: Debt[] } {
@@ -25,9 +26,13 @@ export function pairBalance(debts: Debt[], viewerId: string, otherId: string): n
 
 /** "Ben owes you", "You owe Cara", "Cara owes Ben". */
 export function describeDebt(debt: Debt, viewerId: string): string {
-  if (debt.to.userId === viewerId) return `${debt.from.displayName} owes you`;
-  if (debt.from.userId === viewerId) return `You owe ${debt.to.displayName}`;
-  return `${debt.from.displayName} owes ${debt.to.displayName}`;
+  if (debt.to.userId === viewerId) {
+    return i18n.t('balances:debt.owesYou', { name: debt.from.displayName });
+  }
+  if (debt.from.userId === viewerId) {
+    return i18n.t('balances:debt.youOwe', { name: debt.to.displayName });
+  }
+  return i18n.t('balances:debt.owes', { from: debt.from.displayName, to: debt.to.displayName });
 }
 
 /** "Ben paid you", "You paid Cara", "Ben paid Cara". */
@@ -36,7 +41,7 @@ export function describePayment(
   to: TransactionPerson,
   viewerId: string,
 ): string {
-  if (to.userId === viewerId) return `${from.displayName} paid you`;
-  if (from.userId === viewerId) return `You paid ${to.displayName}`;
-  return `${from.displayName} paid ${to.displayName}`;
+  if (to.userId === viewerId) return i18n.t('balances:payment.paidYou', { name: from.displayName });
+  if (from.userId === viewerId) return i18n.t('balances:payment.youPaid', { name: to.displayName });
+  return i18n.t('balances:payment.paid', { from: from.displayName, to: to.displayName });
 }

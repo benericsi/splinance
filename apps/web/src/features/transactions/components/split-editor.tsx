@@ -7,11 +7,15 @@ import {
 } from '@splinance/shared';
 import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { i18n } from '@/i18n';
+import { intlLocale } from '@/lib/locale';
 import { COLLAPSE, TRANSITION_FAST } from '@/lib/motion';
 import { cn } from '@/lib/utils';
+import { forPerson } from '../describe';
 import type { ShareRow } from '../form';
 import {
   formatMoney,
@@ -22,11 +26,7 @@ import {
 } from '../money';
 import { ShareAmountInput } from './amount-inputs';
 
-const METHODS = [
-  { value: 'equal', label: 'Equally' },
-  { value: 'percentage', label: 'Percent' },
-  { value: 'fixed', label: 'Amounts' },
-] as const;
+const METHODS = ['equal', 'percentage', 'fixed'] as const;
 
 interface SplitEditorProps {
   currency: Currency;
@@ -86,8 +86,8 @@ function remainderHint(
       PERCENT_SCALE - included.reduce((sum, row) => sum + (parsePercent(row.percent) ?? 0), 0);
     if (left === 0) return undefined;
     return left > 0
-      ? `${formatPercentInput(left)} % left to assign`
-      : `${formatPercentInput(-left)} % too much`;
+      ? i18n.t('transactions:split.left', { value: `${formatPercentInput(left)} %` })
+      : i18n.t('transactions:split.over', { value: `${formatPercentInput(-left)} %` });
   }
   if (props.splitMethod === 'fixed' && props.amount !== undefined) {
     const left =
@@ -95,31 +95,56 @@ function remainderHint(
       included.reduce((sum, row) => sum + (parseAmount(row.amount, props.currency) ?? 0), 0);
     if (left === 0) return undefined;
     return left > 0
-      ? `${formatMoney(left, props.currency)} left to assign`
-      : `${formatMoney(-left, props.currency)} too much`;
+      ? i18n.t('transactions:split.left', { value: formatMoney(left, props.currency) })
+      : i18n.t('transactions:split.over', { value: formatMoney(-left, props.currency) });
   }
   return undefined;
 }
 
+const lists = new Map<string, Intl.ListFormat>();
+
+/** "you and Ben", "Anna, Ben and you" / "te és Ben", in the UI language. */
 function joinNames(names: string[]): string {
-  if (names.length <= 1) return names[0] ?? '';
-  return `${names.slice(0, -1).join(', ')} and ${names.at(-1) ?? ''}`;
+  const locale = intlLocale();
+  let list = lists.get(locale);
+  if (!list) {
+    list = new Intl.ListFormat(locale, { type: 'conjunction' });
+    lists.set(locale, list);
+  }
+  return list.format(names);
 }
 
 /** The collapsed form: "Paid by you · split equally between you and Ben". */
 function summarize(props: SplitEditorProps): string {
   const name = (row: Pick<ShareRow, 'userId' | 'displayName'>) =>
-    row.userId === props.viewerId ? 'you' : row.displayName;
+    row.userId === props.viewerId ? i18n.t('transactions:split.you') : row.displayName;
   const payer = props.shares.find((row) => row.userId === props.paidBy);
-  const verb = props.kind === 'income' ? 'Received by' : 'Paid by';
+  const income = props.kind === 'income';
+  let head: string;
+  if (payer?.userId === props.viewerId) {
+    head = income
+      ? i18n.t('transactions:split.receivedByYou')
+      : i18n.t('transactions:split.paidByYou');
+  } else {
+    const payerName = payer ? payer.displayName : i18n.t('transactions:split.someone');
+    head = income
+      ? i18n.t('transactions:split.receivedBy', { name: payerName })
+      : i18n.t('transactions:split.paidBy', { name: payerName });
+  }
   const included = props.shares.filter((row) => row.included);
-  const head = `${verb} ${payer ? name(payer) : 'someone'}`;
 
-  if (included.length === 1 && included[0]) return `${head} · for ${name(included[0])}`;
-  if (props.splitMethod === 'equal')
-    return `${head} · split equally between ${joinNames(included.map(name))}`;
-  if (props.splitMethod === 'percentage') return `${head} · split by percentage`;
-  return `${head} · split by amount`;
+  if (included.length === 1 && included[0]) {
+    return `${head} · ${forPerson(included[0], props.viewerId)}`;
+  }
+  if (props.splitMethod === 'equal') {
+    return `${head} · ${i18n.t('transactions:split.equallyBetween', {
+      names: joinNames(included.map(name)),
+    })}`;
+  }
+  if (props.splitMethod === 'percentage') {
+    return `${head} · ${i18n.t('transactions:split.byPercentage')}`;
+  }
+  return `${head} · ${i18n.t('transactions:split.byAmount')}`;
 }
 
 /**
@@ -128,6 +153,7 @@ function summarize(props: SplitEditorProps): string {
  * has an error, and opens by itself for anything but the default.
  */
 export function SplitEditor(props: SplitEditorProps) {
+  const { t } = useTranslation('transactions');
   const { currency, splitMethod, shares, error } = props;
   const isDefault =
     splitMethod === 'equal' &&
@@ -150,11 +176,12 @@ export function SplitEditor(props: SplitEditorProps) {
           setExpanded(true);
         }}
       >
-        Change
+        {t('split.change')}
       </Button>
     </div>
   );
 
+  const payerLabel = props.kind === 'income' ? t('split.receivedByLabel') : t('split.paidByLabel');
   const payers = shares.filter((row) => !row.former || row.userId === props.paidBy);
   const setRow = (userId: string, patch: Partial<ShareRow>) => {
     props.onSharesChange(shares.map((row) => (row.userId === userId ? { ...row, ...patch } : row)));
@@ -162,33 +189,33 @@ export function SplitEditor(props: SplitEditorProps) {
 
   const editor = (
     <fieldset className="space-y-4 rounded-lg border p-3">
-      <legend className="sr-only">Split</legend>
+      <legend className="sr-only">{t('split.label')}</legend>
       <div className="space-y-1.5">
-        <p className="text-sm font-medium">{props.kind === 'income' ? 'Received by' : 'Paid by'}</p>
+        <p className="text-sm font-medium">{payerLabel}</p>
         <SegmentedControl
-          label={props.kind === 'income' ? 'Received by' : 'Paid by'}
+          label={payerLabel}
           value={props.paidBy}
           onChange={props.onPaidByChange}
           options={payers.map((row) => ({
             value: row.userId,
-            label: row.userId === props.viewerId ? 'You' : row.displayName,
+            label: row.userId === props.viewerId ? t('you') : row.displayName,
           }))}
         />
       </div>
 
       <div className="space-y-1.5">
-        <p className="text-sm font-medium">Split</p>
+        <p className="text-sm font-medium">{t('split.label')}</p>
         <SegmentedControl
-          label="Split method"
+          label={t('split.method')}
           value={splitMethod}
           onChange={props.onMethodChange}
-          options={METHODS}
+          options={METHODS.map((method) => ({ value: method, label: t(`split.${method}`) }))}
         />
       </div>
 
       <ul className="space-y-1">
         {shares.map((row) => {
-          const label = row.userId === props.viewerId ? 'You' : row.displayName;
+          const label = row.userId === props.viewerId ? t('you') : row.displayName;
           const share = preview.get(row.userId);
           return (
             <li key={row.userId} className="flex min-h-9 items-center gap-3">
@@ -203,13 +230,15 @@ export function SplitEditor(props: SplitEditorProps) {
                 />
                 <span className="truncate">
                   {label}
-                  {row.former && <span className="text-muted-foreground"> (left)</span>}
+                  {row.former && (
+                    <span className="text-muted-foreground"> {t('split.former')}</span>
+                  )}
                 </span>
               </label>
               {splitMethod === 'percentage' && row.included && (
                 <div className="relative w-24 shrink-0">
                   <Input
-                    aria-label={`Percent for ${label}`}
+                    aria-label={t('split.percentFor', { name: label })}
                     inputMode="decimal"
                     autoComplete="off"
                     value={row.percent}
@@ -225,7 +254,7 @@ export function SplitEditor(props: SplitEditorProps) {
               )}
               {splitMethod === 'fixed' && row.included && (
                 <ShareAmountInput
-                  label={`Amount for ${label}`}
+                  label={t('split.amountFor', { name: label })}
                   value={row.amount}
                   currency={currency}
                   onChange={(amount) => {

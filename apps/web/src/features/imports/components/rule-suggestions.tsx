@@ -1,5 +1,6 @@
 import type { Category } from '@splinance/shared';
 import { useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { CategoryTile } from '@/features/categories/components/category-tile';
@@ -19,6 +20,7 @@ export function RuleSuggestions({
   suggestions: RuleSuggestion[];
   categories: Category[];
 }) {
+  const { t } = useTranslation('imports');
   const create = useCreateRule();
   const [picked, setPicked] = useState(() => new Set(suggestions.map((s) => s.key)));
   const [done, setDone] = useState(false);
@@ -48,12 +50,12 @@ export function RuleSuggestions({
     }
     setSaving(false);
     setDone(true);
-    toast.success(`${String(created)} ${created === 1 ? 'rule' : 'rules'} created`);
+    toast.success(t('suggestions.created', { count: created }));
   };
 
   return (
-    <section aria-label="Rule suggestions" className="space-y-2 border-t pt-4">
-      <h2 className="font-medium">Do the same next time?</h2>
+    <section aria-label={t('suggestions.label')} className="space-y-2 border-t pt-4">
+      <h2 className="font-medium">{t('suggestions.title')}</h2>
       <ul className="divide-y">
         {suggestions.map((suggestion) => {
           const category = categoryById.get(suggestion.categoryId);
@@ -72,12 +74,17 @@ export function RuleSuggestions({
                   className="accent-primary size-4 shrink-0"
                 />
                 <span className="min-w-0 flex-1">
-                  Contains <span className="font-medium">{suggestion.pattern}</span>
+                  <Trans
+                    t={t}
+                    i18nKey="suggestions.contains"
+                    values={{ pattern: suggestion.pattern }}
+                    components={{ strong: <span className="font-medium" /> }}
+                  />
                 </span>
                 <span className="flex items-center gap-2 text-sm">
                   <CategoryTile category={category} size="sm" />
                   {category?.name}
-                  {suggestion.markShared ? ', shared' : ''}
+                  {suggestion.markShared ? t('suggestions.shared') : ''}
                 </span>
               </label>
             </li>
@@ -89,9 +96,7 @@ export function RuleSuggestions({
         disabled={chosen.length === 0 || saving}
         onClick={() => void createRules()}
       >
-        {saving
-          ? 'Creating…'
-          : `Create ${String(chosen.length)} ${chosen.length === 1 ? 'rule' : 'rules'}`}
+        {saving ? t('suggestions.creating') : t('suggestions.create', { count: chosen.length })}
       </Button>
     </section>
   );

@@ -1,3 +1,6 @@
+import { i18n } from '@/i18n';
+import { intlLocale, localeStore } from '@/lib/locale';
+
 /**
  * Calendar dates (`YYYY-MM-DD`) and months (`YYYY-MM`) in the user's local time zone. Built
  * from parts, never through `new Date('2026-10-10')`, which would mean midnight UTC and show
@@ -25,26 +28,53 @@ export function addMonths(month: string, delta: number): string {
   return toIsoDate(date).slice(0, 7);
 }
 
-/** "October 2026" */
-export function formatMonth(month: string): string {
-  return fromIsoDate(`${month}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+const formats = new Map<string, Intl.DateTimeFormat>();
+
+/** A date in the UI language with the given parts; formatters are cached per locale. */
+export function formatDateWith(date: Date, options: Intl.DateTimeFormatOptions): string {
+  const locale = intlLocale();
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let format = formats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, options);
+    formats.set(key, format);
+  }
+  return format.format(date);
 }
 
-/** "Today, Fri 10 Oct", "Yesterday, Thu 9 Oct", "Wed 8 Oct", or with the year if not this year. */
+/** "October 2026" / "2026. október" */
+export function formatMonth(month: string): string {
+  return formatDateWith(fromIsoDate(`${month}-01`), { month: 'long', year: 'numeric' });
+}
+
+/** "10 Oct" / "okt. 10." */
+export const formatShortDate = (value: string) =>
+  formatDateWith(fromIsoDate(value), { day: 'numeric', month: 'short' });
+
+/**
+ * "Today, Fri 10 Oct", "Yesterday, Thu 9 Oct", "Wed 8 Oct", or with the year if not this
+ * year. Hungarian: "Ma, okt. 10., péntek", "2025. dec. 31., szerda".
+ */
 export function formatDayHeading(value: string, now = new Date()): string {
   const date = fromIsoDate(value);
-  const dayMonth = date.toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-  // Appended by hand: with `year`, en-GB adds a comma after the weekday ("Wed, 31 Dec 2025").
-  const label =
-    date.getFullYear() === now.getFullYear()
-      ? dayMonth
-      : `${dayMonth} ${String(date.getFullYear())}`;
+  const sameYear = date.getFullYear() === now.getFullYear();
+  let label: string;
+  if (localeStore.getState() === 'en') {
+    const dayMonth = formatDateWith(date, { weekday: 'short', day: 'numeric', month: 'short' });
+    // Appended by hand: with `year`, en-GB adds a comma after the weekday ("Wed, 31 Dec 2025").
+    label = sameYear ? dayMonth : `${dayMonth} ${String(date.getFullYear())}`;
+  } else {
+    label = formatDateWith(date, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+      ...(!sameYear && { year: 'numeric' }),
+    });
+  }
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  if (value === toIsoDate(now)) return `Today, ${label}`;
-  if (value === toIsoDate(yesterday)) return `Yesterday, ${label}`;
+  if (value === toIsoDate(now)) return i18n.t('common:date.todayHeading', { date: label });
+  if (value === toIsoDate(yesterday)) {
+    return i18n.t('common:date.yesterdayHeading', { date: label });
+  }
   return label;
 }

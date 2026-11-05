@@ -2,6 +2,7 @@ import { monthSchema } from '@splinance/shared';
 import { useSuspenseInfiniteQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
 import { Plus, Upload } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { PageHeader } from '@/components/page-header';
 import { PageTitle } from '@/components/page-title';
@@ -35,6 +36,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/transaction
 });
 
 function TransactionsPage() {
+  const { t } = useTranslation(['transactions', 'common']);
   const { householdId } = Route.useParams();
   const { month } = Route.useLoaderDeps();
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
@@ -45,9 +47,9 @@ function TransactionsPage() {
 
   return (
     <RevealPage>
-      <PageTitle title={`Transactions · ${household.name}`} />
+      <PageTitle title={t('pageTitle', { household: household.name })} />
       <PageHeader
-        title="Transactions"
+        title={t('title')}
         actions={
           <>
             <Link
@@ -56,7 +58,7 @@ function TransactionsPage() {
               className={buttonVariants({ variant: 'outline', size: 'lg' })}
             >
               <Upload aria-hidden />
-              Import
+              {t('import')}
             </Link>
             <AddLink householdId={householdId} className="max-md:hidden" />
           </>
@@ -69,11 +71,11 @@ function TransactionsPage() {
       <Reveal index={1}>
         {transactions.length === 0 ? (
           <div className="rounded-xl border border-dashed px-6 py-12 text-center">
-            <h2 className="font-heading text-lg font-semibold">Add your first transaction</h2>
+            <h2 className="font-heading text-lg font-semibold">{t('empty.title')}</h2>
             <p className="text-muted-foreground mx-auto mt-1 mb-5 max-w-sm">
-              Expenses and income you add for {formatMonth(month)} show up here.
+              {t('empty.description', { month: formatMonth(month) })}
             </p>
-            <AddLink householdId={householdId} label="Add transaction" />
+            <AddLink householdId={householdId} label={t('addTransaction')} />
           </div>
         ) : (
           <TransactionList
@@ -93,7 +95,7 @@ function TransactionsPage() {
             disabled={list.isFetchingNextPage}
             onClick={() => void list.fetchNextPage()}
           >
-            {list.isFetchingNextPage ? 'Loading…' : 'Load more'}
+            {list.isFetchingNextPage ? t('common:loading') : t('common:loadMore')}
           </Button>
         </div>
       )}
@@ -104,7 +106,7 @@ function TransactionsPage() {
         params={{ householdId }}
         search={true}
         state={OPEN_MODAL_STATE}
-        aria-label="Add transaction"
+        aria-label={t('addTransaction')}
         className={cn(
           buttonVariants({ size: 'icon-lg' }),
           'fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 size-14 rounded-full shadow-lg md:hidden [&_svg:not([class*=size-])]:size-6',
@@ -121,10 +123,11 @@ function TransactionsPage() {
 
 /** Month switcher, the three totals and a day of rows. */
 function TransactionsSkeleton() {
+  const { t } = useTranslation('transactions');
   return (
     <PageSkeleton>
       <PageHeader
-        title="Transactions"
+        title={t('title')}
         actions={<SkeletonActions widths={['w-24', 'w-20 max-md:hidden']} />}
       />
       <div className="mb-6 space-y-4">
@@ -145,13 +148,14 @@ function TransactionsSkeleton() {
 
 function AddLink({
   householdId,
-  label = 'Add',
+  label,
   className,
 }: {
   householdId: string;
   label?: string;
   className?: string;
 }) {
+  const { t } = useTranslation('transactions');
   return (
     <Link
       to="/h/$householdId/transactions/new"
@@ -161,7 +165,7 @@ function AddLink({
       className={cn(buttonVariants({ size: 'lg' }), className)}
     >
       <Plus aria-hidden />
-      {label}
+      {label ?? t('add')}
     </Link>
   );
 }

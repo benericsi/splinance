@@ -11,6 +11,7 @@ import {
   type TransactionVisibility,
 } from '@splinance/shared';
 import { z } from 'zod';
+import { i18n } from '@/i18n';
 import { today } from './dates';
 import {
   amountProblemMessage,
@@ -208,7 +209,7 @@ export function toTransactionInput(
       basisPoints: parsePercent(row.percent),
     }));
     if (shares.some((share) => share.basisPoints === undefined)) {
-      issues.push({ path: 'shares', message: 'Enter a percentage for everyone in the split' });
+      issues.push({ path: 'shares', message: i18n.t('transactions:split.percentMissing') });
     }
     split = { method: 'percentage', shares };
   } else {
@@ -217,7 +218,7 @@ export function toTransactionInput(
       amount: parseAmount(row.amount, currency),
     }));
     if (shares.some((share) => share.amount === undefined)) {
-      issues.push({ path: 'shares', message: 'Enter an amount for everyone in the split' });
+      issues.push({ path: 'shares', message: i18n.t('transactions:split.amountMissing') });
     }
     split = { method: 'fixed', shares };
   }

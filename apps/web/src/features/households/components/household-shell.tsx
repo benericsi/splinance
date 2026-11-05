@@ -46,6 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     to: '/h/$householdId',
     label: 'overview',
+    shortLabel: 'overviewShort',
     icon: House,
     exact: true,
     alsoActiveOn: '/h/$householdId/settle',
@@ -57,9 +58,24 @@ const NAV_ITEMS: NavItem[] = [
     icon: ArrowLeftRight,
   },
   { to: '/h/$householdId/budgets', label: 'budgets', icon: PiggyBank },
-  { to: '/h/$householdId/recurring', label: 'recurring', icon: Repeat },
-  { to: '/h/$householdId/reports', label: 'reports', icon: ChartColumn },
-  { to: '/h/$householdId/settings', label: 'settings', icon: Settings },
+  {
+    to: '/h/$householdId/recurring',
+    label: 'recurring',
+    shortLabel: 'recurringShort',
+    icon: Repeat,
+  },
+  {
+    to: '/h/$householdId/reports',
+    label: 'reports',
+    shortLabel: 'reportsShort',
+    icon: ChartColumn,
+  },
+  {
+    to: '/h/$householdId/settings',
+    label: 'settings',
+    shortLabel: 'settingsShort',
+    icon: Settings,
+  },
 ];
 
 function NavLinks({ householdId, variant }: { householdId: string; variant: 'sidebar' | 'tabs' }) {

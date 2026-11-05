@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { buttonVariants } from '@/components/ui/button';
 import { addMonths, currentMonth, formatMonth } from '@/features/transactions/dates';
 
@@ -8,6 +9,7 @@ type MonthPage = '/h/$householdId/transactions' | '/h/$householdId/budgets';
 
 /** Previous / next month links, the month as a heading, and "This month" when away from it. */
 export function MonthNav({ month, page }: { month: string; page: MonthPage }) {
+  const { t } = useTranslation();
   const stepLink = (delta: number, label: string, Icon: typeof ChevronLeft) => (
     <Link
       from={page}
@@ -21,18 +23,18 @@ export function MonthNav({ month, page }: { month: string; page: MonthPage }) {
 
   return (
     <div className="flex items-center gap-1">
-      {stepLink(-1, 'Previous month', ChevronLeft)}
+      {stepLink(-1, t('month.previous'), ChevronLeft)}
       <h2 className="font-heading min-w-36 text-center text-lg font-semibold">
         {formatMonth(month)}
       </h2>
-      {stepLink(1, 'Next month', ChevronRight)}
+      {stepLink(1, t('month.next'), ChevronRight)}
       {month !== currentMonth() && (
         <Link
           from={page}
           search={(prev) => ({ ...prev, month: undefined })}
           className={buttonVariants({ variant: 'outline', size: 'sm', className: 'ml-2' })}
         >
-          This month
+          {t('month.current')}
         </Link>
       )}
     </div>

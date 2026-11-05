@@ -5,6 +5,7 @@ import { Link } from '@tanstack/react-router';
 import { Lock, Repeat, Trash2 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { firstError } from '@/components/form/first-error';
 import { FormError } from '@/components/form/form-error';
@@ -54,6 +55,7 @@ export function TransactionDialog({
   transaction,
   onClose,
 }: TransactionDialogProps) {
+  const { t } = useTranslation(['transactions', 'common']);
   const { user } = useAuth();
   const viewerId = user?.id ?? '';
   const currency = household.baseCurrency;
@@ -80,10 +82,10 @@ export function TransactionDialog({
             transactionId: base.id,
             input: { ...input, version: base.version },
           });
-          toast.success('Transaction saved');
+          toast.success(t('dialog.saved'));
         } else {
           await create.mutateAsync({ householdId: household.id, input });
-          toast.success('Transaction added');
+          toast.success(t('dialog.added'));
         }
         onClose();
       } catch {
@@ -112,11 +114,11 @@ export function TransactionDialog({
     remove.mutate(ref, {
       onSuccess: () => {
         onClose();
-        toast('Transaction deleted', {
+        toast(t('dialog.deleted'), {
           // Longer than the 4 s default: an undo needs time to notice and reach.
           duration: 8000,
           action: {
-            label: 'Undo',
+            label: t('common:undo'),
             onClick: () => {
               restore.mutate(ref);
             },
@@ -127,7 +129,7 @@ export function TransactionDialog({
   };
 
   return (
-    <RouteDialog title={base ? 'Edit transaction' : 'Add transaction'} onClose={onClose}>
+    <RouteDialog title={base ? t('dialog.editTitle') : t('dialog.addTitle')} onClose={onClose}>
       {/* min-w-0: a grid item, so long content must not widen the dialog's column. */}
       <form
         noValidate
@@ -139,9 +141,9 @@ export function TransactionDialog({
       >
         {conflict ? (
           <div className="space-y-2">
-            <FormError message="Someone else saved a change to this transaction. Load it to see their version, then edit again." />
+            <FormError message={t('dialog.conflict')} />
             <Button type="button" variant="outline" size="sm" onClick={() => void loadLatest()}>
-              Load latest version
+              {t('dialog.loadLatest')}
             </Button>
           </div>
         ) : (
@@ -151,7 +153,7 @@ export function TransactionDialog({
         <form.Field name="kind">
           {(field) => (
             <SegmentedControl
-              label="Type"
+              label={t('dialog.type')}
               value={field.state.value}
               onChange={(kind) => {
                 field.handleChange(kind);
@@ -160,8 +162,8 @@ export function TransactionDialog({
                 if (current && current.kind !== kind) form.setFieldValue('categoryId', '');
               }}
               options={[
-                { value: 'expense', label: 'Expense' },
-                { value: 'income', label: 'Income' },
+                { value: 'expense', label: t('dialog.expense') },
+                { value: 'income', label: t('dialog.income') },
               ]}
             />
           )}
@@ -173,7 +175,7 @@ export function TransactionDialog({
             return (
               <div className="space-y-1.5">
                 <Label htmlFor="field-amount" className="sr-only">
-                  Amount
+                  {t('amount.label')}
                 </Label>
                 <HeroAmountInput
                   id="field-amount"
@@ -199,8 +201,8 @@ export function TransactionDialog({
             <TextField
               field={field}
               required
-              label="Description"
-              placeholder="Groceries at Spar"
+              label={t('dialog.description')}
+              placeholder={t('dialog.descriptionPlaceholder')}
               maxLength={120}
             />
           )}
@@ -208,7 +210,7 @@ export function TransactionDialog({
 
         <div className="grid grid-cols-2 gap-3">
           <form.Field name="occurredOn">
-            {(field) => <TextField field={field} required label="Date" type="date" />}
+            {(field) => <TextField field={field} required label={t('dialog.date')} type="date" />}
           </form.Field>
           <form.Subscribe selector={(state) => state.values.kind}>
             {(kind) => (
@@ -219,7 +221,7 @@ export function TransactionDialog({
                   );
                   return (
                     <div className="space-y-1.5">
-                      <Label htmlFor="field-categoryId">Category</Label>
+                      <Label htmlFor="field-categoryId">{t('dialog.category')}</Label>
                       <CategoryPicker
                         id="field-categoryId"
                         categories={options}
@@ -238,18 +240,18 @@ export function TransactionDialog({
         <form.Field name="visibility">
           {(field) => (
             <div className="space-y-1.5">
-              <p className="text-sm font-medium">Who is it for?</p>
+              <p className="text-sm font-medium">{t('dialog.whoFor')}</p>
               <SegmentedControl
-                label="Who is it for?"
+                label={t('dialog.whoFor')}
                 value={field.state.value}
                 onChange={field.handleChange}
                 options={[
-                  { value: 'shared', label: 'Shared' },
+                  { value: 'shared', label: t('dialog.shared') },
                   {
                     value: 'private',
                     label: (
                       <>
-                        <Lock aria-hidden /> Just me
+                        <Lock aria-hidden /> {t('dialog.justMe')}
                       </>
                     ),
                   },
@@ -268,10 +270,7 @@ export function TransactionDialog({
                 <AnimatePresence initial={false} mode="wait">
                   <m.div key={values.visibility} {...COLLAPSE} transition={TRANSITION_FAST}>
                     {values.visibility === 'private' ? (
-                      <p className="text-muted-foreground text-sm">
-                        Only you can see it. It counts toward your own spending, not the shared
-                        balance.
-                      </p>
+                      <p className="text-muted-foreground text-sm">{t('dialog.privateNote')}</p>
                     ) : (
                       <SplitEditor
                         currency={currency}
@@ -310,7 +309,7 @@ export function TransactionDialog({
             className="text-link inline-flex items-center gap-1.5 text-sm hover:underline"
           >
             <Repeat className="size-3.5" aria-hidden />
-            Make recurring
+            {t('dialog.makeRecurring')}
           </Link>
         )}
 
@@ -326,7 +325,7 @@ export function TransactionDialog({
               onClick={deleteTransaction}
             >
               <Trash2 aria-hidden />
-              Delete
+              {t('dialog.delete')}
             </Button>
           )}
           <form.Subscribe selector={(state) => state.isSubmitting}>
@@ -337,7 +336,7 @@ export function TransactionDialog({
                 className="min-w-28"
                 disabled={isSubmitting || conflict}
               >
-                {isSubmitting ? 'Saving…' : 'Save'}
+                {isSubmitting ? t('common:saving') : t('common:save')}
               </Button>
             )}
           </form.Subscribe>
