@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { authResponseSchema } from '../auth';
+import { localeSchema } from '../i18n/locales';
+
+/** `POST /api/demo` body: the visitor's UI language, which the story is told in. */
+export const demoCreateInputSchema = z.object({ locale: localeSchema.optional() });
+
+export type DemoCreateInput = z.infer<typeof demoCreateInputSchema>;
 
 /** `POST /api/demo`: a signed-in visitor and the household to open. */
 export const demoCreateResponseSchema = authResponseSchema.extend({

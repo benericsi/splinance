@@ -1,4 +1,8 @@
-import type { DemoCreateResponse, DemoStatusResponse } from '@splinance/shared';
+import {
+  demoCreateInputSchema,
+  type DemoCreateResponse,
+  type DemoStatusResponse,
+} from '@splinance/shared';
 import { Router } from 'express';
 import { rateLimiter } from '../../middleware/rate-limit';
 import { getAuth, requireAuth } from '../../middleware/require-auth';
@@ -11,8 +15,10 @@ export function createDemoRouter(config: DemoConfig) {
 
   // Public and expensive (a password hash and a year of data): a few per person, plus the
   // global cap of active sandboxes in the service.
-  router.post('/', rateLimiter(5), async (_req, res) => {
-    const demo = await createDemo(config);
+  router.post('/', rateLimiter(5), async (req, res) => {
+    // A body is optional: older clients send none and get the English story.
+    const { locale } = demoCreateInputSchema.parse(req.body ?? {});
+    const demo = await createDemo(config, { ...(locale && { locale }) });
     if (demo.refreshCookie) setRefreshCookie(res, demo.refreshCookie);
     const body: DemoCreateResponse = {
       accessToken: demo.accessToken,

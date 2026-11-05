@@ -33,7 +33,10 @@ export type DemoPeople = Record<DemoPerson, string>;
  * the caller deletes the sandbox if one fails.
  */
 export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<string> {
-  const household = await createHousehold(people.you, { name: story.householdName });
+  const household = await createHousehold(people.you, {
+    name: story.householdName,
+    locale: story.locale,
+  });
   const householdId = household.id;
   const scopeOf = (person: DemoPerson) => ({ userId: people[person], householdId });
 

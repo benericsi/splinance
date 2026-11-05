@@ -10,6 +10,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createdAt, id, timestamptz } from './columns';
+import { locale } from './enums';
 import { households } from './households';
 import { users } from './users';
 
@@ -33,6 +34,8 @@ export const demos = pgTable(
     seed: integer().notNull(),
     // The day the story ends on: the visitor's "today" when the demo started.
     anchorOn: date({ mode: 'string' }).notNull(),
+    // The language the story was told in (seed, anchor_on and locale rebuild it exactly).
+    locale: locale().notNull().default('en'),
     expiresAt: timestamptz().notNull(),
     createdAt: createdAt(),
   },

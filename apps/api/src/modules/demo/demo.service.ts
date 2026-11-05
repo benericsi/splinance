@@ -1,5 +1,5 @@
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
-import { buildDemoStory, DEMO_PEOPLE } from '@splinance/shared';
+import { buildDemoStory, DEMO_PEOPLE, type Locale } from '@splinance/shared';
 import { count, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
 import { demos, householdMembers, households, type UserRow, users } from '../../db/schema';
@@ -24,6 +24,7 @@ export interface Sandbox {
   seed: number;
   /** The day the story ends on. */
   today: string;
+  locale: Locale;
   expiresAt: Date;
   visitor: UserRow;
 }
@@ -60,15 +61,23 @@ export async function assertDemoDatabase(executor: Db): Promise<void> {
  * the password is random and thrown away) and a household seeded with the demo story for
  * the last 12 months. A failure on the way deletes what was made.
  */
+export interface SandboxOptions {
+  today?: string;
+  seed?: number;
+  /** The language the story is told in; bank files are the same in all. */
+  locale?: Locale;
+}
+
 export async function createSandbox(
   config: DemoConfig,
-  options: { today?: string; seed?: number } = {},
+  options: SandboxOptions = {},
 ): Promise<Sandbox> {
   const started = Date.now();
   await assertDemoDatabase(db);
   const today = options.today ?? budapestToday();
   const seed = options.seed ?? randomInt(0, 2 ** 31 - 1);
-  const story = buildDemoStory({ seed, today });
+  const locale = options.locale ?? 'en';
+  const story = buildDemoStory({ seed, today, locale });
   const passwordHash = await hashPassword(randomBytes(32).toString('base64url'));
   const expiresAt = new Date(Date.now() + config.ttlDays * DAY_MS);
 
@@ -99,7 +108,14 @@ export async function createSandbox(
     );
     const [demo] = await tx
       .insert(demos)
-      .values({ userId: visitor.id, partnerId: partner.id, seed, anchorOn: today, expiresAt })
+      .values({
+        userId: visitor.id,
+        partnerId: partner.id,
+        seed,
+        anchorOn: today,
+        locale,
+        expiresAt,
+      })
       .returning();
     if (!demo) throw new Error('Demo insert returned no row');
     return { demo, visitor };
@@ -113,7 +129,7 @@ export async function createSandbox(
       .set({ householdId, seededAt: sql`now()` })
       .where(eq(demos.id, demo.id));
     logger.info({ demoId: demo.id, ms: Date.now() - started }, 'Demo created');
-    return { demoId: demo.id, householdId, seed, today, expiresAt, visitor };
+    return { demoId: demo.id, householdId, seed, today, locale, expiresAt, visitor };
   } catch (error) {
     // Half a household is no demo: remove what was made, then report the original failure.
     await deleteQuietly(demo.id);
@@ -124,7 +140,7 @@ export async function createSandbox(
 /** A sandbox for a visitor of the demo site, signed in. */
 export async function createDemo(
   config: DemoConfig,
-  options: { today?: string; seed?: number } = {},
+  options: SandboxOptions = {},
 ): Promise<DemoCreated> {
   const sandbox = await createSandbox(config, options);
   try {

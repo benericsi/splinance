@@ -95,6 +95,7 @@ DATASETS: dict[str, Dataset] = {
                     "created_at": TIMESTAMP,
                     "seeded_at": TIMESTAMP,
                     "expires_at": TIMESTAMP,
+                    "locale": ENUM,
                 }
             ),
             Mode.SNAPSHOT,

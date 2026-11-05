@@ -1,8 +1,10 @@
+import type { Locale } from '../i18n/locales';
 import type { StatementSource } from '../imports';
 import type { RecurringCadence, RecurringScope } from '../recurring';
 import { addMonths, monthsBetween } from '../reports';
 import { allocate, PERCENT_SCALE } from '../splits';
 import type { TransactionKind } from '../transactions';
+import { localizeDemoStory } from './locale';
 import { createRandom, type Random } from './random';
 
 /**
@@ -131,6 +133,8 @@ export interface DemoBudget {
 
 export interface DemoStory {
   seed: number;
+  /** The visitor's language: typed text and category names are in it (`localizeDemoStory`). */
+  locale: Locale;
   /** The day the story ends on, `YYYY-MM-DD`; nothing happens after it. */
   today: string;
   /** `YYYY-MM`, oldest first, the current month last. */
@@ -728,8 +732,17 @@ const byDate =
 /**
  * Builds the demo story for the 12 months ending on `today` (`YYYY-MM-DD`). `seed` (an
  * unsigned 32-bit integer) varies amounts, days and shops; the storyline stays the same.
+ * `locale` is the language of what the couple typed; the bank rows are the same in all.
  */
-export function buildDemoStory({ seed, today }: { seed: number; today: string }): DemoStory {
+export function buildDemoStory({
+  seed,
+  today,
+  locale = 'en',
+}: {
+  seed: number;
+  today: string;
+  locale?: Locale;
+}): DemoStory {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffff_ffff) {
     throw new RangeError('buildDemoStory: seed must be an unsigned 32-bit integer');
   }
@@ -747,8 +760,9 @@ export function buildDemoStory({ seed, today }: { seed: number; today: string })
   });
 
   const first = months[0] ?? current;
-  return {
+  const story: DemoStory = {
     seed,
+    locale: 'en',
     today,
     months,
     householdName: DEMO_HOUSEHOLD_NAME,
@@ -798,4 +812,5 @@ export function buildDemoStory({ seed, today }: { seed: number; today: string })
       ],
     },
   };
+  return localizeDemoStory(story, locale);
 }

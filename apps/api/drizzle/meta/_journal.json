@@ -134,6 +134,13 @@
       "when": 1793889922224,
       "tag": "0018_users_locale",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793909684015,
+      "tag": "0019_demos_locale",
+      "breakpoints": true
     }
   ]
 }

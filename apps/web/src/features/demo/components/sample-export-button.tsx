@@ -1,5 +1,6 @@
 import { buildDemoStory, renderDemoBankFiles } from '@splinance/shared';
 import { FlaskConical } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 
 /** Local date, `YYYY-MM-DD` (en-CA formats it that way). */
@@ -16,6 +17,7 @@ export function SampleExportButton({
   onFile: (file: File) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation('demo');
   const useSample = () => {
     const story = buildDemoStory({
       seed: Math.floor(Math.random() * 2 ** 31),
@@ -30,7 +32,7 @@ export function SampleExportButton({
   return (
     <Button variant="outline" className="self-center" disabled={disabled} onClick={useSample}>
       <FlaskConical aria-hidden />
-      No export at hand? Try a sample one
+      {t('sample')}
     </Button>
   );
 }

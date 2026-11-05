@@ -121,3 +121,38 @@ async function endDemo(page: Page) {
   const dialog = page.getByRole('alertdialog', { name: 'End the demo?' });
   await dialog.getByRole('button', { name: 'End demo' }).click();
 }
+
+test.describe('in Hungarian', () => {
+  test.use({ locale: 'hu-HU' });
+
+  test('a Hungarian visitor gets the story in Hungarian, with the same bank history', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(
+      page.getByRole('heading', { name: 'Közös kiadások, rendben.', level: 1 }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Próbáld ki' }).click();
+    await expect(page).toHaveURL(/\/h\/[^/]+$/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'Egyenleg' })).toBeAttached();
+    const householdId = new URL(page.url()).pathname.split('/')[2] ?? '';
+
+    await expect(page.getByRole('complementary', { name: 'Demó' })).toContainText('Demóadatok');
+    await expect(page.getByRole('button', { name: /Doe család/ })).toBeVisible();
+
+    // Typed text and categories in Hungarian; merchant names as the banks print them.
+    await openTransactionsIn(page, householdId, monthOf(-11));
+    await expect(page.getByRole('link', { name: /^Albérlet/ })).toBeVisible();
+    await page.goto(`/h/${householdId}/budgets`);
+    await expect(page.getByRole('link', { name: /^Étterem/ })).toBeVisible();
+
+    // The bank files are the English story's, byte for byte (shared test): same imports.
+    await page.goto(`/h/${householdId}/transactions/import`);
+    await expect(page.getByText(/^revolut-\d{4}-\d{2}\.csv/).first()).toBeVisible();
+  });
+});
+
+async function openTransactionsIn(page: Page, householdId: string, month: string) {
+  await page.goto(`/h/${householdId}/transactions?month=${month}`);
+  await expect(page.getByRole('heading', { name: 'Tranzakciók', level: 1 })).toBeVisible();
+}

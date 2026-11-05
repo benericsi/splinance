@@ -152,6 +152,9 @@ function KpiCard({
   );
 }
 
+/** Signs and digits, the same in both languages. */
+const NO_CHANGE = '± 0%';
+
 /** "↑ 12%" in green or red depending on whether up is good here; nothing to compare: none. */
 function ChangeBadge({
   value,
@@ -168,7 +171,9 @@ function ChangeBadge({
   if (change === null) return null;
   if (change === 0) {
     return (
-      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">± 0%</span>
+      <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs">
+        {NO_CHANGE}
+      </span>
     );
   }
   const up = change > 0;

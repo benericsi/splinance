@@ -1,18 +1,20 @@
 import { m } from 'motion/react';
 import { type ReactNode, useContext, useEffect, useLayoutEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { REVEAL, REVEAL_STAGGER, REVEAL_WINDOW_MS, TRANSITION } from '@/lib/motion';
 import { RevealContext, skeletonFlag } from '@/lib/reveal';
 import { cn } from '@/lib/utils';
 
 /** A route's loading state: the page's static header plus skeleton blocks. */
 export function PageSkeleton({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   useLayoutEffect(() => {
     skeletonFlag.set(true);
   }, []);
   return (
     <div aria-busy="true">
       <span className="sr-only" role="status">
-        Loading…
+        {t('loading')}
       </span>
       {children}
     </div>

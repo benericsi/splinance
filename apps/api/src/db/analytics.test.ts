@@ -262,6 +262,7 @@ describe('the contract', () => {
         'created_at timestamptz',
         'seeded_at timestamptz',
         'expires_at timestamptz',
+        'locale locale',
       ],
       households: [
         'household_id uuid',
