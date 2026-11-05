@@ -96,6 +96,15 @@ async function recordTour(browser: Browser, scheme: (typeof SCHEMES)[number]) {
   await page.mouse.wheel(0, 500);
   await pause(page, 1500);
 
+  // Recurring payments: confirmed and hand-added ones, one gone quiet, suggestions below.
+  await glideAndClick(page, sections.getByRole('link', { name: 'Recurring' }));
+  await expect(page.getByRole('heading', { name: 'Recurring', level: 1 })).toBeVisible();
+  await pause(page, 2000);
+  await page.mouse.wheel(0, 500);
+  await pause(page, 1500);
+  await page.mouse.wheel(0, -500);
+  await pause(page, 500);
+
   await glideAndClick(page, sections.getByRole('link', { name: 'Reports' }));
   await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();
   await pause(page, 2500);
@@ -107,6 +116,13 @@ async function recordTour(browser: Browser, scheme: (typeof SCHEMES)[number]) {
   await glideAndClick(page, sections.getByRole('link', { name: 'Overview' }));
   await expect(page.getByRole('heading', { name: 'Balance' })).toBeVisible();
   await pause(page, 1500);
+
+  // The bell: the partner's week, a renewal and a budget alert.
+  await glideAndClick(page, page.getByRole('button', { name: /^Notifications/ }));
+  await expect(page.getByRole('list', { name: 'Notifications' })).toBeVisible();
+  await pause(page, 3000);
+  await page.keyboard.press('Escape');
+  await pause(page, 1000);
 
   await context.close();
   await video?.saveAs(`${OUT}tour-${scheme}.webm`);
