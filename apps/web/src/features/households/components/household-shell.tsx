@@ -12,6 +12,7 @@ import {
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/logo';
 import { UserMenu } from '@/features/auth/components/user-menu';
+import { NotificationBell } from '@/features/notifications/components/notification-bell';
 import { DemoBanner } from '@/features/demo/components/demo-banner';
 import { useAuth } from '@/lib/auth-store';
 import { cn } from '@/lib/utils';
@@ -116,7 +117,12 @@ export function HouseholdShell({
           <div className="min-w-0 md:hidden">
             <HouseholdSwitcher current={household} />
           </div>
-          {user && <UserMenu user={user} />}
+          {user && (
+            <div className="flex items-center gap-2">
+              <NotificationBell household={household} />
+              <UserMenu user={user} />
+            </div>
+          )}
         </header>
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-24 md:px-8 md:pt-8 md:pb-12">

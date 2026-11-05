@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { notificationQueries } from '@/features/notifications/queries';
 import { budgetsApi } from './api';
 import { budgetQueries } from './queries';
 
@@ -8,7 +9,11 @@ export function useSetBudget() {
   return useMutation({
     mutationFn: budgetsApi.set,
     onSuccess: (_data, { householdId }) =>
-      queryClient.invalidateQueries({ queryKey: budgetQueries.household(householdId) }),
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: budgetQueries.household(householdId) }),
+        // Budget alerts follow the limit.
+        queryClient.invalidateQueries({ queryKey: notificationQueries.all() }),
+      ]),
     meta: { suppressErrorToast: true },
   });
 }
