@@ -118,7 +118,7 @@ export function HouseholdShell({
             <HouseholdSwitcher current={household} />
           </div>
           {user && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <NotificationBell household={household} />
               <UserMenu user={user} />
             </div>

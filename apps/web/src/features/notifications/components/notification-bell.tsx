@@ -32,14 +32,15 @@ export function NotificationBell({ household }: { household: { id: string; name:
   const [open, setOpen] = useState(false);
   const { data: unread = 0 } = useQuery(notificationQueries.unreadCount());
   const label = unread > 0 ? `Notifications, ${String(unread)} unread` : 'Notifications';
+  // As tall as the avatar beside it, with a soft fill so it reads as a control, not a glyph.
   const triggerClass = cn(
     buttonVariants({ variant: 'ghost', size: 'icon' }),
-    'relative rounded-full',
+    'bg-muted/70 hover:bg-muted relative size-9 rounded-full [&_svg]:size-5',
   );
   const badge = unread > 0 && (
     <span
       aria-hidden
-      className="bg-brand-red ring-background absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold text-white tabular-nums ring-2"
+      className="bg-brand-red ring-background absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[11px] leading-none font-semibold text-white tabular-nums ring-2"
     >
       {unread > 9 ? '9+' : unread}
     </span>
