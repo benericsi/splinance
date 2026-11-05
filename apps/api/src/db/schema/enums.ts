@@ -3,6 +3,7 @@ import {
   CATEGORY_KINDS,
   CURRENCIES,
   HOUSEHOLD_ROLES,
+  LOCALES,
   NOTIFICATION_ACTIONS,
   NOTIFICATION_TYPES,
   RECURRING_CADENCES,
@@ -17,6 +18,7 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 // Generated from the shared `as const` arrays: one source of truth for DB, Zod and UI labels.
 export const currency = pgEnum('currency', CURRENCIES);
 export const householdRole = pgEnum('household_role', HOUSEHOLD_ROLES);
+export const locale = pgEnum('locale', LOCALES);
 /** Also the type of transactions.kind, so the category foreign key can include the kind. */
 export const categoryKind = pgEnum('category_kind', CATEGORY_KINDS);
 export const transactionVisibility = pgEnum('transaction_visibility', TRANSACTION_VISIBILITIES);

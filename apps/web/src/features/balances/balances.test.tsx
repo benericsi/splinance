@@ -228,7 +228,7 @@ describe('balances on the overview', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Settle up' });
     await user.click(within(dialog).getByRole('button', { name: 'Record payment' }));
-    expect(await within(dialog).findByText('Not your payment')).toBeVisible();
+    expect(await within(dialog).findByText("You don't have permission to do this.")).toBeVisible();
   });
 
   it('deletes a payment and undoes it from the toast', async () => {

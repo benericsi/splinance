@@ -21,6 +21,8 @@ export default defineConfig({
   globalSetup: './support/global-setup.demo.ts',
 
   use: {
+    // The suites read English text; without this the browser follows the machine's language.
+    locale: 'en-US',
     baseURL: `http://localhost:${String(DEMO_WEB_PORT)}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

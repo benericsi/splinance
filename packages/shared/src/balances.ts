@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { currencySchema } from './households';
 import { amountMinorSchema } from './money';
 import { occurredOnSchema, personSchema } from './transactions';
+import { msg } from './i18n/validation';
 
 /** `debtorId` owes `creditorId` `amount` minor units. */
 export interface DebtFlow {
@@ -63,11 +64,7 @@ export type Balances = z.infer<typeof balancesSchema>;
 export const balancesResponseSchema = z.object({ balances: balancesSchema });
 export type BalancesResponse = z.infer<typeof balancesResponseSchema>;
 
-export const settlementNoteSchema = z
-  .string()
-  .trim()
-  .max(200, 'Note must be at most 200 characters')
-  .nullable();
+export const settlementNoteSchema = z.string().trim().max(200, msg('note.tooLong', 200)).nullable();
 
 /**
  * A payment from one person to another, made outside the app (cash, bank transfer) and
@@ -84,7 +81,7 @@ export const settlementInputSchema = z
   })
   .refine((input) => input.fromUserId !== input.toUserId, {
     path: ['toUserId'],
-    message: 'Choose two different people',
+    ...msg('settlement.samePerson'),
   });
 
 export type SettlementInput = z.infer<typeof settlementInputSchema>;

@@ -43,12 +43,12 @@
 
 	handle {
 		root * {args[1]}
-		# script-src: the two inline scripts of index.html by hash, the theme (applies the saved
-		# theme before first paint) and Zod's jitless switch (no eval). check-csp.mjs checks
+		# script-src: the two inline scripts of index.html by hash, the theme and language one
+		# (applies both before first paint) and Zod's jitless switch (no eval). check-csp.mjs checks
 		# them against the build (image build and CI): changing one without its hash fails the
 		# build, not production.
 		# style-src 'unsafe-inline': the splash <style> and libraries that inject styles (sonner).
-		header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-Js8wkbjAtb9Fuc7xzTd5zeakgp2WaSM+mc2LVlB4iqM=' 'sha256-4kXv8ASJd5N8bG8EomHmGsYVdHTa7cDCfaf7QUT34rU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'"
+		header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-PfsTbpRuYKfibn/F87nJhSpG/fejVRYvDD8Jr9ex5zo=' 'sha256-4kXv8ASJd5N8bG8EomHmGsYVdHTa7cDCfaf7QUT34rU='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'"
 		# Hashed file names never change content; everything else (index.html, the SPA
 		# fallback) is revalidated, so a deploy shows up on the next load. Inline matchers
 		# only: this snippet is imported twice into one site, named ones would collide.

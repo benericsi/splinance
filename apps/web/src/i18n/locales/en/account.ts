@@ -1,0 +1,107 @@
+export const account = {
+  title: 'Account settings',
+  description: 'Your profile and how you sign in.',
+  profile: {
+    editName: 'Edit name',
+    displayName: 'Display name',
+    displayNamePlaceholder: 'Anna',
+    emailNote: "Your email is used to sign in. It can't be changed yet.",
+    nameChanged: 'Name changed',
+  },
+  language: {
+    title: 'Language',
+    description: 'Used on every device you sign in on.',
+  },
+  methods: {
+    title: 'Sign-in methods',
+    description: 'How you get into Splinance. Keep at least one.',
+    password: 'Password',
+    set: 'Set',
+    notSet: 'Not set',
+    change: 'Change',
+    setPassword: 'Set a password',
+    connected: 'Connected {{connected}} · Last used {{lastUsed}}',
+    notConnected: 'Not connected',
+    onlyWayIn:
+      'Your only way to sign in. Set a password first, then you can disconnect {{provider}}.',
+    connect: 'Connect',
+    connectTitle: 'Connect {{provider}}?',
+    connectWithPassword:
+      "Confirm it's you, then pick your account at {{provider}}. After that you can sign in with either.",
+    connectWithoutPassword:
+      'Pick your account at {{provider}}. After that you can sign in with it too.',
+    continueTo: 'Continue to {{provider}}',
+    opening: 'Opening…',
+    disconnect: 'Disconnect',
+    disconnectTitle: 'Disconnect {{provider}}?',
+    disconnectDescription:
+      "You won't be able to sign in with {{provider}} any more. Other devices are signed out; you stay signed in here.",
+    disconnecting: 'Disconnecting…',
+    disconnected: '{{provider}} is disconnected. Other devices are signed out.',
+    nowConnected: '{{provider}} is now connected. Next time, you can continue with {{provider}}.',
+    theProvider: 'the provider',
+  },
+  devices: {
+    title: 'Other devices',
+    description: 'Sign out everywhere except here. It takes effect within 15 minutes.',
+    signOut: 'Sign out other devices',
+    signingOut: 'Signing out…',
+    none: 'No other devices were signed in',
+    signedOut_one: 'Signed out of {{count}} other device',
+    signedOut_other: 'Signed out of {{count}} other devices',
+  },
+  danger: {
+    title: 'Danger zone',
+    deleteAccount: 'Delete account',
+    deleteDescription:
+      'Your sign-in and private data are erased. Shared entries stay for the others, as Former member.',
+    deleteButton: 'Delete account…',
+  },
+  password: {
+    changeTitle: 'Change password',
+    setTitle: 'Set a password',
+    changeDescription: 'Other devices are signed out. You stay signed in here.',
+    setDescription: 'Then you can also log in with {{email}}. Other devices are signed out.',
+    reauth: "For your security, confirm it's you first. You'll come right back here.",
+    new: 'New password',
+    newPlaceholder: 'Create a password',
+    change: 'Change password',
+    changing: 'Changing…',
+    set: 'Set password',
+    setting: 'Setting…',
+    changed: 'Password changed. Other devices are signed out.',
+    setDone: 'Password set. You can now also log in with your email.',
+  },
+  delete: {
+    title: 'Delete your account?',
+    blocked: 'Sort these out first, then come back.',
+    final: "This can't be undone.",
+    openBalance:
+      '<strong>{{household}}: an open balance.</strong> <a>Settle up</a> so nobody is left with a debt.',
+    onlyOwner:
+      "<strong>{{household}}: you're the only owner.</strong> <a>Make someone else an owner</a> first.",
+    leaves:
+      'You leave <strong>{{household}}</strong>. Your shared entries stay there as Former member.',
+    deletes: '<strong>{{household}}</strong> is deleted (nobody else was ever in it).',
+    archives: '<strong>{{household}}</strong> is archived (everyone else has left).',
+    private_one: '{{count}} private transaction is deleted.',
+    private_other: '{{count}} private transactions are deleted.',
+    backups: "Encrypted backups keep data up to 13 months, then it's gone.",
+    typeEmail: 'Type {{email}} to confirm',
+    emailMismatch: 'Type your email exactly as shown',
+    submit: 'Delete my account',
+    submitting: 'Deleting…',
+  },
+  oauthError: {
+    cancelled: 'You cancelled at {{provider}}. Nothing changed.',
+    taken: 'That {{provider}} account is already used by another Splinance account.',
+    conflict: 'Another {{provider}} account is connected. Disconnect it first.',
+    wrong_account:
+      "That's a different {{provider}} account than the one connected here. Try again with that one.",
+    email_unverified:
+      "Your {{provider}} account's email isn't verified. Verify it with {{provider}} first.",
+    expired: 'That took too long or was started in another tab. Try again.',
+    unavailable: "{{provider}} isn't available right now. Try again later.",
+    failed: "That didn't work with {{provider}}. Try again.",
+  },
+};

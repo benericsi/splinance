@@ -1,17 +1,19 @@
+import { useTranslation } from 'react-i18next';
 import { type ErrorComponentProps, Link, useRouter } from '@tanstack/react-router';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { StatusPage } from './status-page';
 
 export function NotFoundPage({ fullPage = false }: { fullPage?: boolean }) {
+  const { t } = useTranslation();
   return (
     <StatusPage
       fullPage={fullPage}
       code="404"
-      title="Page not found"
-      description="The page you are looking for does not exist or has been moved."
+      title={t('notFound.title')}
+      description={t('notFound.description')}
       actions={
         <Link to="/" className={buttonVariants()}>
-          Back to home
+          {t('backHome')}
         </Link>
       }
     />
@@ -23,13 +25,14 @@ export function ErrorPage({
   reset,
   fullPage = false,
 }: ErrorComponentProps & { fullPage?: boolean }) {
+  const { t } = useTranslation();
   const router = useRouter();
 
   return (
     <StatusPage
       fullPage={fullPage}
-      title="Something went wrong"
-      description="An unexpected error occurred. Try again, or reload the page if it keeps happening."
+      title={t('error.title')}
+      description={t('error.description')}
       actions={
         <>
           <Button
@@ -39,10 +42,10 @@ export function ErrorPage({
               void router.invalidate();
             }}
           >
-            Try again
+            {t('tryAgain')}
           </Button>
           <Link to="/" className={buttonVariants({ variant: 'outline' })}>
-            Back to home
+            {t('backHome')}
           </Link>
         </>
       }

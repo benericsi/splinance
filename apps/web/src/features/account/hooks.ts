@@ -1,6 +1,8 @@
+import type { Locale } from '@splinance/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { householdQueries } from '@/features/households/queries';
 import { authStore } from '@/lib/auth-store';
+import { localeStore } from '@/lib/locale';
 import { accountApi } from './api';
 import { accountQueries } from './queries';
 
@@ -18,6 +20,23 @@ export function useUpdateProfile() {
       ]);
     },
     meta: { suppressErrorToast: true },
+  });
+}
+
+/**
+ * Switches the UI language at once (this device remembers it) and, for a signed-in user,
+ * saves it to the account so every other device follows. The demo keeps it on the device:
+ * account writes are closed there. A failed save shows the usual toast; the next session
+ * refresh brings the saved language back.
+ */
+export function useSaveLocale() {
+  return useMutation({
+    mutationFn: async (locale: Locale) => {
+      await localeStore.setLocale(locale);
+      const { user } = authStore.getState();
+      if (__DEMO_SITE__ || !user || user.locale === locale) return;
+      authStore.setUser(await accountApi.updateProfile({ locale }));
+    },
   });
 }
 

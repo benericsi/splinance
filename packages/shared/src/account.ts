@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { displayNameSchema, passwordSchema, userSchema } from './auth';
+import { localeSchema } from './i18n/locales';
 import { oauthProviderIdSchema } from './oauth';
+import { msg } from './i18n/validation';
 
 /** A sign-in provider account connected to the user (`user_identities`). */
 export const accountIdentitySchema = z.object({
@@ -27,10 +29,15 @@ export const accountResponseSchema = z.object({
 
 export type AccountResponse = z.infer<typeof accountResponseSchema>;
 
-/** PATCH /api/account */
-export const updateProfileInputSchema = z.object({
-  displayName: displayNameSchema,
-});
+/** PATCH /api/account: the name, the UI language (null: follow the device), or both. */
+export const updateProfileInputSchema = z
+  .object({
+    displayName: displayNameSchema.optional(),
+    locale: localeSchema.nullable().optional(),
+  })
+  .refine((input) => input.displayName !== undefined || input.locale !== undefined, {
+    ...msg('nothingToUpdate'),
+  });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileInputSchema>;
 
@@ -47,7 +54,7 @@ export type ProfileResponse = z.infer<typeof profileResponseSchema>;
  * signed-in user (`requiredPasswordIssues`).
  */
 export const changePasswordInputSchema = z.object({
-  currentPassword: z.string().min(1, 'Enter your current password').max(128).optional(),
+  currentPassword: z.string().min(1, msg('currentPassword.required')).max(128).optional(),
   newPassword: passwordSchema,
 });
 
@@ -63,7 +70,7 @@ export type RevokeSessionsResponse = z.infer<typeof revokeSessionsResponseSchema
 
 /** Step-up for connect and disconnect: required when the account has a password. */
 export const stepUpInputSchema = z.object({
-  currentPassword: z.string().min(1, 'Enter your current password').max(128).optional(),
+  currentPassword: z.string().min(1, msg('currentPassword.required')).max(128).optional(),
 });
 
 export type StepUpInput = z.infer<typeof stepUpInputSchema>;
@@ -113,7 +120,7 @@ export type AccountDeletionPreview = z.infer<typeof accountDeletionPreviewSchema
 
 /** POST /api/account/delete: step-up plus the email typed again. */
 export const deleteAccountInputSchema = z.object({
-  currentPassword: z.string().min(1, 'Enter your current password').max(128).optional(),
+  currentPassword: z.string().min(1, msg('currentPassword.required')).max(128).optional(),
   confirmEmail: z.string().trim().toLowerCase().max(254),
 });
 

@@ -9,14 +9,18 @@ import {
   Repeat,
   Settings,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/logo';
 import { UserMenu } from '@/features/auth/components/user-menu';
 import { NotificationBell } from '@/features/notifications/components/notification-bell';
 import { DemoBanner } from '@/features/demo/components/demo-banner';
 import { useAuth } from '@/lib/auth-store';
+import type { en } from '@/i18n/locales/en';
 import { cn } from '@/lib/utils';
 import { HouseholdSwitcher } from './household-switcher';
+
+type NavLabel = keyof typeof en.shell.nav;
 
 interface NavItem {
   to:
@@ -26,9 +30,10 @@ interface NavItem {
     | '/h/$householdId/recurring'
     | '/h/$householdId/reports'
     | '/h/$householdId/settings';
-  label: string;
+  /** Its name in the `shell` catalog (`nav.<key>`). */
+  label: NavLabel;
   /** For the phone tab bar, where six columns leave about 60 px each at 360 px. */
-  shortLabel?: string;
+  shortLabel?: NavLabel;
   icon: LucideIcon;
   exact?: boolean;
   /** Modal routes over this section's page that keep the section highlighted. */
@@ -40,24 +45,25 @@ const NAV_ITEMS: NavItem[] = [
   // Exact, or it would match every section; the settle up dialog sits over the overview.
   {
     to: '/h/$householdId',
-    label: 'Overview',
+    label: 'overview',
     icon: House,
     exact: true,
     alsoActiveOn: '/h/$householdId/settle',
   },
   {
     to: '/h/$householdId/transactions',
-    label: 'Transactions',
-    shortLabel: 'Activity',
+    label: 'transactions',
+    shortLabel: 'transactionsShort',
     icon: ArrowLeftRight,
   },
-  { to: '/h/$householdId/budgets', label: 'Budgets', icon: PiggyBank },
-  { to: '/h/$householdId/recurring', label: 'Recurring', icon: Repeat },
-  { to: '/h/$householdId/reports', label: 'Reports', icon: ChartColumn },
-  { to: '/h/$householdId/settings', label: 'Settings', icon: Settings },
+  { to: '/h/$householdId/budgets', label: 'budgets', icon: PiggyBank },
+  { to: '/h/$householdId/recurring', label: 'recurring', icon: Repeat },
+  { to: '/h/$householdId/reports', label: 'reports', icon: ChartColumn },
+  { to: '/h/$householdId/settings', label: 'settings', icon: Settings },
 ];
 
 function NavLinks({ householdId, variant }: { householdId: string; variant: 'sidebar' | 'tabs' }) {
+  const { t } = useTranslation('shell');
   const matchRoute = useMatchRoute();
   return NAV_ITEMS.map(({ to, label, shortLabel, icon: Icon, exact, alsoActiveOn }) => (
     <Link
@@ -79,7 +85,7 @@ function NavLinks({ householdId, variant }: { householdId: string; variant: 'sid
       )}
     >
       <Icon className="size-4" aria-hidden />
-      {variant === 'tabs' ? (shortLabel ?? label) : label}
+      {t(`nav.${variant === 'tabs' ? (shortLabel ?? label) : label}`)}
     </Link>
   ));
 }
@@ -96,6 +102,7 @@ export function HouseholdShell({
   household: Pick<Household, 'id' | 'name'>;
   children: ReactNode;
 }) {
+  const { t } = useTranslation('shell');
   const { user } = useAuth();
 
   return (
@@ -107,7 +114,7 @@ export function HouseholdShell({
         <div className="px-3">
           <HouseholdSwitcher current={household} />
         </div>
-        <nav aria-label="Household sections" className="mt-4 flex flex-col gap-0.5 px-3">
+        <nav aria-label={t('sections')} className="mt-4 flex flex-col gap-0.5 px-3">
           <NavLinks householdId={household.id} variant="sidebar" />
         </nav>
       </aside>
@@ -131,7 +138,7 @@ export function HouseholdShell({
         </main>
 
         <nav
-          aria-label="Household sections"
+          aria-label={t('sections')}
           // One column per section (NAV_ITEMS), so a new section never wraps the bar.
           style={{ gridTemplateColumns: `repeat(${String(NAV_ITEMS.length)}, minmax(0, 1fr))` }}
           className="bg-background fixed inset-x-0 bottom-0 z-40 grid border-t pb-[env(safe-area-inset-bottom)] md:hidden"

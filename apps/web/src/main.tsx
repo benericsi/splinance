@@ -4,6 +4,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ErrorPage, NotFoundPage } from '@/components/route-states';
 import { authStore } from '@/lib/auth-store';
+import { detectLocale, followUserLocale, localeStore } from '@/lib/locale';
 import { createQueryClient } from '@/lib/query-client';
 import { rerunGuardsOnSessionEnd } from '@/lib/session-watch';
 import { routeTree } from './routeTree.gen';
@@ -39,9 +40,12 @@ rerunGuardsOnSessionEnd(authStore, router);
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Root element #root not found');
 
-// Keep the static splash from index.html until the session is restored and the first
-// route has loaded, so users never see a blank frame or a flash of the login page.
-await router.load();
+// Keep the static splash from index.html until the session is restored, the first route
+// has loaded and the language's strings are there, so users never see a blank frame, a
+// flash of the login page or a flash of English. A signed-in user's saved language then
+// wins over the device's (still behind the splash).
+await Promise.all([router.load(), localeStore.setLocale(detectLocale(), { persist: false })]);
+await followUserLocale(authStore);
 
 createRoot(rootElement).render(
   <StrictMode>

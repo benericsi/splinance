@@ -1,8 +1,9 @@
-import type { AccountDeletionPreview, AccountResponse } from '@splinance/shared';
+import { type AccountDeletionPreview, type AccountResponse, msg } from '@splinance/shared';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { Link } from '@tanstack/react-router';
 import { Archive, Crown, DoorOpen, HardDrive, Lock, Scale, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { FormError } from '@/components/form/form-error';
 import { TextField } from '@/components/form/text-field';
@@ -29,11 +30,12 @@ export function DeleteAccountDialog({
 }) {
   const blocked = preview.blockers.length > 0;
   const needsReauth = !account.hasPassword && !account.recentSignIn;
+  const { t } = useTranslation(['account', 'common', 'auth']);
 
   return (
     <RouteDialog
-      title="Delete your account?"
-      description={blocked ? 'Sort these out first, then come back.' : "This can't be undone."}
+      title={t('delete.title')}
+      description={blocked ? t('delete.blocked') : t('delete.final')}
       onClose={onClose}
     >
       {blocked ? (
@@ -62,6 +64,7 @@ function Item({ icon, children }: { icon: ReactNode; children: ReactNode }) {
 }
 
 function Blockers({ preview }: { preview: AccountDeletionPreview }) {
+  const { t } = useTranslation(['account', 'common', 'auth']);
   return (
     <ul className="border-destructive/30 bg-destructive/5 space-y-3 rounded-lg border p-3">
       {preview.blockers.map(({ householdId, householdName, code }) => (
@@ -70,29 +73,37 @@ function Blockers({ preview }: { preview: AccountDeletionPreview }) {
           icon={code === 'UNSETTLED_BALANCE' ? <Scale aria-hidden /> : <Crown aria-hidden />}
         >
           {code === 'UNSETTLED_BALANCE' ? (
-            <>
-              <span className="font-medium">{householdName}: an open balance.</span>{' '}
-              <Link
-                to="/h/$householdId"
-                params={{ householdId }}
-                className="text-link underline underline-offset-4"
-              >
-                Settle up
-              </Link>{' '}
-              so nobody is left with a debt.
-            </>
+            <Trans
+              t={t}
+              i18nKey="delete.openBalance"
+              values={{ household: householdName }}
+              components={{
+                strong: <span className="font-medium" />,
+                a: (
+                  <Link
+                    to="/h/$householdId"
+                    params={{ householdId }}
+                    className="text-link underline underline-offset-4"
+                  />
+                ),
+              }}
+            />
           ) : (
-            <>
-              <span className="font-medium">{householdName}: you&apos;re the only owner.</span>{' '}
-              <Link
-                to="/h/$householdId/settings"
-                params={{ householdId }}
-                className="text-link underline underline-offset-4"
-              >
-                Make someone else an owner
-              </Link>{' '}
-              first.
-            </>
+            <Trans
+              t={t}
+              i18nKey="delete.onlyOwner"
+              values={{ household: householdName }}
+              components={{
+                strong: <span className="font-medium" />,
+                a: (
+                  <Link
+                    to="/h/$householdId/settings"
+                    params={{ householdId }}
+                    className="text-link underline underline-offset-4"
+                  />
+                ),
+              }}
+            />
           )}
         </Item>
       ))}
@@ -101,36 +112,43 @@ function Blockers({ preview }: { preview: AccountDeletionPreview }) {
 }
 
 function Consequences({ preview }: { preview: AccountDeletionPreview }) {
+  const { t } = useTranslation(['account', 'common', 'auth']);
   const count = preview.privateTransactionCount;
+  const strong = { strong: <span className="font-medium" /> };
   return (
     <ul className="space-y-2.5">
       {preview.leaves.map((h) => (
         <Item key={h.householdId} icon={<DoorOpen aria-hidden />}>
-          You leave <span className="font-medium">{h.householdName}</span>. Your shared entries stay
-          there as Former member.
+          <Trans
+            t={t}
+            i18nKey="delete.leaves"
+            values={{ household: h.householdName }}
+            components={strong}
+          />
         </Item>
       ))}
       {preview.deletes.map((h) => (
         <Item key={h.householdId} icon={<Trash2 aria-hidden />}>
-          <span className="font-medium">{h.householdName}</span> is deleted (nobody else was ever in
-          it).
+          <Trans
+            t={t}
+            i18nKey="delete.deletes"
+            values={{ household: h.householdName }}
+            components={strong}
+          />
         </Item>
       ))}
       {preview.archives.map((h) => (
         <Item key={h.householdId} icon={<Archive aria-hidden />}>
-          <span className="font-medium">{h.householdName}</span> is archived (everyone else has
-          left).
+          <Trans
+            t={t}
+            i18nKey="delete.archives"
+            values={{ household: h.householdName }}
+            components={strong}
+          />
         </Item>
       ))}
-      {count > 0 && (
-        <Item icon={<Lock aria-hidden />}>
-          {count === 1 ? '1 private transaction is' : `${String(count)} private transactions are`}{' '}
-          deleted.
-        </Item>
-      )}
-      <Item icon={<HardDrive aria-hidden />}>
-        Encrypted backups keep data up to 13 months, then it&apos;s gone.
-      </Item>
+      {count > 0 && <Item icon={<Lock aria-hidden />}>{t('delete.private', { count })}</Item>}
+      <Item icon={<HardDrive aria-hidden />}>{t('delete.backups')}</Item>
     </ul>
   );
 }
@@ -142,17 +160,18 @@ const FIELD_ERRORS: Partial<Record<string, 'currentPassword' | 'confirmEmail'>> 
 };
 
 function ConfirmForm({ account }: { account: AccountResponse }) {
+  const { t } = useTranslation(['account', 'common', 'auth']);
   const remove = useDeleteAccount();
   const { user, hasPassword } = account;
   const schema = z.object({
     currentPassword: hasPassword
-      ? z.string().min(1, 'Enter your current password').max(128)
+      ? z.string().min(1, msg('currentPassword.required')).max(128)
       : z.string(),
     confirmEmail: z
       .string()
       .trim()
       .toLowerCase()
-      .refine((value) => value === user.email, 'Type your email exactly as shown'),
+      .refine((value) => value === user.email, t('delete.emailMismatch')),
   });
 
   const form = useForm({
@@ -174,7 +193,7 @@ function ConfirmForm({ account }: { account: AccountResponse }) {
 
   const code = remove.error instanceof ApiError ? remove.error.code : undefined;
   const field = FIELD_ERRORS[code ?? ''];
-  const serverError = field && remove.error ? remove.error.message : undefined;
+  const serverError = field && remove.error ? errorMessage(remove.error) : undefined;
   const formError = remove.error && !field ? errorMessage(remove.error) : undefined;
 
   return (
@@ -193,9 +212,9 @@ function ConfirmForm({ account }: { account: AccountResponse }) {
             <TextField
               field={f}
               required
-              label="Current password"
+              label={t('common:password.current')}
               type="password"
-              placeholder="Your current password"
+              placeholder={t('common:password.currentPlaceholder')}
               autoComplete="current-password"
               maxLength={128}
               serverError={field === 'currentPassword' ? serverError : undefined}
@@ -209,7 +228,7 @@ function ConfirmForm({ account }: { account: AccountResponse }) {
           <TextField
             field={f}
             required
-            label={`Type ${user.email} to confirm`}
+            label={t('delete.typeEmail', { email: user.email })}
             placeholder={user.email}
             autoComplete="off"
             maxLength={254}
@@ -222,7 +241,7 @@ function ConfirmForm({ account }: { account: AccountResponse }) {
         {(isSubmitting) => (
           <div className="flex justify-end pt-1">
             <Button type="submit" variant="destructive" size="lg" disabled={isSubmitting}>
-              {isSubmitting ? 'Deleting…' : 'Delete my account'}
+              {isSubmitting ? t('delete.submitting') : t('delete.submit')}
             </Button>
           </div>
         )}

@@ -2,6 +2,7 @@ import { oauthErrorCodeSchema, oauthProviderIdSchema } from '@splinance/shared';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { PageHeader } from '@/components/page-header';
@@ -12,12 +13,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountLayout } from '@/features/account/components/account-layout';
 import { DangerZoneCard } from '@/features/account/components/danger-zone-card';
+import { LanguageCard } from '@/features/account/components/language-card';
 import { OtherDevicesCard } from '@/features/account/components/other-devices-card';
 import { ProfileCard } from '@/features/account/components/profile-card';
 import { SignInMethodsCard } from '@/features/account/components/sign-in-methods-card';
 import { accountOAuthMessage } from '@/features/account/messages';
 import { accountQueries } from '@/features/account/queries';
 import { PROVIDER_VIEWS } from '@/features/auth/providers';
+import { i18n } from '@/i18n';
 
 /** How a connect or re-authentication came back from the provider (API callback). */
 const accountSearchSchema = z.object({
@@ -37,12 +40,13 @@ export const Route = createFileRoute('/_authenticated/account')({
 });
 
 function AccountPage() {
+  const { t } = useTranslation('account');
   const { data: account } = useSuspenseQuery(accountQueries.detail());
   useProviderResult();
 
   return (
     <AccountLayout>
-      <PageTitle title="Account settings" />
+      <PageTitle title={t('title')} />
       <RevealPage>
         <AccountHeader />
         <div className="space-y-6">
@@ -53,9 +57,12 @@ function AccountPage() {
             <SignInMethodsCard account={account} />
           </Reveal>
           <Reveal index={2}>
-            <OtherDevicesCard />
+            <LanguageCard />
           </Reveal>
           <Reveal index={3}>
+            <OtherDevicesCard />
+          </Reveal>
+          <Reveal index={4}>
             <DangerZoneCard />
           </Reveal>
         </div>
@@ -77,10 +84,9 @@ function useProviderResult() {
   useEffect(() => {
     if (!connected && !error) return;
     const providerName = (id: string | undefined) =>
-      (id && PROVIDER_VIEWS[id]?.name) ?? 'the provider';
+      (id && PROVIDER_VIEWS[id]?.name) ?? i18n.t('account:methods.theProvider');
     if (connected) {
-      const name = providerName(connected);
-      toast.success(`${name} is now connected. Next time, you can continue with ${name}.`);
+      toast.success(i18n.t('account:methods.nowConnected', { provider: providerName(connected) }));
     }
     // Only Google exists today; a second provider would carry its id in the error too.
     if (error) toast.error(accountOAuthMessage(error, providerName('google')));
@@ -89,7 +95,8 @@ function useProviderResult() {
 }
 
 function AccountHeader() {
-  return <PageHeader title="Account settings" description="Your profile and how you sign in." />;
+  const { t } = useTranslation('account');
+  return <PageHeader title={t('title')} description={t('description')} />;
 }
 
 function AccountSkeleton() {

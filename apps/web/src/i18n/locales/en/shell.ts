@@ -1,0 +1,20 @@
+export const shell = {
+  accountMenu: 'Account menu',
+  demoAccount: 'Demo account',
+  accountSettings: 'Account settings',
+  logOut: 'Log out',
+  endDemo: 'End demo',
+  endDemoTitle: 'End the demo?',
+  endDemoDescription: 'This deletes the demo household for good. You can start a new one any time.',
+  ending: 'Ending…',
+  sections: 'Household sections',
+  nav: {
+    overview: 'Overview',
+    transactions: 'Transactions',
+    transactionsShort: 'Activity',
+    budgets: 'Budgets',
+    recurring: 'Recurring',
+    reports: 'Reports',
+    settings: 'Settings',
+  },
+};

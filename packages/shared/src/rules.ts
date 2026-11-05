@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { categoryKindSchema } from './categories';
+import { msg } from './i18n/validation';
 
 /**
  * Text as rules compare it: accents and case dropped, runs of spaces collapsed. "TESCO
@@ -17,8 +18,8 @@ export function matchKey(text: string): string {
 export const rulePatternSchema = z
   .string()
   .trim()
-  .min(2, 'Enter at least 2 characters')
-  .max(60, 'Keep it under 60 characters');
+  .min(2, msg('text.min', 2))
+  .max(60, msg('text.max', 60));
 
 export const ruleInputSchema = z.object({
   pattern: rulePatternSchema,

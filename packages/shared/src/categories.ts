@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BRAND_COLORS, type BrandColor } from './brand';
+import { msg } from './i18n/validation';
 
 export const CATEGORY_KINDS = ['expense', 'income'] as const;
 export const categoryKindSchema = z.enum(CATEGORY_KINDS);
@@ -57,8 +58,8 @@ export const categoryColorSchema = z.enum(
 export const categoryNameSchema = z
   .string()
   .trim()
-  .min(1, 'Name is required')
-  .max(40, 'Name must be at most 40 characters');
+  .min(1, msg('name.required'))
+  .max(40, msg('name.tooLong', 40));
 
 export const createCategoryInputSchema = z.object({
   name: categoryNameSchema,
@@ -73,7 +74,7 @@ export type CreateCategoryInput = z.infer<typeof createCategoryInputSchema>;
 export const updateCategoryInputSchema = createCategoryInputSchema
   .omit({ kind: true })
   .partial()
-  .refine((input) => Object.keys(input).length > 0, 'Nothing to update');
+  .refine((input) => Object.keys(input).length > 0, msg('nothingToUpdate'));
 
 export type UpdateCategoryInput = z.infer<typeof updateCategoryInputSchema>;
 

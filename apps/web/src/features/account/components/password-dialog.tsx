@@ -3,10 +3,12 @@ import {
   PASSWORD_MAX_LENGTH,
   passwordSchema,
   requiredPasswordIssues,
+  msg,
   type User,
 } from '@splinance/shared';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { FormError } from '@/components/form/form-error';
@@ -30,7 +32,7 @@ function formSchema(user: User, withCurrent: boolean) {
   return z
     .object({
       currentPassword: withCurrent
-        ? z.string().min(1, 'Enter your current password').max(128)
+        ? z.string().min(1, msg('currentPassword.required')).max(128)
         : z.string(),
       newPassword: passwordSchema,
     })
@@ -57,16 +59,17 @@ export function PasswordDialog({
   /** After a successful change (replaces the modal entry). */
   onDone: () => void;
 }) {
+  const { t } = useTranslation(['account', 'common', 'auth']);
   const { user, hasPassword } = account;
   const [needsReauth, setNeedsReauth] = useState(!hasPassword && !account.recentSignIn);
 
   return (
     <RouteDialog
-      title={hasPassword ? 'Change password' : 'Set a password'}
+      title={hasPassword ? t('password.changeTitle') : t('password.setTitle')}
       description={
         hasPassword
-          ? 'Other devices are signed out. You stay signed in here.'
-          : `Then you can also log in with ${user.email}. Other devices are signed out.`
+          ? t('password.changeDescription')
+          : t('password.setDescription', { email: user.email })
       }
       onClose={onClose}
     >
@@ -94,14 +97,13 @@ export function ReauthPrompt({
   account: AccountResponse;
   redirect: '/account/password' | '/account/delete';
 }) {
+  const { t } = useTranslation(['account', 'common', 'auth']);
   const reauth = useStartReauth();
   const leaving = reauth.isPending || reauth.isSuccess;
 
   return (
     <div className="space-y-4">
-      <p className="text-muted-foreground text-sm">
-        For your security, confirm it&apos;s you first. You&apos;ll come right back here.
-      </p>
+      <p className="text-muted-foreground text-sm">{t('password.reauth')}</p>
       {account.identities.map(({ provider }) => {
         const view = PROVIDER_VIEWS[provider];
         if (!view) return null;
@@ -117,7 +119,7 @@ export function ReauthPrompt({
             }}
           >
             <view.Logo className="size-4" />
-            Continue with {view.name}
+            {t('auth:provider.continueWith', { provider: view.name })}
           </Button>
         );
       })}
@@ -136,6 +138,7 @@ function PasswordForm({
   onDone: () => void;
   onReauthRequired: () => void;
 }) {
+  const { t } = useTranslation(['account', 'common', 'auth']);
   const change = useChangePassword();
   const schema = formSchema(user, hasPassword);
 
@@ -147,11 +150,7 @@ function PasswordForm({
       const { currentPassword, newPassword } = schema.parse(value);
       try {
         await change.mutateAsync(hasPassword ? { currentPassword, newPassword } : { newPassword });
-        toast.success(
-          hasPassword
-            ? 'Password changed. Other devices are signed out.'
-            : 'Password set. You can now also log in with your email.',
-        );
+        toast.success(hasPassword ? t('password.changed') : t('password.setDone'));
         onDone();
       } catch (err) {
         // The sign-in got older than the window while the dialog was open.
@@ -163,7 +162,7 @@ function PasswordForm({
 
   const code = change.error instanceof ApiError ? change.error.code : undefined;
   const field = FIELD_ERRORS[code ?? ''];
-  const serverError = field && change.error ? change.error.message : undefined;
+  const serverError = field && change.error ? errorMessage(change.error) : undefined;
   const formError = change.error && !field ? errorMessage(change.error) : undefined;
 
   return (
@@ -185,9 +184,9 @@ function PasswordForm({
             <TextField
               field={currentField}
               required
-              label="Current password"
+              label={t('common:password.current')}
               type="password"
-              placeholder="Your current password"
+              placeholder={t('common:password.currentPlaceholder')}
               autoComplete="current-password"
               maxLength={128}
               serverError={field === 'currentPassword' ? serverError : undefined}
@@ -204,9 +203,9 @@ function PasswordForm({
               <TextField
                 field={newField}
                 required
-                label="New password"
+                label={t('password.new')}
                 type="password"
-                placeholder="Create a password"
+                placeholder={t('password.newPlaceholder')}
                 autoComplete="new-password"
                 maxLength={PASSWORD_MAX_LENGTH}
                 // Opened by an explicit click when there is no current password to type first.
@@ -234,11 +233,11 @@ function PasswordForm({
             <Button type="submit" size="lg" className="min-w-28" disabled={isSubmitting}>
               {hasPassword
                 ? isSubmitting
-                  ? 'Changing…'
-                  : 'Change password'
+                  ? t('password.changing')
+                  : t('password.change')
                 : isSubmitting
-                  ? 'Setting…'
-                  : 'Set password'}
+                  ? t('password.setting')
+                  : t('password.set')}
             </Button>
           </div>
         )}

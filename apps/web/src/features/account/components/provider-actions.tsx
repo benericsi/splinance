@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { CurrentPasswordField } from './current-password-field';
 function splitError(error: Error | null) {
   if (!error) return { field: undefined, form: undefined };
   return error instanceof ApiError && error.code === 'WRONG_PASSWORD'
-    ? { field: error.message, form: undefined }
+    ? { field: errorMessage(error), form: undefined }
     : { field: undefined, form: errorMessage(error) };
 }
 
@@ -28,6 +29,7 @@ export function ConnectButton({
   name: string;
   hasPassword: boolean;
 }) {
+  const { t } = useTranslation('account');
   const connect = useStartConnect();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
@@ -47,7 +49,7 @@ export function ConnectButton({
           setOpen(true);
         }}
       >
-        Connect
+        {t('methods.connect')}
       </Button>
       <ConfirmDialog
         open={open}
@@ -58,14 +60,14 @@ export function ConnectButton({
             connect.reset();
           }
         }}
-        title={`Connect ${name}?`}
+        title={t('methods.connectTitle', { provider: name })}
         description={
           hasPassword
-            ? `Confirm it's you, then pick your account at ${name}. After that you can sign in with either.`
-            : `Pick your account at ${name}. After that you can sign in with it too.`
+            ? t('methods.connectWithPassword', { provider: name })
+            : t('methods.connectWithoutPassword', { provider: name })
         }
-        confirmLabel={`Continue to ${name}`}
-        pendingLabel="Opening…"
+        confirmLabel={t('methods.continueTo', { provider: name })}
+        pendingLabel={t('methods.opening')}
         pending={leaving}
         error={errors.form}
         onConfirm={start}
@@ -102,6 +104,7 @@ export function DisconnectButton({
   name: string;
   hasPassword: boolean;
 }) {
+  const { t } = useTranslation('account');
   const disconnect = useDisconnect();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
@@ -114,7 +117,7 @@ export function DisconnectButton({
         onSuccess: () => {
           setOpen(false);
           setPassword('');
-          toast.success(`${name} is disconnected. Other devices are signed out.`);
+          toast.success(t('methods.disconnected', { provider: name }));
         },
       },
     );
@@ -129,7 +132,7 @@ export function DisconnectButton({
           setOpen(true);
         }}
       >
-        Disconnect
+        {t('methods.disconnect')}
       </Button>
       <ConfirmDialog
         open={open}
@@ -140,10 +143,10 @@ export function DisconnectButton({
             disconnect.reset();
           }
         }}
-        title={`Disconnect ${name}?`}
-        description={`You won't be able to sign in with ${name} any more. Other devices are signed out; you stay signed in here.`}
-        confirmLabel="Disconnect"
-        pendingLabel="Disconnecting…"
+        title={t('methods.disconnectTitle', { provider: name })}
+        description={t('methods.disconnectDescription', { provider: name })}
+        confirmLabel={t('methods.disconnect')}
+        pendingLabel={t('methods.disconnecting')}
         destructive
         pending={disconnect.isPending}
         error={errors.form}

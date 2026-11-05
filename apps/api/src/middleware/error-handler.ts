@@ -1,9 +1,12 @@
-import type { ApiErrorResponse } from '@splinance/shared';
+import type { ApiErrorCode, ApiErrorResponse } from '@splinance/shared';
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
 import { ZodError, z } from 'zod';
 import { HttpError } from '../lib/http-error';
 
-function sendError(res: Response, status: number, error: ApiErrorResponse['error']) {
+/** Every code the API sends is in the shared list, so the web has words for it. */
+type ApiError = ApiErrorResponse['error'] & { code: ApiErrorCode };
+
+function sendError(res: Response, status: number, error: ApiError) {
   const body: ApiErrorResponse = { error };
   res.status(status).json(body);
 }
@@ -34,7 +37,7 @@ function isBodyParserError(err: unknown): err is BodyParserError {
   );
 }
 
-const BODY_ERRORS: Record<string, { code: string; message: string }> = {
+const BODY_ERRORS: Record<string, { code: ApiErrorCode; message: string }> = {
   'entity.parse.failed': { code: 'INVALID_JSON', message: 'Request body is not valid JSON' },
   'entity.too.large': { code: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large' },
   'encoding.unsupported': {

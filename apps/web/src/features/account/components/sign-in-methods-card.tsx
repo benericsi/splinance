@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { AccountResponse } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { Info, KeyRound } from 'lucide-react';
@@ -16,6 +17,7 @@ import { ConnectButton, DisconnectButton } from './provider-actions';
  * last way in has no Disconnect button, only the explanation (the API refuses it too).
  */
 export function SignInMethodsCard({ account }: { account: AccountResponse }) {
+  const { t } = useTranslation('account');
   const providerIds = [
     ...new Set([
       ...account.identities.map((i) => i.provider),
@@ -28,14 +30,14 @@ export function SignInMethodsCard({ account }: { account: AccountResponse }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sign-in methods</CardTitle>
-        <CardDescription>How you get into Splinance. Keep at least one.</CardDescription>
+        <CardTitle>{t('methods.title')}</CardTitle>
+        <CardDescription>{t('methods.description')}</CardDescription>
       </CardHeader>
       <CardContent className="divide-y">
         <MethodRow
           icon={<KeyRound className="size-4" aria-hidden />}
-          name="Password"
-          status={account.hasPassword ? 'Set' : 'Not set'}
+          name={t('methods.password')}
+          status={account.hasPassword ? t('methods.set') : t('methods.notSet')}
           action={
             __DEMO_SITE__ ? undefined : (
               <Link
@@ -44,7 +46,7 @@ export function SignInMethodsCard({ account }: { account: AccountResponse }) {
                 // cn merges the variant's border over the base's transparent one.
                 className={cn(buttonVariants({ variant: 'outline' }))}
               >
-                {account.hasPassword ? 'Change' : 'Set a password'}
+                {account.hasPassword ? t('methods.change') : t('methods.setPassword')}
               </Link>
             )
           }
@@ -61,8 +63,11 @@ export function SignInMethodsCard({ account }: { account: AccountResponse }) {
               name={view.name}
               status={
                 identity
-                  ? `Connected ${formatDate(identity.connectedAt)} · Last used ${formatLastUsed(identity.lastUsedAt)}`
-                  : 'Not connected'
+                  ? t('methods.connected', {
+                      connected: formatDate(identity.connectedAt),
+                      lastUsed: formatLastUsed(identity.lastUsedAt),
+                    })
+                  : t('methods.notConnected')
               }
               action={
                 onlyWayIn ? undefined : identity ? (
@@ -75,11 +80,7 @@ export function SignInMethodsCard({ account }: { account: AccountResponse }) {
                   <ConnectButton provider={id} name={view.name} hasPassword={account.hasPassword} />
                 ) : undefined
               }
-              note={
-                onlyWayIn
-                  ? `Your only way to sign in. Set a password first, then you can disconnect ${view.name}.`
-                  : undefined
-              }
+              note={onlyWayIn ? t('methods.onlyWayIn', { provider: view.name }) : undefined}
             />
           );
         })}

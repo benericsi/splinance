@@ -6,8 +6,12 @@ import {
 } from '@tanstack/react-router';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
+import { authStore } from '@/lib/auth-store';
+import { localeStore } from '@/lib/locale';
 import { themeStore } from '@/lib/theme';
+import { server } from '../../../../test/msw';
 import { renderWithQuery, testUser } from '../../../../test/utils';
 import { UserMenu } from './user-menu';
 
@@ -91,5 +95,41 @@ describe('UserMenu keyboard access', () => {
     await waitFor(() => {
       expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('UserMenu language', () => {
+  it('switches the UI at once and saves the choice to the account', async () => {
+    authStore.setSession('access-1', testUser);
+    let saved: unknown;
+    server.use(
+      http.patch('/api/account', async ({ request }) => {
+        saved = await request.json();
+        return HttpResponse.json({ user: { ...testUser, locale: 'hu' } });
+      }),
+    );
+    await renderMenu();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    await user.click(await screen.findByRole('button', { name: 'Magyar' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Fiókbeállítások' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Magyar' })).toHaveAttribute('aria-pressed', 'true');
+    expect(document.documentElement.lang).toBe('hu');
+    expect(localeStore.getState()).toBe('hu');
+    await waitFor(() => {
+      expect(authStore.getState().user?.locale).toBe('hu');
+    });
+    expect(saved).toEqual({ locale: 'hu' });
+  });
+
+  it('keeps the choice on the device when nobody is signed in', async () => {
+    await renderMenu();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Account menu' }));
+    // No PATCH handler: a request would fail the test.
+    await user.click(await screen.findByRole('button', { name: 'Magyar' }));
+    expect(await screen.findByRole('menuitem', { name: 'Kijelentkezés' })).toBeVisible();
   });
 });

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Eye, EyeOff } from 'lucide-react';
 import { useId, useState } from 'react';
 import {
@@ -23,17 +24,18 @@ export function CurrentPasswordField({
 }) {
   const id = useId();
   const errorId = `${id}-error`;
+  const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id}>Current password</Label>
+      <Label htmlFor={id}>{t('password.current')}</Label>
       <InputGroup className="h-10">
         <InputGroupInput
           id={id}
           type={revealed ? 'text' : 'password'}
           autoComplete="current-password"
-          placeholder="Your current password"
+          placeholder={t('password.currentPlaceholder')}
           maxLength={128}
           value={value}
           onChange={(e) => {
@@ -45,7 +47,7 @@ export function CurrentPasswordField({
         <InputGroupAddon align="inline-end">
           <InputGroupButton
             size="icon-xs"
-            aria-label={revealed ? 'Hide password' : 'Show password'}
+            aria-label={revealed ? t('password.hide') : t('password.show')}
             aria-pressed={revealed}
             onClick={() => {
               setRevealed((r) => !r);

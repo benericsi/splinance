@@ -2,6 +2,7 @@ import type { User } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { LogOut, UserRound } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { UserAvatar } from '@/components/user-avatar';
@@ -14,10 +15,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { LanguageSwitch } from '@/features/account/components/language-switch';
 import { useEndDemo } from '@/features/demo/hooks';
 import { useLogout } from '../hooks';
 
 export function UserMenu({ user }: { user: User }) {
+  const { t } = useTranslation(['shell', 'common']);
   const logout = useLogout();
   const endDemo = useEndDemo();
   const [confirmingEnd, setConfirmingEnd] = useState(false);
@@ -25,17 +28,17 @@ export function UserMenu({ user }: { user: User }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label="Account menu"
+        aria-label={t('accountMenu')}
         className="focus-visible:ring-ring/50 rounded-full outline-none focus-visible:ring-[3px]"
       >
         <UserAvatar user={user} />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-56">
+      <DropdownMenuContent align="end" className="min-w-60">
         <DropdownMenuGroup>
           <DropdownMenuLabel>
             <div className="text-foreground font-medium">{user.displayName}</div>
             <div className="text-muted-foreground truncate text-xs font-normal">
-              {__DEMO_SITE__ ? 'Demo account' : user.email}
+              {__DEMO_SITE__ ? t('demoAccount') : user.email}
             </div>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
@@ -44,14 +47,18 @@ export function UserMenu({ user }: { user: User }) {
           <>
             <DropdownMenuItem render={<Link to="/account" />}>
               <UserRound aria-hidden />
-              Account settings
+              {t('accountSettings')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         )}
         <div className="flex items-center justify-between gap-4 px-2 py-1">
-          <span className="text-sm">Theme</span>
+          <span className="text-sm">{t('common:theme.label')}</span>
           <ThemeToggle />
+        </div>
+        <div className="flex items-center justify-between gap-4 px-2 py-1">
+          <span className="text-sm">{t('common:language')}</span>
+          <LanguageSwitch />
         </div>
         <DropdownMenuSeparator />
         {__DEMO_SITE__ ? (
@@ -62,7 +69,7 @@ export function UserMenu({ user }: { user: User }) {
             }}
           >
             <LogOut aria-hidden />
-            End demo
+            {t('endDemo')}
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem
@@ -72,7 +79,7 @@ export function UserMenu({ user }: { user: User }) {
             }}
           >
             <LogOut aria-hidden />
-            Log out
+            {t('logOut')}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
@@ -80,10 +87,10 @@ export function UserMenu({ user }: { user: User }) {
         <ConfirmDialog
           open={confirmingEnd}
           onOpenChange={setConfirmingEnd}
-          title="End the demo?"
-          description="This deletes the demo household for good. You can start a new one any time."
-          confirmLabel="End demo"
-          pendingLabel="Ending…"
+          title={t('endDemoTitle')}
+          description={t('endDemoDescription')}
+          confirmLabel={t('endDemo')}
+          pendingLabel={t('ending')}
           destructive
           pending={endDemo.isPending}
           onConfirm={() => {

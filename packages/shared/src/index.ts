@@ -8,6 +8,8 @@ export * from './categories';
 export * from './demo';
 export * from './health';
 export * from './households';
+export * from './i18n/locales';
+export * from './i18n/validation';
 export * from './imports';
 export * from './invites';
 export * from './money';

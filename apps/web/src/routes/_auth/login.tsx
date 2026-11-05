@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { CircleCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { FormError } from '@/components/form/form-error';
 import { PageTitle } from '@/components/page-title';
@@ -10,7 +11,7 @@ import { AuthLayout } from '@/features/auth/components/auth-layout';
 import { LinkNotice } from '@/features/auth/components/link-notice';
 import { LoginForm } from '@/features/auth/components/login-form';
 import { ProviderButtons } from '@/features/auth/components/provider-buttons';
-import { OAUTH_ERROR_MESSAGES, PROVIDER_VIEWS } from '@/features/auth/providers';
+import { oauthErrorMessage, PROVIDER_VIEWS } from '@/features/auth/providers';
 import { authQueries } from '@/features/auth/queries';
 import { useSignInProviders } from '@/features/auth/use-sign-in-providers';
 import { useAuth } from '@/lib/auth-store';
@@ -40,6 +41,7 @@ export const Route = createFileRoute('/_auth/login')({
 });
 
 function LoginPage() {
+  const { t } = useTranslation('auth');
   const { redirect: target, oauth_error: oauthError, oauth } = Route.useSearch();
   const navigate = Route.useNavigate();
   const providers = useSignInProviders();
@@ -58,27 +60,28 @@ function LoginPage() {
 
   const firstProvider = providers[0] && PROVIDER_VIEWS[providers[0].id];
   const passwordHint =
-    firstProvider && !link
-      ? `Signed up with ${firstProvider.name}? Use the button above.`
-      : undefined;
+    firstProvider && !link ? t('login.providerHint', { provider: firstProvider.name }) : undefined;
 
   return (
     <>
-      <PageTitle title="Log in" />
+      <PageTitle title={t('login.title')} />
       <AuthLayout
-        title="Log in"
-        description="Welcome back to Splinance."
+        title={t('login.title')}
+        description={t('login.description')}
         aside={
-          <>
-            No account yet?{' '}
-            <Link
-              to="/register"
-              search={{ redirect: target }}
-              className="text-link font-medium underline-offset-4 hover:underline"
-            >
-              Create one
-            </Link>
-          </>
+          <Trans
+            t={t}
+            i18nKey="login.noAccount"
+            components={{
+              a: (
+                <Link
+                  to="/register"
+                  search={{ redirect: target }}
+                  className="text-link font-medium underline-offset-4 hover:underline"
+                />
+              ),
+            }}
+          />
         }
       >
         {deleted && (
@@ -87,12 +90,12 @@ function LoginPage() {
             className="bg-muted text-foreground mb-4 flex gap-2 rounded-lg px-3 py-2.5 text-sm"
           >
             <CircleCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
-            Your account has been deleted. Thanks for using Splinance.
+            {t('login.deleted')}
           </p>
         )}
         {shownError && (
           <div className="mb-4">
-            <FormError message={OAUTH_ERROR_MESSAGES[shownError]} />
+            <FormError message={oauthErrorMessage(shownError)} />
           </div>
         )}
         {link ? <LinkNotice providerId={link.provider} /> : <ProviderButtons redirect={target} />}
@@ -104,10 +107,18 @@ function LoginPage() {
         />
         {DEMO_URL && (
           <p className="text-muted-foreground mt-6 text-center text-sm">
-            Just looking?{' '}
-            <a href={DEMO_URL} className="text-link font-medium underline-offset-4 hover:underline">
-              Try the demo
-            </a>
+            <Trans
+              t={t}
+              i18nKey="login.tryDemo"
+              components={{
+                a: (
+                  <a
+                    href={DEMO_URL}
+                    className="text-link font-medium underline-offset-4 hover:underline"
+                  />
+                ),
+              }}
+            />
           </p>
         )}
       </AuthLayout>

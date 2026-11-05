@@ -1,5 +1,6 @@
 import { loginInputSchema } from '@splinance/shared';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { useTranslation } from 'react-i18next';
 import { FormError } from '@/components/form/form-error';
 import { TextField } from '@/components/form/text-field';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSuccess, linkEmail, passwordHint }: LoginFormProps) {
+  const { t } = useTranslation('auth');
   const login = useLogin();
   const linking = linkEmail !== undefined;
 
@@ -52,10 +54,10 @@ export function LoginForm({ onSuccess, linkEmail, passwordHint }: LoginFormProps
           <TextField
             field={field}
             required
-            label="Email"
+            label={t('email')}
             autoFocus={!linking}
             type="email"
-            placeholder="you@example.com"
+            placeholder={t('emailPlaceholder')}
             autoComplete="email"
             onValueChange={login.reset}
           />
@@ -67,10 +69,10 @@ export function LoginForm({ onSuccess, linkEmail, passwordHint }: LoginFormProps
           <TextField
             field={field}
             required
-            label="Password"
+            label={t('password')}
             autoFocus={linking}
             type="password"
-            placeholder="Enter your password"
+            placeholder={t('login.passwordPlaceholder')}
             autoComplete="current-password"
             description={
               passwordHint ? (
@@ -85,7 +87,11 @@ export function LoginForm({ onSuccess, linkEmail, passwordHint }: LoginFormProps
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (
           <Button type="submit" size="lg" className="h-10 w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Logging in…' : linking ? 'Log in and connect' : 'Log in'}
+            {isSubmitting
+              ? t('login.submitting')
+              : linking
+                ? t('login.submitLink')
+                : t('login.submit')}
           </Button>
         )}
       </form.Subscribe>
