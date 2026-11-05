@@ -2,7 +2,7 @@ import { type Category, monthsBetween, type Report } from '@splinance/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { http as mock, HttpResponse } from 'msw';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
 import { authResponse, householdDetail, testHousehold } from '../../../test/utils';
@@ -100,11 +100,6 @@ async function categoryRows() {
 }
 
 describe('reports page', () => {
-  // The page and Recharts load lazily; the first render would spend most of its time on that.
-  beforeAll(async () => {
-    await import('recharts');
-  }, 30_000);
-
   it('shows six months as a table and the latest month by category', async () => {
     const api = fakeApi();
     renderRoute(page);

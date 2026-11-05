@@ -1,10 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createMemoryHistory, createRouter, RouterProvider } from '@tanstack/react-router';
+import {
+  type AnyRoute,
+  createMemoryHistory,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router';
 import { render } from '@testing-library/react';
 import { authStore } from '@/lib/auth-store';
 import { rerunGuardsOnSessionEnd } from '@/lib/session-watch';
 import { routeTree } from '@/routeTree.gen';
-import { onTestFinished } from 'vitest';
+import { beforeAll, onTestFinished } from 'vitest';
 
 /**
  * Renders the real route tree at `path` with a fresh QueryClient and memory history.
@@ -29,3 +34,21 @@ export function renderRoute(path: string, { pendingMs = Infinity }: { pendingMs?
   );
   return router;
 }
+
+/**
+ * Routes are code-split (`autoCodeSplitting`): the first render of a page in a file would
+ * import its chunks (layouts, page, everything they import) inside the test's first
+ * findBy*, which under a full parallel run took most of the 5 s limit and sometimes more.
+ * Every file that renders routes loads all route code once before its tests instead.
+ */
+beforeAll(async () => {
+  const router = createRouter({
+    routeTree,
+    context: { queryClient: new QueryClient(), auth: authStore },
+  });
+  await Promise.all(
+    Object.values(router.routesById).map(async (route: AnyRoute) => {
+      await router.loadRouteChunk(route);
+    }),
+  );
+}, 60_000);
