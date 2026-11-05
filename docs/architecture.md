@@ -699,6 +699,12 @@ invitee: opens /invite#<token>
 - The overview's `UpcomingCard` lists series due within a week (or a few days late) and links "3 possible recurring payments found. Review"; hidden when neither.
 - Transaction and import writes invalidate the recurring queries (a new payment moves a due date). `RouteDialog` caps its height and scrolls, for dialogs taller than the window.
 
+### Notifications (the bell)
+
+- `NotificationBell` sits left of the account menu in `HouseholdShell` (top right on desktop, in the phone top bar). The badge is the unread count (`GET /notifications/unread-count`, polled every 5 minutes and on window focus; "9+" above nine, brand red with white text). It opens a Base UI popover (`components/ui/popover.tsx`) on desktop and a drawer on phones: local state, not a URL-driven modal, since it is a menu-like panel.
+- The panel loads `GET /notifications` when it opens. `describeNotification` turns a row into words from the reader's side ("Jane added Groceries", "Your share 6200 Ft", "Netflix renews on Saturday", "Eating out is over budget"); names come from the API. Unread items have a dot, resolved ones are muted. Opening an item marks it read and goes to it (`notificationTarget`: the series dialog, the budgets month, the transaction, the transactions list or the overview); "Mark all as read" does all. The footer switches "What others change in <household>" for the current household.
+- Transaction, import, recurring and budget writes invalidate the notification queries, so a renewal or budget alert from one's own change shows without waiting for the poll. `PageHeader` and the demo banner leave `md:pr-24` / `md:mr-24` for the bell and the avatar.
+
 ### Reports
 
 - A section of its own (sidebar and phone tabs). Two cards: the last six months (`?to=`, default now) as grouped bars, spent next to income (shadcn `chart`, Recharts), and the selected month (`?month=`, default `to`) by category as horizontal bars in the category colors, largest first, with amount and share. "Household" or "Your share" (`?view=`) switches both.

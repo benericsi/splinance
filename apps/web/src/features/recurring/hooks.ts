@@ -1,12 +1,17 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { notificationQueries } from '@/features/notifications/queries';
 import { recurringApi } from './api';
 import { recurringQueries } from './queries';
 
 function useInvalidateRecurring() {
   const queryClient = useQueryClient();
   return (_data: unknown, { householdId }: { householdId: string }) =>
-    queryClient.invalidateQueries({ queryKey: recurringQueries.household(householdId) });
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: recurringQueries.household(householdId) }),
+      // Renewal reminders follow the series.
+      queryClient.invalidateQueries({ queryKey: notificationQueries.all() }),
+    ]);
 }
 
 // The dialog shows the error itself (a taken pattern next to its field).

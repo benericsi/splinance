@@ -33,6 +33,12 @@ export const server = setupServer(
       recurring: { currency: 'HUF', series: [], suggestions: [], dismissed: [] },
     }),
   ),
+  // Every household page shows the bell: no notifications unless a test adds some.
+  http.get('/api/notifications/unread-count', () => HttpResponse.json({ unread: 0 })),
+  http.get('/api/notifications', () => HttpResponse.json({ notifications: [], unread: 0 })),
+  http.get('/api/households/:id/notification-settings', () =>
+    HttpResponse.json({ settings: { activity: true } }),
+  ),
   http.get('/api/households/:id/settlements', () =>
     HttpResponse.json({ settlements: [], nextCursor: null }),
   ),
