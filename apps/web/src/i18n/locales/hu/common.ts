@@ -48,6 +48,7 @@ export const common: Messages<typeof en.common> = {
     title: 'Az oldal nem található',
     description: 'A keresett oldal nem létezik, vagy máshová került.',
   },
+  offline: 'Nincs kapcsolat',
   error: {
     title: 'Valami hiba történt',
     description:

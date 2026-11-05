@@ -57,6 +57,9 @@
     "sharp": "^0.35.5",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.3",
-    "vitest": "^5.0.3"
+    "vite-plugin-pwa": "2.0.0",
+    "vitest": "^5.0.3",
+    "workbox-build": "7.4.1",
+    "workbox-window": "7.4.1"
   }
 }

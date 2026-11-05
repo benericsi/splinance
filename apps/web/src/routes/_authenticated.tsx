@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 import { z } from 'zod';
 import { NewHouseholdDialog } from '@/features/households/components/new-household-dialog';
+import { InstallAppDialog } from '@/features/pwa/components/install-app-dialog';
 import { endedOnPurpose } from '@/lib/auth-store';
 
 /**
@@ -8,7 +9,7 @@ import { endedOnPurpose } from '@/lib/auth-store';
  * back work). Page-bound modals are child routes instead. Unknown values are dropped.
  */
 const modalSearchSchema = z.object({
-  modal: z.enum(['new-household']).optional().catch(undefined),
+  modal: z.enum(['new-household', 'install-app']).optional().catch(undefined),
 });
 
 /** Pathless layout: every route below it requires a logged-in user. */
@@ -37,6 +38,7 @@ function AuthenticatedLayout() {
     <>
       <Outlet />
       {modal === 'new-household' && <NewHouseholdDialog />}
+      {modal === 'install-app' && <InstallAppDialog />}
     </>
   );
 }

@@ -8,6 +8,7 @@ const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const logo = await readFile(`${publicDir}logo.svg`, 'utf8');
 const sources = {
   favicon: await readFile(`${publicDir}favicon.svg`),
+  logo: Buffer.from(logo),
   // iOS rounds the corners itself and shows any inner rounding as a visible edge,
   // so the home-screen icon uses a full-bleed square tile.
   logoFullBleed: Buffer.from(
@@ -24,6 +25,12 @@ const icons = [
   // Legacy browsers that ignore SVG favicons.
   { file: 'favicon-32.png', size: 32, source: 'favicon' },
   { file: 'apple-touch-icon.png', size: 180, source: 'logoFullBleed' },
+  // The web app manifest. Maskable: launchers crop to their own shape, keeping a circle of
+  // 80% of the width; the S stays inside it (at most 23.75 of 64 units from the center,
+  // the circle's radius is 25.6), so the full-bleed tile needs no extra margin.
+  { file: 'pwa-192.png', size: 192, source: 'logo' },
+  { file: 'pwa-512.png', size: 512, source: 'logo' },
+  { file: 'pwa-maskable-512.png', size: 512, source: 'logoFullBleed' },
 ];
 
 for (const { file, size, source } of icons) {

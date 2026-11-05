@@ -45,6 +45,7 @@ export const common = {
     title: 'Page not found',
     description: 'The page you are looking for does not exist or has been moved.',
   },
+  offline: 'No connection',
   error: {
     title: 'Something went wrong',
     description:
