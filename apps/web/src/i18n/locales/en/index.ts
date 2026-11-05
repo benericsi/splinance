@@ -14,6 +14,7 @@ import { budgets } from './budgets';
 import { reports } from './reports';
 import { recurring } from './recurring';
 import { notifications } from './notifications';
+import { demo } from './demo';
 import { balances } from './balances';
 import { transactions } from './transactions';
 
@@ -37,4 +38,5 @@ export const en = {
   reports,
   recurring,
   notifications,
+  demo,
 };

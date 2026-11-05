@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CATEGORIES } from '../categories';
+import { DEFAULT_CATEGORIES, defaultCategories } from '../categories';
 import { EXCLUDED_BY_DEFAULT, parseStatement, type StatementFlag } from '../imports';
 import {
   assignPayments,
@@ -10,6 +10,7 @@ import {
 } from '../recurring';
 import { PERCENT_SCALE } from '../splits';
 import { demoParseOptions, renderDemoBankFiles } from './bank-files';
+import { DEMO_TEXT } from './locale';
 import { createRandom } from './random';
 import {
   buildDemoStory,
@@ -304,5 +305,42 @@ describe('the story as recurring payments', () => {
     expect(lastPaidOn).toBe('2026-07-03');
     const next = nextDueOn({ anchorOn: '2025-12-03', cadence: 'monthly' }, lastPaidOn, today);
     expect(seriesTiming(next, 'monthly', today).timing).toBe('lapsed');
+  });
+});
+
+describe('the story in Hungarian', () => {
+  const hu = buildDemoStory({ seed: 1, today: TODAY, locale: 'hu' });
+
+  it('gives the same bank files byte for byte: banks do not translate', () => {
+    expect(renderDemoBankFiles(hu)).toEqual(renderDemoBankFiles(story));
+  });
+
+  it('translates what the couple typed and names the Hungarian default categories', () => {
+    expect(hu.locale).toBe('hu');
+    expect(hu.householdName).toBe('Doe család');
+    expect(hu.transactions.map((t) => t.id)).toEqual(story.transactions.map((t) => t.id));
+    expect(hu.transactions.some((t) => t.description === 'Albérlet')).toBe(true);
+    expect(new Set(hu.settlements.map((s) => s.note))).toEqual(
+      new Set(['Lakbér része', 'Elszámolás']),
+    );
+
+    const names = new Set(defaultCategories('hu').map((c) => `${c.kind}:${c.name}`));
+    const used = [
+      ...hu.transactions.flatMap((t) => (t.category ? [`${t.kind}:${t.category}`] : [])),
+      ...hu.rules.map((r) => `expense:${r.category}`),
+      ...hu.budgets.map((b) => `expense:${b.category}`),
+      ...hu.recurring.added.map((a) => `expense:${a.category}`),
+    ];
+    expect(used.filter((name) => !names.has(name))).toEqual([]);
+  });
+
+  it('has no stale words: every translated text appears in the English story', () => {
+    const typed = new Set([
+      story.householdName,
+      ...story.transactions.map((t) => t.description),
+      ...story.settlements.map((s) => s.note),
+      ...story.recurring.added.map((a) => a.name),
+    ]);
+    expect(Object.keys(DEMO_TEXT.hu).filter((word) => !typed.has(word))).toEqual([]);
   });
 });

@@ -106,6 +106,30 @@ describe('POST /api/demo', { timeout: 30_000 }, () => {
     expect(demoStatusResponseSchema.parse(status.body).demo.expiresAt).toBe(body.expiresAt);
   });
 
+  it("tells the story in the visitor's language, with the same bank history", async () => {
+    const res = await request(app).post('/api/demo').send({ locale: 'hu' }).expect(201);
+    const body = demoCreateResponseSchema.parse(res.body);
+    const auth = `Bearer ${body.accessToken}`;
+
+    const detail = await request(app)
+      .get(`/api/households/${body.householdId}`)
+      .set('Authorization', auth)
+      .expect(200);
+    expect(householdDetailResponseSchema.parse(detail.body).household.name).toBe('Doe család');
+    const categories = await request(app)
+      .get(`/api/households/${body.householdId}/categories`)
+      .set('Authorization', auth)
+      .expect(200);
+    expect(JSON.stringify(categories.body)).toContain('Élelmiszer');
+    const [demo] = await db.select().from(demos).where(eq(demos.userId, body.user.id));
+    expect(demo?.locale).toBe('hu');
+    // The same files as in English: one import per month and bank, as before.
+    expect(await db.$count(importBatches)).toBeGreaterThan(0);
+
+    const bad = await request(app).post('/api/demo').send({ locale: 'de' }).expect(400);
+    expect(errorCode(bad)).toBe('VALIDATION_ERROR');
+  });
+
   it('turns the whole story into the household', async () => {
     const story = buildDemoStory({ seed: 1, today: TODAY });
     const demo = await createDemo(config, { seed: 1, today: TODAY });

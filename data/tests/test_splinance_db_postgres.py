@@ -43,6 +43,7 @@ ENUMS = {
     "transaction_visibility",
     "split_method",
     "import_source",
+    "locale",
 }
 
 

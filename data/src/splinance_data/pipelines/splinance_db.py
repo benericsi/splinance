@@ -108,6 +108,14 @@ def _raw_days(lake: Lake) -> list[str]:
 def _read_raw(lake: Lake, dataset: Dataset, day: str) -> pl.DataFrame:
     key = raw_daily_key(SOURCE, date.fromisoformat(day), dataset.name, "parquet")
     frame = pl.read_parquet(io.BytesIO(lake.get(key)))
+    expected = list(dataset.schema.items())
+    found = list(frame.schema.items())
+    if found != expected and found == expected[: len(found)]:
+        # A view may only gain columns at its end (CREATE OR REPLACE VIEW): a day stored
+        # before that lacks them, and they are null there, as the source never had them.
+        frame = frame.with_columns(
+            pl.lit(None, dtype=dtype).alias(name) for name, dtype in expected[len(found) :]
+        )
     if frame.schema != dataset.schema:
         # The views changed shape between days: rebuilding would mix two contracts.
         raise InvalidExtractError(dataset.name, [f"{key} has schema {frame.schema}"])

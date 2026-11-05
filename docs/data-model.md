@@ -355,17 +355,18 @@ Private and deleted rows never count. Debts are netted within each pair (`netDeb
 
 One "Try the demo" sandbox on the demo instance. Empty on production.
 
-| Column       | Type                  | Notes                                                                    |
-| ------------ | --------------------- | ------------------------------------------------------------------------ |
-| id           | uuid PK               | uuidv7                                                                   |
-| user_id      | uuid FK -> users      | The visitor; unique (`demos_user_id_unique`)                             |
-| partner_id   | uuid FK -> users      | The made-up partner; differs from the visitor (`demos_people_differ`)    |
-| household_id | uuid FK -> households | The seeded household; null only while seeding runs                       |
-| seeded_at    | timestamptz, nullable | When seeding finished (database clock, set with `household_id`)          |
-| seed         | integer               | `>= 0`; with `anchor_on` rebuilds the story and its bank files exactly   |
-| anchor_on    | date                  | The day the story ends on (the visitor's today when the demo started)    |
-| expires_at   | timestamptz           | Indexed (`demos_expires_at_idx`): the cap counts unexpired rows, cleanup |
-| created_at   | timestamptz           |                                                                          |
+| Column       | Type                  | Notes                                                                                                     |
+| ------------ | --------------------- | --------------------------------------------------------------------------------------------------------- |
+| id           | uuid PK               | uuidv7                                                                                                    |
+| user_id      | uuid FK -> users      | The visitor; unique (`demos_user_id_unique`)                                                              |
+| partner_id   | uuid FK -> users      | The made-up partner; differs from the visitor (`demos_people_differ`)                                     |
+| household_id | uuid FK -> households | The seeded household; null only while seeding runs                                                        |
+| seeded_at    | timestamptz, nullable | When seeding finished (database clock, set with `household_id`)                                           |
+| seed         | integer               | `>= 0`; with `anchor_on` and `locale` rebuilds the story and its bank files exactly                       |
+| anchor_on    | date                  | The day the story ends on (the visitor's today when the demo started)                                     |
+| locale       | locale, default `en`  | The language the story was told in (the visitor's UI language); bank files are the same in every language |
+| expires_at   | timestamptz           | Indexed (`demos_expires_at_idx`): the cap counts unexpired rows, cleanup                                  |
+| created_at   | timestamptz           |                                                                                                           |
 
 - The exception to "never hard-deleted": a sandbox is deleted with its households, every row in them and both accounts (`deleteDemo`, architecture hard part 26). Soft deleting would keep visitors' text forever and grow the demo database without bound.
 - No `is_demo` flag on households: the demo instance has its own database, so everything in it is demo data; what cleanup and the banner need is the expiry per visitor.
@@ -380,7 +381,7 @@ The data track's Postgres extract (D5) reads only these views, as the role `spli
 | `households`         | name\*, base_currency, created_by, archived_at, created_at, updated_at, origin                                                                                                                                                           | full snapshot               |
 | `members`            | role, joined_at, left_at                                                                                                                                                                                                                 | full snapshot               |
 | `users`              | display_name (demo people only), created_at                                                                                                                                                                                              | full snapshot               |
-| `demos`              | visitor_id, partner_id, seed, anchor_on, created_at, seeded_at, expires_at                                                                                                                                                               | full snapshot               |
+| `demos`              | visitor_id, partner_id, seed, anchor_on, created_at, seeded_at, expires_at, locale                                                                                                                                                       | full snapshot               |
 | `categories`         | name\*, kind, icon, color, archived_at, created_at, updated_at, origin                                                                                                                                                                   | full snapshot               |
 | `budgets`            | category_id, user_id, starts_on, amount, created_by, created_at, updated_at, origin                                                                                                                                                      | full snapshot               |
 | `transactions`       | visibility, redacted, origin, kind, amount, currency, occurred_on, category_id, split_method, paid_by, created_by, import_batch_id, description\*, counterparty\*\*, import_fingerprint\*\*, version, deleted_at, created_at, updated_at | by `updated_at`             |

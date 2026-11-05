@@ -245,13 +245,26 @@ def test_a_raw_day_with_another_schema_fails_the_build(tmp_path: Path) -> None:
     lake = LocalLake(tmp_path)
     write_day(lake, date(2026, 10, 20))
     buffer = io.BytesIO()
-    frame("transactions").drop("origin").write_parquet(buffer)
+    frame("transactions").drop("amount").write_parquet(buffer)
     lake.put(
         raw_daily_key("splinance", date(2026, 10, 20), "transactions", "parquet"), buffer.getvalue()
     )
 
     with pytest.raises(InvalidExtractError, match="transactions"):
         build(lake)
+
+
+def test_a_raw_day_from_before_a_column_was_appended_gets_it_as_null(tmp_path: Path) -> None:
+    lake = LocalLake(tmp_path)
+    write_day(lake, date(2026, 10, 20))
+    # demos.locale was appended to the view later: older days lack it.
+    buffer = io.BytesIO()
+    frame("demos").drop("locale").write_parquet(buffer)
+    lake.put(raw_daily_key("splinance", date(2026, 10, 20), "demos", "parquet"), buffer.getvalue())
+    write_day(lake, date(2026, 10, 21))
+
+    build(lake)
+    assert "locale" in pl.read_parquet(lake.root / "clean/demos/part.parquet").columns
 
 
 def test_an_empty_lake_builds_nothing(tmp_path: Path) -> None:

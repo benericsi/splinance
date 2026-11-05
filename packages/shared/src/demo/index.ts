@@ -1,5 +1,6 @@
 export * from './api';
 export { type DemoBankFile, demoParseOptions, renderDemoBankFiles } from './bank-files';
+export { DEMO_TEXT, localizeDemoStory } from './locale';
 export { createRandom, type Random } from './random';
 export {
   buildDemoStory,
