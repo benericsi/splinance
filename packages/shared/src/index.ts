@@ -11,6 +11,7 @@ export * from './households';
 export * from './imports';
 export * from './invites';
 export * from './money';
+export * from './notifications';
 export * from './oauth';
 export * from './password/rules';
 export * from './recurring';

@@ -20,6 +20,7 @@ import {
   seriesNotFound,
   updateSeries,
 } from './recurring.service';
+import { syncAfterChange } from '../notifications/sync';
 
 const seriesScope = (req: Request) => ({
   ...householdScope(req),
@@ -42,6 +43,7 @@ export function createRecurringRouter() {
     const scope = householdScope(req);
     const input = recurringSeriesInputSchema.parse(req.body);
     const body: RecurringSeriesResponse = { series: await createSeries(scope, input) };
+    await syncAfterChange(scope.householdId);
     res.status(201).json(body);
   });
 
@@ -57,6 +59,7 @@ export function createRecurringRouter() {
     const scope = householdScope(req);
     const decision = recurringSuggestionDecisionSchema.parse(req.body);
     const body: RecurringSeriesResponse = { series: await confirmSuggestion(scope, decision) };
+    await syncAfterChange(scope.householdId);
     res.status(201).json(body);
   });
 
@@ -71,11 +74,14 @@ export function createRecurringRouter() {
     const scope = seriesScope(req);
     const input = updateRecurringSeriesInputSchema.parse(req.body);
     const body: RecurringSeriesResponse = { series: await updateSeries(scope, input) };
+    await syncAfterChange(scope.householdId);
     res.json(body);
   });
 
   router.delete('/:seriesId', writes, async (req, res) => {
-    await deleteSeries(seriesScope(req));
+    const scope = seriesScope(req);
+    await deleteSeries(scope);
+    await syncAfterChange(scope.householdId);
     res.status(204).end();
   });
 

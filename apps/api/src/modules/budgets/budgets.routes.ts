@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { HttpError } from '../../lib/http-error';
 import { householdScope, idParam } from '../households/scope';
 import { listBudgets, setBudget } from './budgets.service';
+import { syncAfterChange } from '../notifications/sync';
 
 const categoryNotFound = () => new HttpError(404, 'Category not found', 'CATEGORY_NOT_FOUND');
 
@@ -24,6 +25,7 @@ export function createBudgetsRouter() {
       categoryId: idParam(req, 'categoryId', categoryNotFound),
     };
     await setBudget(scope, budgetInputSchema.parse(req.body));
+    await syncAfterChange(scope.householdId);
     res.status(204).end();
   });
 

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { check, foreignKey, index, pgTable, primaryKey, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, foreignKey, index, pgTable, primaryKey, uuid } from 'drizzle-orm/pg-core';
 import { timestamptz } from './columns';
 import { householdRole } from './enums';
 import { households } from './households';
@@ -19,6 +19,8 @@ export const householdMembers = pgTable(
     role: householdRole().notNull(),
     joinedAt: timestamptz().notNull().defaultNow(),
     leftAt: timestamptz(),
+    /** Hear about what others do to money you are part of (activity notifications). */
+    notifyActivity: boolean().notNull().default(true),
   },
   (t) => [
     primaryKey({ name: 'household_members_pk', columns: [t.householdId, t.userId] }),

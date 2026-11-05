@@ -17,7 +17,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 
 - Frontend: React, TypeScript, Vite, TanStack Router, TanStack Query, TanStack Form, shadcn/ui, Tailwind CSS, charts (shadcn charts / Recharts), Zod
 - Backend: Node.js, Express 5, TypeScript, PostgreSQL 18, Drizzle ORM (node-postgres driver), Zod validation, Argon2, pino
-- Later: BullMQ + Redis for jobs
+- Jobs: `startPeriodic` + `withAdvisoryLock` for now; a queue (pg-boss first, then BullMQ + Redis) when a trigger in architecture.md section 4 ("Jobs") fires
 - Data track (`data/`, `infra/`): Python 3.13, uv, Polars, httpx, boto3, ruff, mypy (strict), pytest, Terraform, AWS (S3, IAM, Budgets), Airflow 3 (Docker Compose, LocalExecutor); later dbt (DuckDB)
 - Tooling: pnpm monorepo (apps/web, apps/api, packages/shared), Vitest, Supertest, Playwright, Docker Compose, GitHub Actions
 
@@ -38,7 +38,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - API routes are mounted under `/api`; errors use the shared `apiErrorResponseSchema` shape
 - API code is organized by domain in `apps/api/src/modules/<name>/` (`<name>.routes.ts` parses input with shared Zod schemas, `<name>.service.ts` holds business logic and Drizzle queries; services accept `Db` so they run inside or outside a transaction). Multi-row writes use `db.transaction`
 - Protected routes use `requireAuth` and read the user with `getAuth(req)`; authorization checks live in services
-- Scheduled work in the API (demo cleanup, maintenance) uses `startPeriodic` + `withAdvisoryLock` (`src/lib/periodic.ts`): plain functions with a `now` parameter, safe with several instances, started and stopped in `index.ts` (Phase 6 moves them to BullMQ unchanged)
+- Scheduled work in the API (demo cleanup, maintenance) uses `startPeriodic` + `withAdvisoryLock` (`src/lib/periodic.ts`): plain functions with a `now` parameter, safe with several instances, started and stopped in `index.ts` (a queue later moves them unchanged; see the jobs decision in architecture.md)
 - Web: file-based TanStack Router routes in `apps/web/src/routes` (`routeTree.gen.ts` is generated, committed, not linted); protected pages live under the `_authenticated` layout route; Vite proxies `/api` to the API in dev
 - Web data layer (service layer + custom hooks), per feature in `src/features/<name>/`:
   - `api.ts`: service functions, the only place that imports `http` from `src/lib/http.ts`; object params; return parsed data or void

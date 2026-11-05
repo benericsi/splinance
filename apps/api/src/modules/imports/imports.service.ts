@@ -17,6 +17,7 @@ import {
   insertTransaction,
   softDeleteTransaction,
 } from '../transactions/transactions.service';
+import { collectingActivity, recordImportActivity } from '../notifications/activity';
 
 export const importNotFound = () => new HttpError(404, 'Import not found', 'IMPORT_NOT_FOUND');
 
@@ -206,24 +207,28 @@ export async function createImport(
       if (!batch) throw new Error('Import batch insert returned no row');
 
       const allowed = await activeMemberIds(tx, scope.householdId);
-      for (const { row, index } of rows) {
-        try {
-          await insertTransaction(tx, scope, household, row.transaction, allowed, {
-            importBatchId: batch.id,
-            importFingerprint: row.fingerprint,
-            counterparty: row.counterparty || null,
-          });
-        } catch (error) {
-          if (error instanceof HttpError) {
-            throw new HttpError(
-              error.status,
-              `Row ${String(index + 1)}: ${error.message}`,
-              error.code,
-            );
+      // One notification per person the import involves, not one per row.
+      const { people } = await collectingActivity(async () => {
+        for (const { row, index } of rows) {
+          try {
+            await insertTransaction(tx, scope, household, row.transaction, allowed, {
+              importBatchId: batch.id,
+              importFingerprint: row.fingerprint,
+              counterparty: row.counterparty || null,
+            });
+          } catch (error) {
+            if (error instanceof HttpError) {
+              throw new HttpError(
+                error.status,
+                `Row ${String(index + 1)}: ${error.message}`,
+                error.code,
+              );
+            }
+            throw error;
           }
-          throw error;
         }
-      }
+      });
+      await recordImportActivity(tx, scope, batch.id, 'create', people);
 
       const [created] = await toBatches(tx, [batch]);
       if (!created) throw new Error('toBatches returned nothing');
@@ -288,7 +293,10 @@ export async function undoImport(scope: HouseholdScope & { importId: string }): 
     // One timestamp for the rows and the batch: a row whose deletion matches the undo was
     // deleted by it; an earlier deletion was the person's own choice (see checkImport).
     const at = new Date();
-    for (const row of rows) await softDeleteTransaction(tx, scope, row, at);
+    const { people } = await collectingActivity(async () => {
+      for (const row of rows) await softDeleteTransaction(tx, scope, row, at);
+    });
+    await recordImportActivity(tx, scope, batch.id, 'undo', people);
 
     await tx.update(importBatches).set({ undoneAt: at }).where(eq(importBatches.id, batch.id));
   });

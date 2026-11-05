@@ -3,6 +3,8 @@ import {
   CATEGORY_KINDS,
   CURRENCIES,
   HOUSEHOLD_ROLES,
+  NOTIFICATION_ACTIONS,
+  NOTIFICATION_TYPES,
   RECURRING_CADENCES,
   RECURRING_SOURCES,
   RECURRING_STATUSES,
@@ -25,3 +27,5 @@ export const importSource = pgEnum('import_source', STATEMENT_SOURCES);
 export const recurringCadence = pgEnum('recurring_cadence', RECURRING_CADENCES);
 export const recurringStatus = pgEnum('recurring_status', RECURRING_STATUSES);
 export const recurringSource = pgEnum('recurring_source', RECURRING_SOURCES);
+export const notificationType = pgEnum('notification_type', NOTIFICATION_TYPES);
+export const notificationAction = pgEnum('notification_action', NOTIFICATION_ACTIONS);

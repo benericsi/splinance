@@ -97,13 +97,14 @@ A user can belong to any number of households.
 
 ### `household_members`
 
-| Column       | Type                                 | Notes                                                                  |
-| ------------ | ------------------------------------ | ---------------------------------------------------------------------- |
-| household_id | uuid FK -> households                | PK part (`household_members_pk`)                                       |
-| user_id      | uuid FK -> users                     | PK part; indexed on its own for "my households"                        |
-| role         | enum `household_role` (owner/member) |                                                                        |
-| joined_at    | timestamptz                          |                                                                        |
-| left_at      | timestamptz, nullable                | Set on leave or removal, never deleted; `left_at >= joined_at` (CHECK) |
+| Column          | Type                                 | Notes                                                                             |
+| --------------- | ------------------------------------ | --------------------------------------------------------------------------------- |
+| household_id    | uuid FK -> households                | PK part (`household_members_pk`)                                                  |
+| user_id         | uuid FK -> users                     | PK part; indexed on its own for "my households"                                   |
+| role            | enum `household_role` (owner/member) |                                                                                   |
+| joined_at       | timestamptz                          |                                                                                   |
+| left_at         | timestamptz, nullable                | Set on leave or removal, never deleted; `left_at >= joined_at` (CHECK)            |
+| notify_activity | boolean                              | Default true: activity notifications in this household (the person's own setting) |
 
 - `(household_id, user_id)` is the target of every composite foreign key from household-scoped tables.
 - Rejoining (a new invite) reuses the row: `left_at = null`, `role = member`, fresh `joined_at`.
@@ -244,6 +245,29 @@ Recurring payments people track, and suggestions they turned down. Which transac
 - Settings, not money records: no audit log, plain updates. "Show again" deletes a dismissal; a series that never matched anything is deleted, one with payments archived (its text is free again).
 - Private rows go with the person on account deletion; shared rows they created stay. Not in the `analytics` views (names and bank-derived merchant text, no consumer); backed up like every table.
 
+### `notifications`
+
+One item in one person's bell. Only ids and numbers: names come from the current data when the list is read (architecture section 4), so nothing goes stale and nothing holds text that would need erasing.
+
+| Column                  | Type                                 | Notes                                                                                                                                                      |
+| ----------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                      | uuid PK                              | uuidv7                                                                                                                                                     |
+| user_id                 | uuid                                 | The reader. Composite FK `(household_id, user_id)` -> members                                                                                              |
+| household_id            | uuid                                 |                                                                                                                                                            |
+| type                    | enum `notification_type`             | State: renewal_due, renewal_missed, price_changed, budget_near, budget_over. Activity: tx_added, tx_changed, tx_deleted, import_added, settlement_recorded |
+| action                  | enum `notification_action`, nullable | Activity: create, update, delete, restore, undo                                                                                                            |
+| actor_id                | uuid, nullable                       | Activity: who did it. Composite FK -> members                                                                                                              |
+| subject_id              | uuid                                 | Series, category, transaction, import batch or settlement; no FK (like `audit_log.entity_id`)                                                              |
+| due_on                  | date, nullable                       | A renewal's payment date, a price change's payment, a budget's month                                                                                       |
+| amount, previous_amount | bigint, nullable                     | Payment and previous price; the reader's share after and before; a budget's spending and limit                                                             |
+| count                   | integer, nullable                    | Transactions an import added that involve the reader                                                                                                       |
+| dedupe_key              | text, nullable                       | State rows: one per reader and fact (`renewal_due:<series>:<date>`)                                                                                        |
+| created_at              | timestamptz                          | Moved forward when an unread activity row folds in a newer change                                                                                          |
+| read_at, resolved_at    | timestamptz, nullable                | Read by the person; a state row that no longer holds                                                                                                       |
+
+- Unique `(user_id, dedupe_key)` (`notifications_user_dedupe_unique`; activity rows have no key, and NULLs never collide). Partial unique `(user_id, subject_id) WHERE read_at IS NULL AND type is an activity type` (`notifications_activity_unread_unique`): later changes fold into the unread row.
+- Deleted when the reader leaves the household, with their account, with a sandbox (`deleteHouseholdContents`), and by the maintenance job (read over 90 days ago, or older than 180). Not in the `analytics` views; backed up.
+
 ### `import_batches`
 
 One bank export imported by one person. The file itself is never uploaded: the browser parses it and sends normalized rows.
@@ -377,7 +401,7 @@ The role: `splinance_analytics_reader` (`NOLOGIN`) is created by the migration i
 
 ## Planned (not created yet)
 
-- Later: notifications (Phase 6, next PR)
+- Later: email delivery of notifications (a `sent_at` column, with a job queue; architecture section 4, "Jobs")
 
 Business rules already agreed:
 

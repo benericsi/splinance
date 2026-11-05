@@ -21,6 +21,7 @@ import {
   type Membership,
   requireMembership,
 } from '../households/households.service';
+import { recordSettlementActivity } from '../notifications/activity';
 
 export const settlementNotFound = () =>
   new HttpError(404, 'Settlement not found', 'SETTLEMENT_NOT_FOUND');
@@ -139,6 +140,8 @@ async function recordAudit(
     before,
     after,
   });
+  const settlement = after ?? before;
+  if (settlement) await recordSettlementActivity(tx, scope, action, settlement);
 }
 
 /**

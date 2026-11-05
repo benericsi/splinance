@@ -112,6 +112,6 @@ describe('runMaintenance', () => {
       other.release();
     }
 
-    expect(await runMaintenance(NOW)).toEqual({ sessions: 1, invites: 0 });
+    expect(await runMaintenance(NOW)).toEqual({ sessions: 1, invites: 0, notifications: 0 });
   });
 });

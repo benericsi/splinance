@@ -16,6 +16,7 @@ import {
   type HouseholdMemberRow,
   households,
   type HouseholdRow,
+  notifications,
   users,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
@@ -272,6 +273,10 @@ export async function endMembership(tx: Db, householdId: string, userId: string)
     .set({ leftAt: new Date() })
     .where(activeMember(householdId, userId));
   await revokePendingInvitesBy(tx, householdId, userId);
+  // They can no longer see what the notifications are about.
+  await tx
+    .delete(notifications)
+    .where(and(eq(notifications.householdId, householdId), eq(notifications.userId, userId)));
 }
 
 export async function removeMember({ targetUserId, ...scope }: MemberScope): Promise<void> {

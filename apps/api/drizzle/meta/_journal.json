@@ -120,6 +120,13 @@
       "when": 1793829974960,
       "tag": "0016_recurring_series",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1793842230532,
+      "tag": "0017_notifications",
+      "breakpoints": true
     }
   ]
 }
