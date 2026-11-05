@@ -78,6 +78,25 @@ test('production: hashed assets are cached for good, the API keeps its own heade
   expect((await request.post('/api/demo')).status()).toBe(404);
 });
 
+test('production: the app installs: manifest type, worker fresh, registered without violations', async ({
+  page,
+  request,
+}) => {
+  const manifest = await request.get('/manifest.webmanifest');
+  expect(manifest.headers()['content-type']).toContain('application/manifest+json');
+  const worker = await request.get('/sw.js');
+  expect(worker.headers()['content-type']).toContain('javascript');
+  // Never immutable: a stale worker would be stuck on an old version.
+  expect(worker.headers()['cache-control']).toBe('no-cache');
+
+  const violations = await watchCsp(page);
+  const response = await page.goto('/login');
+  expect(response?.headers()['content-security-policy']).toContain("worker-src 'self'");
+  const scope = await page.evaluate(async () => (await navigator.serviceWorker.ready).scope);
+  expect(new URL(scope).pathname).toBe('/');
+  expect(await violations()).toEqual([]);
+});
+
 test('demo: a visitor tries the demo through Caddy without CSP violations', async ({ page }) => {
   const violations = await watchCsp(page);
   await page.goto(DEMO_URL);

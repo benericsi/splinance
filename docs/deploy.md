@@ -268,7 +268,13 @@ Set up and drilled on 2026-11-04 (drill log in section 5): since then production
 
 11. **Account deletion** (after the deletion PR): on a throwaway allowlisted account with a household and a partner test account: an open balance blocks with a Settle up link; once settled, delete with the password and the email; `/login` says so, the old login fails, the partner sees "Former member"; `railway logs -s api` shows `account.deleted` with a user id and counts, no email.
 
+12. **Installable app** (after the PWA PR): `curl -I https://splinance.com/manifest.webmanifest` shows `application/manifest+json`, `/sw.js` shows `no-cache`, and the CSP has `worker-src 'self'`. On a phone: "Install app" in the account menu installs it (Android) or shows the two steps (iOS); the installed app opens without browser bars and its bottom tabs clear the home indicator. In flight mode it opens to "No connection", and recovers by itself. After the next deploy an open tab offers "New version available".
+
 ## 5. Operating
+
+- **Service worker** (architecture section 12, "Installable app"): `sw.js` and `manifest.webmanifest` are served `no-cache`; a deploy reaches open tabs as a "New version available" toast. Two things to know:
+  - **Kill switch:** if a worker misbehaves, set `selfDestroying: true` in `VitePWA(...)` (`apps/web/vite.config.ts`) and deploy. The new `sw.js` unregisters itself and clears its caches on every device at the next visit. Do not delete `sw.js` instead: a 404 leaves installed workers running, and here the SPA fallback would answer with HTML.
+  - **A CSP change alone does not reach installed apps:** a precached `index.html` keeps the headers it was fetched with until its content changes. To tighten the CSP urgently, ship it together with a change that alters `index.html` (any code change does, through the hashed asset names).
 
 - **Deploying:** merge to `main`. CI runs; with Wait for CI the services whose watch paths changed build and deploy afterwards, each API after its migrations.
 - **Migrations are forward-only and must work with the previous image** (expand, then contract in a later release). Rolling back is then the previous deployment (dashboard: Deployments -> an earlier one -> Redeploy); the database goes back only from a backup, if a migration destroyed data.

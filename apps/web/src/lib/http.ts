@@ -112,8 +112,9 @@ export function createHttpClient({ baseUrl, auth }: HttpClientConfig): HttpClien
 
   function refreshSession(): Promise<boolean> {
     refreshing ??= withCrossTabLock(doRefresh)
-      .catch(() => {
-        auth.clear();
+      .catch((error: unknown) => {
+        // No answer says nothing about the session: stay as we are (offline, in the app).
+        if (!(error instanceof ApiError && error.code === 'NETWORK_ERROR')) auth.clear();
         return false;
       })
       .finally(() => {

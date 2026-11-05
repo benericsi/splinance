@@ -83,6 +83,17 @@ describe('http client', () => {
     expect(authStore.getState()).toMatchObject({ status: 'anonymous', accessToken: null });
   });
 
+  it('keeps the session when a refresh gets no answer: that says nothing about it', async () => {
+    authStore.setSession('expired', testUser);
+    server.use(
+      protectedThing('never', { count: 0 }),
+      mock.post('/api/auth/refresh', () => HttpResponse.error()),
+    );
+
+    await expect(client.get('/thing', schema)).rejects.toMatchObject({ status: 401 });
+    expect(authStore.getState()).toMatchObject({ status: 'authenticated', accessToken: 'expired' });
+  });
+
   it('does not attach tokens or refresh for public requests', async () => {
     authStore.setSession('access-1', testUser);
     let authHeader: string | null = 'unset';

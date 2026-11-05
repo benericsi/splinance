@@ -8,6 +8,17 @@ export const shell = {
   endDemoDescription: 'This deletes the demo household for good. You can start a new one any time.',
   ending: 'Ending…',
   sections: 'Household sections',
+  install: {
+    item: 'Install app',
+    title: 'Install Splinance',
+    description: 'Add it to your home screen and it opens like an app.',
+    share: 'Tap Share in the browser',
+    add: 'Choose Add to Home Screen',
+  },
+  update: {
+    title: 'New version available',
+    reload: 'Reload',
+  },
   nav: {
     overview: 'Overview',
     overviewShort: 'Overview',

@@ -3,6 +3,8 @@ import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ErrorPage, NotFoundPage } from '@/components/route-states';
+import { watchInstallPrompt } from '@/features/pwa/install';
+import { startServiceWorker } from '@/features/pwa/register';
 import { authStore } from '@/lib/auth-store';
 import { detectLocale, followUserLocale, localeStore } from '@/lib/locale';
 import { createQueryClient } from '@/lib/query-client';
@@ -36,6 +38,7 @@ declare module '@tanstack/react-router' {
 }
 
 rerunGuardsOnSessionEnd(authStore, router);
+watchInstallPrompt();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error('Root element #root not found');
@@ -54,3 +57,5 @@ createRoot(rootElement).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+startServiceWorker();

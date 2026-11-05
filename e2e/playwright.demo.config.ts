@@ -23,6 +23,8 @@ export default defineConfig({
   use: {
     // The suites read English text; without this the browser follows the machine's language.
     locale: 'en-US',
+    // Tests load fresh builds and keep their pages simple; pwa.spec.ts turns workers back on.
+    serviceWorkers: 'block',
     baseURL: `http://localhost:${String(DEMO_WEB_PORT)}`,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

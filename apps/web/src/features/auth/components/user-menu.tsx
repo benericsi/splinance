@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LanguageSwitch } from '@/features/account/components/language-switch';
 import { useEndDemo } from '@/features/demo/hooks';
+import { InstallAppItem } from '@/features/pwa/components/install-app-item';
 import { useLogout } from '../hooks';
 
 export function UserMenu({ user }: { user: User }) {
@@ -61,6 +62,7 @@ export function UserMenu({ user }: { user: User }) {
           <LanguageSwitch />
         </div>
         <DropdownMenuSeparator />
+        <InstallAppItem />
         {__DEMO_SITE__ ? (
           // Demo accounts have no password: leaving means the household is gone.
           <DropdownMenuItem
