@@ -48,10 +48,10 @@ describe('money pages in Hungarian', () => {
         ],
       },
     } as unknown as Transaction;
-    expect(describeTransaction(transaction, testUser.id)).toBe('Ben fizette · egyenlően elosztva');
+    expect(describeTransaction(transaction, testUser.id)).toBe('Ben fizette · egyenlően');
     expect(plain(budgetNote({ amount: 10_000, spent: 12_000 }, 'HUF'))).toBe('Túllépve: 2000 Ft');
     expect(reasonText({ code: 'imported' })).toBe('Már importálva');
-    expect(dueLabel({ nextOn: '2026-11-08', daysUntil: 3 })).toBe('3 nap múlva esedékes');
+    expect(dueLabel({ nextOn: '2026-11-08', daysUntil: 3 })).toBe('3 nap múlva');
     expect(amountProblemMessage('empty', 'HUF')).toBe('Add meg az összeget');
   });
 
@@ -68,6 +68,17 @@ describe('money pages in Hungarian', () => {
     const { lead, rest, detail } = describeNotification(n, testUser.id, '2026-11-05');
     expect(plain(`${lead}${rest} | ${detail}`)).toBe('Ben hozzáadta: Pizza | A részed: 2000 Ft');
     expect(timeAgo('2026-11-05T11:15:00Z', new Date('2026-11-05T12:00:00Z'))).toBe('45 p');
+
+    // Hungarian dates end in a period: a sentence after one must not add another.
+    const missed = {
+      type: 'renewal_missed',
+      subjectName: 'Netflix',
+      dueOn: '2026-08-03',
+      currency: 'HUF',
+    } as Notification;
+    expect(describeNotification(missed, testUser.id, '2026-11-05').detail).toBe(
+      'Várható volt: aug. 3. Lemondtad?',
+    );
   });
 
   it('names the row an import stopped at', async () => {

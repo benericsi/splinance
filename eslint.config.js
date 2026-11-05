@@ -58,9 +58,8 @@ export default tseslint.config(
   },
   {
     // Text people read comes from the catalogs (src/i18n): a hard-coded sentence in JSX fails.
-    // Generated shadcn components and tests are left out.
     files: ['apps/web/src/{features,components,routes}/**/*.tsx'],
-    ignores: ['**/*.test.tsx', 'apps/web/src/components/ui/**'],
+    ignores: ['**/*.test.tsx'],
     plugins: { i18next },
     rules: { 'i18next/no-literal-string': ['error', { mode: 'jsx-text-only' }] },
   },

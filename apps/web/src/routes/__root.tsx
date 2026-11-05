@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
 import { lazy, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Toaster } from 'sonner';
 import { MotionProvider } from '@/components/motion-provider';
 import { ErrorPage, NotFoundPage } from '@/components/route-states';
@@ -28,6 +29,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 /** App shell shared by every page; layouts live in _auth and _authenticated. */
 function RootLayout() {
   const { resolved } = useTheme();
+  const { t } = useTranslation(['common', 'notifications']);
 
   return (
     <TooltipProvider>
@@ -36,7 +38,14 @@ function RootLayout() {
           <Outlet />
         </div>
       </MotionProvider>
-      <Toaster position="top-center" richColors closeButton theme={resolved} />
+      <Toaster
+        position="top-center"
+        richColors
+        closeButton
+        theme={resolved}
+        containerAriaLabel={t('notifications:title')}
+        toastOptions={{ closeButtonAriaLabel: t('closeToast') }}
+      />
       <Suspense>
         <Devtools />
       </Suspense>
