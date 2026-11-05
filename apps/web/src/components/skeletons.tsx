@@ -38,9 +38,9 @@ export function SkeletonLine({
 /** The grey stat tiles above a list (month totals, budget totals). */
 export function SkeletonStats({ count }: { count: number }) {
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-3 gap-2 sm:gap-3">
       {Array.from({ length: count }, (_, index) => (
-        <div key={index} className="bg-muted/50 min-w-0 rounded-lg px-3 py-2.5">
+        <div key={index} className="bg-muted/50 min-w-0 rounded-lg px-2 py-2.5 sm:px-3">
           <SkeletonLine line="h-4" className="w-14" />
           <SkeletonLine line="h-5 sm:h-7" className="w-20" />
         </div>
