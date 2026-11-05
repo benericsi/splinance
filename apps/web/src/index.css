@@ -145,6 +145,8 @@
     @apply border-border outline-ring/50;
   }
   body {
+    /* viewport-fit=cover: in landscape, keep content out from under a notch. */
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
     /* 14px base for a dense app UI (shadcn controls are already text-sm). */
     @apply bg-background text-foreground text-sm;
   }

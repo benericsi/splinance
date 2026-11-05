@@ -848,7 +848,7 @@ English and Hungarian (Phase 7; informal "te" in Hungarian). i18next + react-i18
 - **Offline:** the shell opens and the root shows "No connection" (`ErrorPage` on a `NETWORK_ERROR`), and retries by itself on the `online` event. A session that cannot be checked is not a session that ended: `refreshSession` keeps the auth state when it gets no answer at all, and `ensureSessionRestored` throws and asks again next time. Without this an installed app would show the login page in a tunnel.
 - **Updates:** `registerType: 'prompt'`. A waiting worker shows a persistent toast ("New version available", Reload), because reloading on its own could lose a form. `features/pwa/register.ts` checks hourly and on window focus. Reload reloads every open tab of the app.
 - **Install:** "Install app" in the account menu, only where it can work (`useInstallMethod`): Chromium's captured `beforeinstallprompt`, or on iOS a `?modal=install-app` sheet with the two steps. Hidden in the installed app. Nothing else nags about it.
-- **Safe areas:** `viewport-fit=cover`, with `env(safe-area-inset-*)` on the phone top bar, bottom tabs, main padding and drawers.
+- **Safe areas:** `viewport-fit=cover`, with `env(safe-area-inset-*)` on the phone top bar, bottom tabs, main padding and drawers, and side padding on `body` for a notch in landscape.
 - **Tests:** Playwright blocks service workers (`serviceWorkers: 'block'`) except in `tests/pwa.spec.ts` and the smoke suite; the browser pane of the Claude desktop app refuses worker scripts.
 
 A precached `index.html` keeps the response headers it was fetched with, including the CSP, until its content changes (see "Operating" in deploy.md).
