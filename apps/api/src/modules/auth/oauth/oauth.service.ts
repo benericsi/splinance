@@ -1,5 +1,5 @@
 import { emailSchema, type OAuthErrorCode } from '@splinance/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { db } from '../../../db/client';
 import { isUniqueViolation } from '../../../db/errors';
 import { userIdentities, users } from '../../../db/schema';
@@ -96,38 +96,43 @@ function attempt(
   policy: RegistrationPolicy,
 ): Promise<SignInOutcome> {
   return db.transaction(async (tx): Promise<SignInOutcome> => {
-    const byIdentity = and(
-      eq(userIdentities.provider, identity.provider),
-      eq(userIdentities.subject, identity.subject),
-    );
-    const [known] = await tx
-      .select({ user: users })
-      .from(userIdentities)
-      .innerJoin(users, eq(users.id, userIdentities.userId))
-      .where(byIdentity);
+    // One statement, so one snapshot: under READ COMMITTED each statement sees what has been
+    // committed when it starts. Two lookups (identity, then email) could straddle a parallel
+    // first sign-in's commit and see its user but not its identity (architecture hard part 36).
+    // Each user has at most one identity per provider, so this is at most two rows: the
+    // identity's owner and the email's owner (the same row when both match).
+    const candidates = await tx
+      .select({ user: users, subject: userIdentities.subject })
+      .from(users)
+      .leftJoin(
+        userIdentities,
+        and(eq(userIdentities.userId, users.id), eq(userIdentities.provider, identity.provider)),
+      )
+      .where(or(eq(userIdentities.subject, identity.subject), eq(users.email, identity.email)));
+
+    const known = candidates.find((c) => c.subject === identity.subject);
     if (known) {
-      await tx.update(userIdentities).set({ lastUsedAt: new Date() }).where(byIdentity);
+      await tx
+        .update(userIdentities)
+        .set({ lastUsedAt: new Date() })
+        .where(
+          and(
+            eq(userIdentities.provider, identity.provider),
+            eq(userIdentities.subject, identity.subject),
+          ),
+        );
       return { kind: 'session', result: await createSession(tx, known.user) };
     }
 
-    const [existing] = await tx.select().from(users).where(eq(users.email, identity.email));
+    const existing = candidates.find((c) => c.user.email === identity.email);
     if (existing) {
       if (!config.linkByEmail) {
         return { kind: 'rejected', code: 'conflict', reason: 'provider does not link by email' };
       }
-      if (!existing.passwordHash) {
+      if (!existing.user.passwordHash) {
         return { kind: 'rejected', code: 'conflict', reason: 'account has no password' };
       }
-      const [other] = await tx
-        .select({ id: userIdentities.id })
-        .from(userIdentities)
-        .where(
-          and(
-            eq(userIdentities.userId, existing.id),
-            eq(userIdentities.provider, identity.provider),
-          ),
-        );
-      if (other) {
+      if (existing.subject !== null) {
         return { kind: 'rejected', code: 'conflict', reason: 'account has another identity' };
       }
       return {
