@@ -24,16 +24,16 @@ const STATS = ['months', 'banks', 'click'] as const;
 const STACK = [
   'React 19',
   'TypeScript',
-  'TanStack Router and Query',
+  'TanStack Router + Query',
   'Express 5',
   'PostgreSQL 18',
   'Drizzle',
   'Zod',
-  'Vitest and Playwright',
-  'Python and Polars',
+  'Vitest + Playwright',
+  'Python + Polars',
   'Airflow',
   'dbt',
-  'Terraform on AWS',
+  'Terraform + AWS',
 ];
 
 const LINKS = [

@@ -4,6 +4,7 @@ import type { Messages } from '../../types';
 export const common: Messages<typeof en.common> = {
   cancel: 'Mégse',
   close: 'Bezárás',
+  closeToast: 'Értesítés bezárása',
   save: 'Mentés',
   saving: 'Mentés…',
   back: 'Vissza',

@@ -238,7 +238,11 @@ export function SplitEditor(props: SplitEditorProps) {
               {splitMethod === 'percentage' && row.included && (
                 <div className="relative w-24 shrink-0">
                   <Input
-                    aria-label={t('split.percentFor', { name: label })}
+                    aria-label={
+                      row.userId === props.viewerId
+                        ? t('split.percentForYou')
+                        : t('split.percentFor', { name: label })
+                    }
                     inputMode="decimal"
                     autoComplete="off"
                     value={row.percent}
@@ -254,7 +258,11 @@ export function SplitEditor(props: SplitEditorProps) {
               )}
               {splitMethod === 'fixed' && row.included && (
                 <ShareAmountInput
-                  label={t('split.amountFor', { name: label })}
+                  label={
+                    row.userId === props.viewerId
+                      ? t('split.amountForYou')
+                      : t('split.amountFor', { name: label })
+                  }
                   value={row.amount}
                   currency={currency}
                   onChange={(amount) => {

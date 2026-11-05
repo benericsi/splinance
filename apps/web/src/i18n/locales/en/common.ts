@@ -1,6 +1,7 @@
 export const common = {
   cancel: 'Cancel',
   close: 'Close',
+  closeToast: 'Close toast',
   save: 'Save',
   saving: 'Saving…',
   back: 'Back',

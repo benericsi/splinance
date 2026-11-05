@@ -20,7 +20,7 @@ export const notifications: Messages<typeof en.notifications> = {
     soon: ' hamarosan megújul',
     paid: 'Kifizetve',
     missed: ' nem lett kifizetve',
-    expected: 'Várható volt: {{date}}. Lemondtad?',
+    expected: 'Várható volt: {{date}} Lemondtad?',
     cancelled: 'Lemondtad?',
   },
   price: {

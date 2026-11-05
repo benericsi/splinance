@@ -126,7 +126,7 @@ function TransactionRow({
             <Lock className="text-muted-foreground size-3 shrink-0" aria-label={t('private')} />
           )}
         </p>
-        <p className="text-muted-foreground truncate text-xs">
+        <p className="text-muted-foreground text-xs max-sm:line-clamp-2 sm:truncate">
           {category ? `${category.name} · ` : ''}
           {describeTransaction(transaction, user?.id)}
         </p>

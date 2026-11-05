@@ -38,7 +38,7 @@ export function DemoBanner() {
         }}
       >
         <RotateCcw aria-hidden />
-        {t('banner.startOver')}
+        <span className="max-sm:sr-only">{t('banner.startOver')}</span>
       </Button>
       <ConfirmDialog
         open={confirming}
