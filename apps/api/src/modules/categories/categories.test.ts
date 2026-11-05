@@ -58,6 +58,26 @@ describe('categories', () => {
     );
   });
 
+  it('names the default set in the language the household is created in', async () => {
+    const res = await request(app)
+      .post('/api/households')
+      .set('Authorization', await bearer(owner))
+      .send({ name: 'Otthon', locale: 'hu' })
+      .expect(201);
+    const { id } = (res.body as { household: { id: string } }).household;
+    const names = (await list(app, owner, id)).map((c) => c.name);
+    expect(names).toHaveLength(DEFAULT_CATEGORIES.length);
+    expect(names).toEqual(expect.arrayContaining(['Élelmiszer', 'Rezsi', 'Fizetés']));
+    expect(names).not.toContain('Groceries');
+
+    const bad = await request(app)
+      .post('/api/households')
+      .set('Authorization', await bearer(owner))
+      .send({ name: 'Home', locale: 'de' })
+      .expect(400);
+    expect(errorCode(bad)).toBe('VALIDATION_ERROR');
+  });
+
   it('lets any member create, rename and archive', async () => {
     const member = await createTestUser('Ben');
     await join(app, owner, householdId, member);

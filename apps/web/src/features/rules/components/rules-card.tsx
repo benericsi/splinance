@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { ArrowDown, ArrowUp, Ellipsis, Pencil, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +42,7 @@ export function RulesCard({
   rules: Rule[];
   categories: Category[];
 }) {
+  const { t } = useTranslation('rules');
   const reorder = useReorderRules();
   const remove = useDeleteRule();
   const [deleting, setDeleting] = useState<Rule | null>(null);
@@ -57,11 +59,8 @@ export function RulesCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Rules</CardTitle>
-        <CardDescription>
-          Imported rows whose merchant or description contains the text get the category. The first
-          match wins.
-        </CardDescription>
+        <CardTitle>{t('title')}</CardTitle>
+        <CardDescription>{t('description')}</CardDescription>
         <CardAction>
           <Link
             to="/h/$householdId/settings/rules/new"
@@ -70,15 +69,13 @@ export function RulesCard({
             className={buttonVariants({ variant: 'outline' })}
           >
             <Plus aria-hidden />
-            Add rule
+            {t('add')}
           </Link>
         </CardAction>
       </CardHeader>
       <CardContent>
         {rules.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            No rules yet. They are suggested after an import, or add one here.
-          </p>
+          <p className="text-muted-foreground text-sm">{t('empty')}</p>
         ) : (
           <ol className="divide-y">
             <AnimatePresence initial={false}>
@@ -93,17 +90,22 @@ export function RulesCard({
                       className="hover:bg-muted/60 focus-visible:ring-ring/50 -mx-1 flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-1 py-2 outline-none focus-visible:ring-[3px]"
                     >
                       <span className="min-w-0 flex-1 truncate">
-                        Contains <span className="font-medium">{rule.pattern}</span>
+                        <Trans
+                          t={t}
+                          i18nKey="contains"
+                          values={{ pattern: rule.pattern }}
+                          components={{ strong: <span className="font-medium" /> }}
+                        />
                       </span>
                       <span className="flex items-center gap-2">
                         <CategoryTile category={category} size="sm" />
                         <span
                           className={category?.archivedAt ? 'text-muted-foreground' : undefined}
                         >
-                          {category?.name ?? 'Unknown'}
-                          {category?.archivedAt ? ' (archived)' : ''}
+                          {category?.name ?? t('unknown')}
+                          {category?.archivedAt ? t('archived') : ''}
                         </span>
-                        {rule.markShared && <Badge variant="secondary">Shared</Badge>}
+                        {rule.markShared && <Badge variant="secondary">{t('shared')}</Badge>}
                       </span>
                     </Link>
                     <DropdownMenu>
@@ -112,7 +114,7 @@ export function RulesCard({
                           <Button
                             variant="ghost"
                             size="icon"
-                            aria-label={`Actions for rule ${rule.pattern}`}
+                            aria-label={t('actionsFor', { pattern: rule.pattern })}
                           />
                         }
                       >
@@ -129,7 +131,7 @@ export function RulesCard({
                           }
                         >
                           <Pencil aria-hidden />
-                          Edit
+                          {t('edit')}
                         </DropdownMenuItem>
                         {index > 0 && (
                           <DropdownMenuItem
@@ -138,7 +140,7 @@ export function RulesCard({
                             }}
                           >
                             <ArrowUp aria-hidden />
-                            Move up
+                            {t('moveUp')}
                           </DropdownMenuItem>
                         )}
                         {index < rules.length - 1 && (
@@ -148,7 +150,7 @@ export function RulesCard({
                             }}
                           >
                             <ArrowDown aria-hidden />
-                            Move down
+                            {t('moveDown')}
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem
@@ -158,7 +160,7 @@ export function RulesCard({
                           }}
                         >
                           <Trash2 aria-hidden />
-                          Delete
+                          {t('delete')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -178,10 +180,10 @@ export function RulesCard({
             remove.reset();
           }
         }}
-        title={`Delete the rule "${deleting?.pattern ?? ''}"?`}
-        description="Transactions it categorized keep their category."
-        confirmLabel="Delete"
-        pendingLabel="Deleting…"
+        title={t('deleteTitle', { pattern: deleting?.pattern ?? '' })}
+        description={t('deleteDescription')}
+        confirmLabel={t('delete')}
+        pendingLabel={t('deleting')}
         destructive
         pending={remove.isPending}
         error={remove.error ? errorMessage(remove.error) : undefined}
@@ -192,7 +194,7 @@ export function RulesCard({
             {
               onSuccess: () => {
                 setDeleting(null);
-                toast.success('Rule deleted');
+                toast.success(t('deleted'));
               },
             },
           );

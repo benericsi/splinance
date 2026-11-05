@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { Archive, ArchiveRestore, ChevronDown, Ellipsis, Pencil, Plus } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Collapse } from '@/components/collapse';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -15,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { compareNames } from '@/lib/locale';
 import { COLLAPSE } from '@/lib/motion';
 import { errorMessage } from '@/lib/query-client';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
@@ -29,15 +31,21 @@ export function CategoriesCard({
   householdId: string;
   categories: Category[];
 }) {
+  const { t } = useTranslation('categories');
   const [kind, setKind] = useState<CategoryKind>('expense');
   const [showArchived, setShowArchived] = useState(false);
-  const active = (k: CategoryKind) => categories.filter((c) => c.kind === k && !c.archivedAt);
-  const archived = categories.filter((c) => c.kind === kind && c.archivedAt);
+  const active = (k: CategoryKind) =>
+    categories
+      .filter((c) => c.kind === k && !c.archivedAt)
+      .sort((a, b) => compareNames(a.name, b.name));
+  const archived = categories
+    .filter((c) => c.kind === kind && c.archivedAt)
+    .sort((a, b) => compareNames(a.name, b.name));
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Categories</CardTitle>
+        <CardTitle>{t('title')}</CardTitle>
         <CardAction>
           <Link
             to="/h/$householdId/settings/categories/new"
@@ -47,30 +55,27 @@ export function CategoriesCard({
             className={buttonVariants({ variant: 'outline' })}
           >
             <Plus aria-hidden />
-            Add category
+            {t('add')}
           </Link>
         </CardAction>
       </CardHeader>
       <CardContent className="space-y-3">
         <SegmentedControl
-          label="Kind"
+          label={t('kind')}
           value={kind}
           onChange={(next) => {
             setKind(next);
             setShowArchived(false);
           }}
           options={[
-            { value: 'expense', label: `Expenses (${String(active('expense').length)})` },
-            { value: 'income', label: `Income (${String(active('income').length)})` },
+            { value: 'expense', label: t('expenses', { count: active('expense').length }) },
+            { value: 'income', label: t('income', { count: active('income').length }) },
           ]}
           className="sm:w-80"
         />
 
         {active(kind).length === 0 ? (
-          <p className="text-muted-foreground py-2 text-sm">
-            No {kind === 'expense' ? 'expense' : 'income'} categories. Transactions can still go
-            without one.
-          </p>
+          <p className="text-muted-foreground py-2 text-sm">{t(`empty_${kind}`)}</p>
         ) : (
           // Keyed by kind: switching tabs swaps the list instead of animating every row.
           <ul key={kind} className="divide-y">
@@ -110,7 +115,7 @@ export function CategoriesCard({
                   showArchived ? 'rotate-180 transition-transform' : 'transition-transform'
                 }
               />
-              Archived ({archived.length})
+              {t('archived', { count: archived.length })}
             </Button>
             <Collapse open={showArchived}>
               <ul className="mt-1">
@@ -129,16 +134,16 @@ export function CategoriesCard({
 }
 
 function CategoryActions({ householdId, category }: { householdId: string; category: Category }) {
+  const { t } = useTranslation('categories');
   const archive = useArchiveCategory();
   const [confirming, setConfirming] = useState(false);
+  const name = category.name;
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={
-            <Button variant="ghost" size="icon" aria-label={`Actions for ${category.name}`} />
-          }
+          render={<Button variant="ghost" size="icon" aria-label={t('actionsFor', { name })} />}
         >
           <Ellipsis aria-hidden />
         </DropdownMenuTrigger>
@@ -153,7 +158,7 @@ function CategoryActions({ householdId, category }: { householdId: string; categ
             }
           >
             <Pencil aria-hidden />
-            Edit
+            {t('edit')}
           </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"
@@ -162,7 +167,7 @@ function CategoryActions({ householdId, category }: { householdId: string; categ
             }}
           >
             <Archive aria-hidden />
-            Archive
+            {t('archive')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -173,10 +178,10 @@ function CategoryActions({ householdId, category }: { householdId: string; categ
           setConfirming(open);
           if (!open) archive.reset();
         }}
-        title={`Archive ${category.name}?`}
-        description="It disappears from the category picker. Transactions filed under it keep showing it, and you can restore it later."
-        confirmLabel="Archive"
-        pendingLabel="Archiving…"
+        title={t('archiveTitle', { name })}
+        description={t('archiveDescription')}
+        confirmLabel={t('archive')}
+        pendingLabel={t('archiving')}
         destructive
         pending={archive.isPending}
         error={archive.error ? errorMessage(archive.error) : undefined}
@@ -186,7 +191,7 @@ function CategoryActions({ householdId, category }: { householdId: string; categ
             {
               onSuccess: () => {
                 setConfirming(false);
-                toast.success(`${category.name} archived`);
+                toast.success(t('archivedToast', { name }));
               },
             },
           );
@@ -197,6 +202,7 @@ function CategoryActions({ householdId, category }: { householdId: string; categ
 }
 
 function ArchivedRow({ householdId, category }: { householdId: string; category: Category }) {
+  const { t } = useTranslation('categories');
   const restore = useRestoreCategory();
 
   return (
@@ -207,20 +213,20 @@ function ArchivedRow({ householdId, category }: { householdId: string; category:
         variant="outline"
         size="sm"
         disabled={restore.isPending}
-        aria-label={`Restore ${category.name}`}
+        aria-label={t('restoreLabel', { name: category.name })}
         onClick={() => {
           restore.mutate(
             { householdId, categoryId: category.id },
             {
               onSuccess: () => {
-                toast.success(`${category.name} restored`);
+                toast.success(t('restored', { name: category.name }));
               },
             },
           );
         }}
       >
         <ArchiveRestore aria-hidden />
-        Restore
+        {t('restore')}
       </Button>
     </m.li>
   );

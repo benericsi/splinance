@@ -96,6 +96,23 @@ export function useLocale(): Locale {
 /** The current language's Intl tag, for formatters outside React. */
 export const intlLocale = (locale = localeStore.getState()) => INTL_LOCALES[locale];
 
+const collators = new Map<string, Intl.Collator>();
+
+/**
+ * Compares names the way the UI language sorts them ("Élelmiszer" next to "Egészség", not
+ * after "Z"). The API orders by the database's byte order, so lists people read are sorted
+ * here.
+ */
+export function compareNames(a: string, b: string): number {
+  const locale = intlLocale();
+  let collator = collators.get(locale);
+  if (!collator) {
+    collator = new Intl.Collator(locale, { sensitivity: 'base', numeric: true });
+    collators.set(locale, collator);
+  }
+  return collator.compare(a, b);
+}
+
 /**
  * A signed-in user's saved language wins: after the session is restored, after a login,
  * and when a refresh brings a choice made on another device. Returns the promise of the

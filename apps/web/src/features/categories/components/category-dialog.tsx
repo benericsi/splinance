@@ -6,6 +6,7 @@ import {
   updateCategoryInputSchema,
 } from '@splinance/shared';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { FormError } from '@/components/form/form-error';
 import { TextField } from '@/components/form/text-field';
@@ -18,8 +19,6 @@ import { suggestColor } from '../appearance';
 import { useCreateCategory, useUpdateCategory } from '../hooks';
 import { ColorPicker, IconPicker } from './appearance-pickers';
 import { CategoryTile } from './category-tile';
-
-const KIND_LABELS: Record<CategoryKind, string> = { expense: 'Expense', income: 'Income' };
 
 /** Create (with a kind) or edit (name, color, icon; the kind is fixed once created). */
 export function CategoryDialog({
@@ -37,9 +36,11 @@ export function CategoryDialog({
   initialKind?: CategoryKind;
   onClose: () => void;
 }) {
+  const { t } = useTranslation(['categories', 'common', 'errors']);
   const create = useCreateCategory();
   const update = useUpdateCategory();
   const mutation = category ? update : create;
+  const kindLabel = (kind: CategoryKind) => (kind === 'expense' ? t('expense') : t('incomeKind'));
 
   const defaultValues: CreateCategoryInput = category
     ? { name: category.name, kind: category.kind, icon: category.icon, color: category.color }
@@ -58,10 +59,10 @@ export function CategoryDialog({
             categoryId: category.id,
             input: { name, icon, color },
           });
-          toast.success('Category saved');
+          toast.success(t('saved'));
         } else {
           await create.mutateAsync({ householdId, input: createCategoryInputSchema.parse(value) });
-          toast.success('Category added');
+          toast.success(t('added'));
         }
         onClose();
       } catch {
@@ -75,7 +76,7 @@ export function CategoryDialog({
   const formError = mutation.error && !nameTaken ? errorMessage(mutation.error) : undefined;
 
   return (
-    <RouteDialog title={category ? 'Edit category' : 'New category'} onClose={onClose}>
+    <RouteDialog title={category ? t('editTitle') : t('newTitle')} onClose={onClose}>
       <form
         noValidate
         className="min-w-0 space-y-5"
@@ -99,13 +100,13 @@ export function CategoryDialog({
 
         {category ? (
           <p className="text-muted-foreground text-center text-sm">
-            {KIND_LABELS[category.kind]} category
+            {t(`kindCategory_${category.kind}`)}
           </p>
         ) : (
           <form.Field name="kind">
             {(field) => (
               <SegmentedControl
-                label="Type"
+                label={t('type')}
                 value={field.state.value}
                 onChange={(kind) => {
                   field.handleChange(kind);
@@ -117,8 +118,8 @@ export function CategoryDialog({
                   }
                 }}
                 options={[
-                  { value: 'expense', label: KIND_LABELS.expense },
-                  { value: 'income', label: KIND_LABELS.income },
+                  { value: 'expense', label: kindLabel('expense') },
+                  { value: 'income', label: kindLabel('income') },
                 ]}
               />
             )}
@@ -130,11 +131,11 @@ export function CategoryDialog({
             <TextField
               field={field}
               required
-              label="Name"
-              placeholder="Pets, Kindergarten, Car"
+              label={t('name')}
+              placeholder={t('namePlaceholder')}
               maxLength={40}
               autoFocus={!category}
-              serverError={nameTaken ? 'A category with this name already exists' : undefined}
+              serverError={nameTaken ? t('errors:codes.CATEGORY_NAME_TAKEN') : undefined}
               onValueChange={mutation.reset}
             />
           )}
@@ -152,7 +153,7 @@ export function CategoryDialog({
           {(isSubmitting) => (
             <div className="flex justify-end pt-1">
               <Button type="submit" size="lg" className="min-w-28" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving…' : category ? 'Save' : 'Add category'}
+                {isSubmitting ? t('common:saving') : category ? t('common:save') : t('add')}
               </Button>
             </div>
           )}

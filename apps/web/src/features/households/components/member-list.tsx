@@ -2,6 +2,7 @@ import type { HouseholdDetail, HouseholdMember } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { Ellipsis, ShieldCheck, ShieldMinus, UserMinus, UserPlus } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -21,16 +22,15 @@ import { errorMessage } from '@/lib/query-client';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { useRemoveMember, useUpdateMemberRole } from '../hooks';
 
-const ROLE_LABELS = { owner: 'Owner', member: 'Member' } as const;
-
 export function MemberList({ household }: { household: HouseholdDetail }) {
+  const { t } = useTranslation('households');
   const { user } = useAuth();
   const isOwner = household.role === 'owner';
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Members</CardTitle>
+        <CardTitle>{t('members.title')}</CardTitle>
         {isOwner && (
           <CardAction>
             <Link
@@ -40,7 +40,7 @@ export function MemberList({ household }: { household: HouseholdDetail }) {
               className={buttonVariants({ variant: 'outline' })}
             >
               <UserPlus aria-hidden />
-              Invite
+              {t('members.invite')}
             </Link>
           </CardAction>
         )}
@@ -54,10 +54,10 @@ export function MemberList({ household }: { household: HouseholdDetail }) {
                 <UserAvatar user={{ id: member.userId, displayName: member.displayName }} />
                 <span className="min-w-0 flex-1 truncate">
                   {member.displayName}
-                  {isSelf && <span className="text-muted-foreground"> (you)</span>}
+                  {isSelf && <span className="text-muted-foreground"> {t('members.you')}</span>}
                 </span>
                 <Badge variant={member.role === 'owner' ? 'secondary' : 'outline'}>
-                  {ROLE_LABELS[member.role]}
+                  {t(`members.${member.role}`)}
                 </Badge>
                 {/* Your own membership is changed from the danger zone (leave). */}
                 {isOwner && !isSelf ? (
@@ -75,6 +75,7 @@ export function MemberList({ household }: { household: HouseholdDetail }) {
 }
 
 function MemberActions({ householdId, member }: { householdId: string; member: HouseholdMember }) {
+  const { t } = useTranslation('households');
   const updateRole = useUpdateMemberRole();
   const remove = useRemoveMember();
   const [confirmingRemove, setConfirmingRemove] = useState(false);
@@ -85,7 +86,9 @@ function MemberActions({ householdId, member }: { householdId: string; member: H
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          render={<Button variant="ghost" size="icon" aria-label={`Actions for ${name}`} />}
+          render={
+            <Button variant="ghost" size="icon" aria-label={t('members.actionsFor', { name })} />
+          }
         >
           <Ellipsis aria-hidden />
         </DropdownMenuTrigger>
@@ -97,7 +100,9 @@ function MemberActions({ householdId, member }: { householdId: string; member: H
                 {
                   onSuccess: () => {
                     toast.success(
-                      nextRole === 'owner' ? `${name} is now an owner` : `${name} is now a member`,
+                      nextRole === 'owner'
+                        ? t('members.nowOwner', { name })
+                        : t('members.nowMember', { name }),
                     );
                   },
                 },
@@ -105,7 +110,7 @@ function MemberActions({ householdId, member }: { householdId: string; member: H
             }}
           >
             {nextRole === 'owner' ? <ShieldCheck aria-hidden /> : <ShieldMinus aria-hidden />}
-            {nextRole === 'owner' ? 'Make owner' : 'Make member'}
+            {nextRole === 'owner' ? t('members.makeOwner') : t('members.makeMember')}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -115,7 +120,7 @@ function MemberActions({ householdId, member }: { householdId: string; member: H
             }}
           >
             <UserMinus aria-hidden />
-            Remove from household
+            {t('members.remove')}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -126,10 +131,10 @@ function MemberActions({ householdId, member }: { householdId: string; member: H
           setConfirmingRemove(open);
           if (!open) remove.reset();
         }}
-        title={`Remove ${name}?`}
-        description="They lose access to this household and its expenses. You can invite them again later."
-        confirmLabel="Remove"
-        pendingLabel="Removing…"
+        title={t('members.removeTitle', { name })}
+        description={t('members.removeDescription')}
+        confirmLabel={t('members.removeConfirm')}
+        pendingLabel={t('members.removing')}
         destructive
         pending={remove.isPending}
         error={
@@ -143,7 +148,7 @@ function MemberActions({ householdId, member }: { householdId: string; member: H
             {
               onSuccess: () => {
                 setConfirmingRemove(false);
-                toast.success(`${name} was removed`);
+                toast.success(t('members.removed', { name }));
               },
             },
           );

@@ -2,6 +2,7 @@ import type { CreateInviteResponse, Household, Invite } from '@splinance/shared'
 import { useQuery } from '@tanstack/react-query';
 import { Link2 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { RouteDialog } from '@/components/route-dialog';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ export function InviteDialog({
   household: Pick<Household, 'id' | 'name'>;
   onClose: () => void;
 }) {
+  const { t } = useTranslation('invites');
   const householdId = household.id;
   const create = useCreateInvite();
   const { data: invites = [], isPending } = useQuery(inviteQueries.list(householdId));
@@ -25,8 +27,8 @@ export function InviteDialog({
 
   return (
     <RouteDialog
-      title={`Invite to ${household.name}`}
-      description="Anyone with the link can join once. It works for 7 days."
+      title={t('dialogTitle', { household: household.name })}
+      description={t('dialogDescription')}
       onClose={onClose}
     >
       <div className="space-y-6">
@@ -42,21 +44,21 @@ export function InviteDialog({
           >
             <Link2 aria-hidden />
             {create.isPending
-              ? 'Creating…'
+              ? t('creating')
               : invites.length > 0
-                ? 'Create another link'
-                : 'Create invite link'}
+                ? t('createAnother')
+                : t('create')}
           </Button>
         )}
 
         <section aria-labelledby="pending-invites" className="space-y-2">
           <h3 id="pending-invites" className="text-sm font-medium">
-            Pending invites
+            {t('pending')}
           </h3>
           {isPending ? (
-            <p className="text-muted-foreground text-sm">Loading…</p>
+            <p className="text-muted-foreground text-sm">{t('loading')}</p>
           ) : invites.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No pending invites.</p>
+            <p className="text-muted-foreground text-sm">{t('none')}</p>
           ) : (
             <ul className="divide-y">
               {invites.map((invite) => (
@@ -86,31 +88,31 @@ function PendingInvite({
   invite: Invite;
   onRevoked: () => void;
 }) {
+  const { t } = useTranslation('invites');
   const revoke = useRevokeInvite();
+  const who = { name: invite.invitedBy.displayName, expires: expiresIn(invite.expiresAt) };
 
   return (
     <li className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
-      <span className="text-muted-foreground min-w-0 text-sm">
-        By {invite.invitedBy.displayName}, expires {expiresIn(invite.expiresAt)}
-      </span>
+      <span className="text-muted-foreground min-w-0 text-sm">{t('by', who)}</span>
       <Button
         variant="ghost"
         size="sm"
         disabled={revoke.isPending}
-        aria-label={`Revoke invite by ${invite.invitedBy.displayName}, expires ${expiresIn(invite.expiresAt)}`}
+        aria-label={t('revokeLabel', who)}
         onClick={() => {
           revoke.mutate(
             { householdId, inviteId: invite.id },
             {
               onSuccess: () => {
                 onRevoked();
-                toast.success('Invite revoked');
+                toast.success(t('revoked'));
               },
             },
           );
         }}
       >
-        Revoke
+        {t('revoke')}
       </Button>
     </li>
   );

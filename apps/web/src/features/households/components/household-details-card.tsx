@@ -2,19 +2,20 @@ import { type HouseholdDetail, updateHouseholdInputSchema } from '@splinance/sha
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { Pencil } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { FormError } from '@/components/form/form-error';
 import { TextField } from '@/components/form/text-field';
 import { HouseholdAvatar } from '@/components/household-avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { formatDate } from '@/features/account/format';
 import { errorMessage } from '@/lib/query-client';
 import { useUpdateHousehold } from '../hooks';
 
-const dateFormat = new Intl.DateTimeFormat('en', { dateStyle: 'medium' });
-
 /** Name, currency and age of the household; owners rename it inline. */
 export function HouseholdDetailsCard({ household }: { household: HouseholdDetail }) {
+  const { t } = useTranslation('households');
   const [editing, setEditing] = useState(false);
 
   return (
@@ -33,8 +34,10 @@ export function HouseholdDetailsCard({ household }: { household: HouseholdDetail
             <div className="min-w-0 flex-1">
               <p className="font-heading truncate text-lg font-semibold">{household.name}</p>
               <p className="text-muted-foreground text-sm">
-                {household.baseCurrency} · created{' '}
-                {dateFormat.format(new Date(household.createdAt))}
+                {t('details.created', {
+                  currency: household.baseCurrency,
+                  date: formatDate(household.createdAt),
+                })}
               </p>
             </div>
             {household.role === 'owner' && (
@@ -45,7 +48,7 @@ export function HouseholdDetailsCard({ household }: { household: HouseholdDetail
                 }}
               >
                 <Pencil aria-hidden />
-                Rename
+                {t('details.rename')}
               </Button>
             )}
           </>
@@ -56,6 +59,7 @@ export function HouseholdDetailsCard({ household }: { household: HouseholdDetail
 }
 
 function RenameForm({ household, onDone }: { household: HouseholdDetail; onDone: () => void }) {
+  const { t } = useTranslation(['households', 'common']);
   const update = useUpdateHousehold();
 
   const form = useForm({
@@ -67,7 +71,7 @@ function RenameForm({ household, onDone }: { household: HouseholdDetail; onDone:
         const input = updateHouseholdInputSchema.parse(value);
         if (input.name !== household.name) {
           await update.mutateAsync({ householdId: household.id, input });
-          toast.success('Household renamed');
+          toast.success(t('details.renamed'));
         }
         onDone();
       } catch {
@@ -79,7 +83,7 @@ function RenameForm({ household, onDone }: { household: HouseholdDetail; onDone:
   return (
     <form
       noValidate
-      aria-label="Rename household"
+      aria-label={t('details.renameForm')}
       className="min-w-0 flex-1 space-y-3"
       onSubmit={(e) => {
         e.preventDefault();
@@ -95,7 +99,7 @@ function RenameForm({ household, onDone }: { household: HouseholdDetail; onDone:
           <TextField
             field={field}
             required
-            label="Name"
+            label={t('name')}
             maxLength={60}
             // Opened by an explicit click on Rename, so moving focus here is expected.
             autoFocus
@@ -107,12 +111,12 @@ function RenameForm({ household, onDone }: { household: HouseholdDetail; onDone:
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(isSubmitting) => (
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving…' : 'Save'}
+              {isSubmitting ? t('common:saving') : t('common:save')}
             </Button>
           )}
         </form.Subscribe>
         <Button type="button" variant="ghost" onClick={onDone}>
-          Cancel
+          {t('common:cancel')}
         </Button>
       </div>
     </form>

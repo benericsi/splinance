@@ -1,8 +1,10 @@
 import { createHouseholdInputSchema, type Household } from '@splinance/shared';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { useTranslation } from 'react-i18next';
 import { FormError } from '@/components/form/form-error';
 import { TextField } from '@/components/form/text-field';
 import { Button } from '@/components/ui/button';
+import { useLocale } from '@/lib/locale';
 import { errorMessage } from '@/lib/query-client';
 import { useCreateHousehold } from '../hooks';
 
@@ -15,6 +17,8 @@ export function CreateHouseholdForm({
   /** Only where creating a household is the single purpose of the page. */
   autoFocus?: boolean;
 }) {
+  const { t } = useTranslation('households');
+  const locale = useLocale();
   const create = useCreateHousehold();
 
   const form = useForm({
@@ -23,7 +27,9 @@ export function CreateHouseholdForm({
     validators: { onDynamic: createHouseholdInputSchema },
     onSubmit: async ({ value }) => {
       try {
-        await onCreated(await create.mutateAsync(createHouseholdInputSchema.parse(value)));
+        // The default categories are named in the language the household is created in.
+        const input = createHouseholdInputSchema.parse({ ...value, locale });
+        await onCreated(await create.mutateAsync(input));
       } catch {
         // Rendered from create.error below.
       }
@@ -46,8 +52,8 @@ export function CreateHouseholdForm({
           <TextField
             field={field}
             required
-            label="Name"
-            placeholder="Home, Flatmates, Balaton trip"
+            label={t('name')}
+            placeholder={t('namePlaceholder')}
             maxLength={60}
             autoFocus={autoFocus}
             onValueChange={create.reset}
@@ -58,7 +64,7 @@ export function CreateHouseholdForm({
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(isSubmitting) => (
           <Button type="submit" size="lg" className="h-10 w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating…' : 'Create household'}
+            {isSubmitting ? t('creating') : t('create')}
           </Button>
         )}
       </form.Subscribe>

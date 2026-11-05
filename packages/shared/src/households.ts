@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { localeSchema } from './i18n/locales';
 import { msg } from './i18n/validation';
 
 export const HOUSEHOLD_ROLES = ['owner', 'member'] as const;
@@ -21,6 +22,8 @@ export const householdNameSchema = z
 
 export const createHouseholdInputSchema = z.object({
   name: householdNameSchema,
+  /** The language its default categories are named in (the creator's UI); English if absent. */
+  locale: localeSchema.optional(),
 });
 
 export type CreateHouseholdInput = z.infer<typeof createHouseholdInputSchema>;

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BrandPanel } from '@/components/brand/brand-panel';
 import { Logo } from '@/components/logo';
 import { PageTitle } from '@/components/page-title';
@@ -52,6 +53,7 @@ export function OnboardingLayout({
 }
 
 function StepIndicator({ step, steps }: { step: number; steps: number }) {
+  const { t } = useTranslation('onboarding');
   return (
     <div className="mb-6 flex items-center gap-3">
       <ol className="flex items-center gap-1.5" aria-hidden>
@@ -65,9 +67,7 @@ function StepIndicator({ step, steps }: { step: number; steps: number }) {
           />
         ))}
       </ol>
-      <p className="text-muted-foreground text-sm">
-        Step {step} of {steps}
-      </p>
+      <p className="text-muted-foreground text-sm">{t('step', { step, steps })}</p>
     </div>
   );
 }

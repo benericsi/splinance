@@ -3,6 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Link2 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { HouseholdAvatar } from '@/components/household-avatar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { householdQueries } from '@/features/households/queries';
@@ -21,6 +22,7 @@ export const Route = createFileRoute('/_authenticated/welcome/invite')({
 });
 
 function InviteStep() {
+  const { t } = useTranslation(['onboarding', 'invites']);
   const household = Route.useLoaderData();
   // Keep the cache subscription so a rename elsewhere shows up.
   const { data } = useSuspenseQuery(householdQueries.detail(household.id));
@@ -32,19 +34,19 @@ function InviteStep() {
     <OnboardingLayout
       step={3}
       steps={4}
-      title="Invite your partner"
-      description="Send them a link or let them scan the code. You can also do this later in settings."
+      title={t('invite.title')}
+      description={t('invite.description')}
       footer={
         created ? (
           <Link {...next} className={buttonVariants({ size: 'lg', className: 'h-10 w-full' })}>
-            Continue
+            {t('continue')}
           </Link>
         ) : (
           <Link
             {...next}
             className={buttonVariants({ variant: 'ghost', size: 'lg', className: 'h-10 w-full' })}
           >
-            Skip for now
+            {t('invite.skip')}
           </Link>
         )
       }
@@ -54,7 +56,7 @@ function InviteStep() {
           <HouseholdAvatar household={data} size={40} decorative />
           <div className="min-w-0">
             <p className="truncate font-medium">{data.name}</p>
-            <p className="text-muted-foreground text-sm">You are the owner</p>
+            <p className="text-muted-foreground text-sm">{t('invite.owner')}</p>
           </div>
         </div>
         {created ? (
@@ -69,7 +71,7 @@ function InviteStep() {
             }}
           >
             <Link2 aria-hidden />
-            {create.isPending ? 'Creating…' : 'Create invite link'}
+            {create.isPending ? t('invites:creating') : t('invites:create')}
           </Button>
         )}
       </div>

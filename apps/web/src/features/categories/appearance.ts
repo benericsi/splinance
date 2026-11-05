@@ -5,26 +5,16 @@ import {
   type CategoryIcon,
   type CategoryKind,
 } from '@splinance/shared';
+import { i18n } from '@/i18n';
 
-export const COLOR_NAMES: Record<BrandColor, string> = {
-  green: 'Green',
-  pink: 'Pink',
-  red: 'Red',
-  orange: 'Orange',
-  mustard: 'Mustard',
-  cream: 'Cream',
-  blue: 'Blue',
-  sky: 'Sky',
-};
+/** The color's name in the UI language (a swatch's accessible name). */
+export const colorName = (color: BrandColor): string => i18n.t(`categories:colors.${color}`);
 
 /** In palette order, the order the swatches are shown in. */
 export const COLORS = Object.keys(BRAND_COLORS) as BrandColor[];
 
-/** "shopping-cart" -> "Shopping cart", "gamepad-2" -> "Gamepad": the accessible name of an icon. */
-export function iconName(icon: CategoryIcon): string {
-  const words = icon.replace(/-\d+$/, '').replace(/-/g, ' ');
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
+/** The accessible name of an icon in the UI language: "shopping-cart" -> "Shopping cart". */
+export const iconName = (icon: CategoryIcon): string => i18n.t(`categories:icons.${icon}`);
 
 /**
  * A color for a new category: the one used least among the active categories of that kind

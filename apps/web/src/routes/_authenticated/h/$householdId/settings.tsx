@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/page-header';
 import { PageTitle } from '@/components/page-title';
 import { PageSkeleton, Reveal, RevealPage } from '@/components/reveal';
@@ -27,6 +28,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/settings')(
 });
 
 function SettingsPage() {
+  const { t } = useTranslation('households');
   const { householdId } = Route.useParams();
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
@@ -34,7 +36,7 @@ function SettingsPage() {
 
   return (
     <RevealPage>
-      <PageTitle title={`Settings · ${household.name}`} />
+      <PageTitle title={t('settings.pageTitle', { household: household.name })} />
       <SettingsHeader />
       <div className="space-y-6">
         <Reveal index={0}>
@@ -60,9 +62,8 @@ function SettingsPage() {
 }
 
 function SettingsHeader() {
-  return (
-    <PageHeader title="Household settings" description="Details, members, categories and rules." />
-  );
+  const { t } = useTranslation('households');
+  return <PageHeader title={t('settings.title')} description={t('settings.description')} />;
 }
 
 /** The cards above the fold: details, members and the start of the categories. */

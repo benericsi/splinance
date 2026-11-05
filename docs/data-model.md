@@ -145,7 +145,7 @@ A user can belong to any number of households.
 
 - `(household_id, id)` is unique (`categories_household_id_id_unique`): the target of the composite foreign key from transactions, so a transaction can only use a category of its own household.
 - Active names are unique per household and kind, ignoring case: partial unique index `categories_household_kind_name_unique` on `(household_id, kind, lower(name)) WHERE archived_at IS NULL`. An archived name can be reused.
-- New households get `DEFAULT_CATEGORIES` (10 expense, 2 income) in the creating transaction. Migration `0004_default_categories_backfill` gave households that existed before the same set (a data migration; it mirrors the defaults as they were then).
+- New households get the default set (10 expense, 2 income) in the creating transaction, named in the creator's UI language (`defaultCategories(locale)`; `DEFAULT_CATEGORIES` is the English set). Migration `0004_default_categories_backfill` gave households that existed before the same set (a data migration; it mirrors the defaults as they were then).
 
 ### `transactions`
 

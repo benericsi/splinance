@@ -1,4 +1,5 @@
 import type { Category } from '@splinance/shared';
+import { useTranslation } from 'react-i18next';
 import {
   Combobox,
   ComboboxContent,
@@ -8,6 +9,7 @@ import {
   ComboboxSearchInput,
   ComboboxTrigger,
 } from '@/components/ui/combobox';
+import { compareNames } from '@/lib/locale';
 import { cn } from '@/lib/utils';
 import { CategoryTile } from './category-tile';
 
@@ -17,8 +19,6 @@ interface Option {
   name: string;
   category: Category | undefined;
 }
-
-const NONE: Option = { id: '', name: 'No category', category: undefined };
 
 /**
  * A searchable category select: the trigger looks like a field, the popup has a search box
@@ -45,11 +45,15 @@ export function CategoryPicker({
   /** A shorter trigger for dense rows. */
   compact?: boolean;
 }) {
+  const { t } = useTranslation('categories');
+  const none: Option = { id: '', name: t('none'), category: undefined };
   const options = [
-    NONE,
-    ...categories.map((category) => ({ id: category.id, name: category.name, category })),
+    none,
+    ...[...categories]
+      .sort((a, b) => compareNames(a.name, b.name))
+      .map((category) => ({ id: category.id, name: category.name, category })),
   ];
-  const selected = options.find((option) => option.id === value) ?? NONE;
+  const selected = options.find((option) => option.id === value) ?? none;
 
   return (
     <Combobox
@@ -77,8 +81,8 @@ export function CategoryPicker({
         <span className="min-w-0 flex-1 truncate">{selected.name}</span>
       </ComboboxTrigger>
       <ComboboxContent className="min-w-56">
-        <ComboboxSearchInput placeholder="Search categories" aria-label="Search categories" />
-        <ComboboxEmpty>No categories match</ComboboxEmpty>
+        <ComboboxSearchInput placeholder={t('search')} aria-label={t('search')} />
+        <ComboboxEmpty>{t('noMatch')}</ComboboxEmpty>
         <ComboboxList>
           {(option: Option) => (
             <ComboboxItem key={option.id || 'none'} value={option} className="gap-2.5 py-1.5">

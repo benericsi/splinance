@@ -1,5 +1,6 @@
 import { revalidateLogic, useForm } from '@tanstack/react-form';
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import { TextField } from '@/components/form/text-field';
 import { Button } from '@/components/ui/button';
 import { stashInviteToken } from '@/features/invites/pending-invite';
@@ -17,6 +18,7 @@ export const Route = createFileRoute('/_authenticated/welcome/join')({
 });
 
 function JoinStep() {
+  const { t } = useTranslation('onboarding');
   const navigate = useNavigate();
 
   const form = useForm({
@@ -35,8 +37,8 @@ function JoinStep() {
     <OnboardingLayout
       step={2}
       steps={2}
-      title="Join with an invite link"
-      description="Paste the link someone sent you. You'll see the household before you join."
+      title={t('join.title')}
+      description={t('join.description')}
       footer={<BackLink />}
     >
       <form
@@ -52,7 +54,7 @@ function JoinStep() {
             <TextField
               field={field}
               required
-              label="Invite link"
+              label={t('join.link')}
               placeholder="https://splinance.hu/invite#…"
               autoComplete="off"
               autoFocus
@@ -60,7 +62,7 @@ function JoinStep() {
           )}
         </form.Field>
         <Button type="submit" size="lg" className="h-10 w-full">
-          Continue
+          {t('continue')}
         </Button>
       </form>
     </OnboardingLayout>

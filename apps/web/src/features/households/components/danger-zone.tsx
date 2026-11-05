@@ -1,6 +1,7 @@
 import type { HouseholdDetail } from '@splinance/shared';
 import { useNavigate } from '@tanstack/react-router';
 import { useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
@@ -12,25 +13,20 @@ import { errorMessage } from '@/lib/query-client';
 import { useArchiveHousehold, useLeaveHousehold } from '../hooks';
 
 export function DangerZone({ household }: { household: HouseholdDetail }) {
+  const { t } = useTranslation('households');
   const isOwner = household.role === 'owner';
 
   return (
     <Card className="ring-destructive/30">
       <CardHeader>
-        <CardTitle className="text-destructive">Danger zone</CardTitle>
+        <CardTitle className="text-destructive">{t('danger.title')}</CardTitle>
       </CardHeader>
       <CardContent className="divide-y">
-        <DangerRow
-          title="Leave household"
-          description="You lose access to its expenses. Someone can invite you again."
-        >
+        <DangerRow title={t('danger.leaveTitle')} description={t('danger.leaveDescription')}>
           <LeaveButton household={household} />
         </DangerRow>
         {isOwner && (
-          <DangerRow
-            title="Archive household"
-            description="Hides it for every member. Its history is kept."
-          >
+          <DangerRow title={t('danger.archiveTitle')} description={t('danger.archiveDescription')}>
             <ArchiveButton household={household} />
           </DangerRow>
         )}
@@ -60,6 +56,7 @@ function DangerRow({
 }
 
 function LeaveButton({ household }: { household: HouseholdDetail }) {
+  const { t } = useTranslation('households');
   const navigate = useNavigate();
   const leave = useLeaveHousehold();
   const [open, setOpen] = useState(false);
@@ -75,14 +72,14 @@ function LeaveButton({ household }: { household: HouseholdDetail }) {
           setOpen(true);
         }}
       >
-        Leave
+        {t('danger.leave')}
       </Button>
       {isLastOwner ? (
         <ConfirmDialog
           open={open}
           onOpenChange={setOpen}
-          title="You're the only owner"
-          description="A household always needs an owner. Make another member an owner first, or archive the household."
+          title={t('danger.onlyOwnerTitle')}
+          description={t('danger.onlyOwnerDescription')}
         />
       ) : (
         <ConfirmDialog
@@ -91,10 +88,10 @@ function LeaveButton({ household }: { household: HouseholdDetail }) {
             setOpen(next);
             if (!next) leave.reset();
           }}
-          title={`Leave ${household.name}?`}
-          description="You lose access to its expenses. Someone can invite you again."
-          confirmLabel="Leave"
-          pendingLabel="Leaving…"
+          title={t('danger.leaveConfirmTitle', { household: household.name })}
+          description={t('danger.leaveDescription')}
+          confirmLabel={t('danger.leave')}
+          pendingLabel={t('danger.leaving')}
           destructive
           pending={leave.isPending}
           error={
@@ -107,7 +104,7 @@ function LeaveButton({ household }: { household: HouseholdDetail }) {
               { householdId: household.id },
               {
                 onSuccess: () => {
-                  toast.success(`You left ${household.name}`);
+                  toast.success(t('danger.left', { household: household.name }));
                   void navigate({ to: '/', replace: true });
                 },
               },
@@ -120,6 +117,7 @@ function LeaveButton({ household }: { household: HouseholdDetail }) {
 }
 
 function ArchiveButton({ household }: { household: HouseholdDetail }) {
+  const { t } = useTranslation('households');
   const navigate = useNavigate();
   const archive = useArchiveHousehold();
   const [open, setOpen] = useState(false);
@@ -136,7 +134,7 @@ function ArchiveButton({ household }: { household: HouseholdDetail }) {
           setOpen(true);
         }}
       >
-        Archive
+        {t('danger.archive')}
       </Button>
       <ConfirmDialog
         open={open}
@@ -148,10 +146,10 @@ function ArchiveButton({ household }: { household: HouseholdDetail }) {
             archive.reset();
           }
         }}
-        title={`Archive ${household.name}?`}
-        description="It disappears for every member. Expenses and history are kept, but nobody can open it anymore."
-        confirmLabel="Archive"
-        pendingLabel="Archiving…"
+        title={t('danger.archiveConfirmTitle', { household: household.name })}
+        description={t('danger.archiveConfirmDescription')}
+        confirmLabel={t('danger.archive')}
+        pendingLabel={t('danger.archiving')}
         destructive
         pending={archive.isPending}
         error={
@@ -169,7 +167,7 @@ function ArchiveButton({ household }: { household: HouseholdDetail }) {
             { householdId: household.id },
             {
               onSuccess: () => {
-                toast.success(`${household.name} was archived`);
+                toast.success(t('danger.archived', { household: household.name }));
                 void navigate({ to: '/', replace: true });
               },
             },
@@ -177,7 +175,7 @@ function ArchiveButton({ household }: { household: HouseholdDetail }) {
         }}
       >
         <div className="space-y-1.5">
-          <Label htmlFor={inputId}>Type {household.name} to confirm</Label>
+          <Label htmlFor={inputId}>{t('danger.typeName', { household: household.name })}</Label>
           <Input
             id={inputId}
             value={typed}
@@ -192,7 +190,7 @@ function ArchiveButton({ household }: { household: HouseholdDetail }) {
           />
           {mismatch && (
             <p id={errorId} className="text-destructive text-sm">
-              The name does not match.
+              {t('danger.nameMismatch')}
             </p>
           )}
         </div>

@@ -194,21 +194,21 @@ Account (the signed-in user's own settings, `modules/account`). Every route need
 
 Households and invites. Every route needs a Bearer token except the invite preview. "Member" means an active member (not left) of a non-archived household; everyone else gets 404 `HOUSEHOLD_NOT_FOUND`, also for malformed ids. A member calling an owner-only route gets 403 `FORBIDDEN`.
 
-| Method and path                                | Who                   | Request    | Success                                                   | Errors (besides the above)                                                      |
-| ---------------------------------------------- | --------------------- | ---------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `POST /api/households`                         | any user              | `{ name }` | 201 `{ household }`, caller is owner                      | 400                                                                             |
-| `GET /api/households`                          | any user              |            | 200 `{ households }` (active memberships)                 |                                                                                 |
-| `GET /api/households/:id`                      | member                |            | 200 `{ household }` with `members`                        |                                                                                 |
-| `PATCH /api/households/:id`                    | owner                 | `{ name }` | 200 `{ household }`                                       | 400                                                                             |
-| `DELETE /api/households/:id`                   | owner                 |            | 204, archived (404 for everyone after)                    | 409 `UNSETTLED_BALANCE` (anyone still owes anybody)                             |
-| `POST /api/households/:id/leave`               | member                |            | 204                                                       | 409 `LAST_OWNER`, 409 `UNSETTLED_BALANCE`                                       |
-| `PATCH /api/households/:id/members/:userId`    | owner                 | `{ role }` | 200 `{ member }`                                          | 404 `MEMBER_NOT_FOUND`, 409 `LAST_OWNER`                                        |
-| `DELETE /api/households/:id/members/:userId`   | owner                 |            | 204                                                       | 400 `CANNOT_REMOVE_SELF`, 404 `MEMBER_NOT_FOUND`, 409 `UNSETTLED_BALANCE`       |
-| `POST /api/households/:id/invites`             | owner                 |            | 201 `{ invite, token }`                                   |                                                                                 |
-| `GET /api/households/:id/invites`              | owner                 |            | 200 `{ invites }` (pending only)                          |                                                                                 |
-| `DELETE /api/households/:id/invites/:inviteId` | owner                 |            | 204                                                       | 404 `INVITE_NOT_FOUND` (unknown or no longer pending)                           |
-| `GET /api/invites/:token`                      | none, 60 / 15 min     |            | 200 `{ invite: { householdName, invitedBy, expiresAt } }` | 404 `INVITE_NOT_FOUND`, 410 `INVITE_REVOKED` / `INVITE_USED` / `INVITE_EXPIRED` |
-| `POST /api/invites/:token/accept`              | any user, 30 / 15 min |            | 200 `{ household }`, caller is member                     | same as preview, 409 `ALREADY_MEMBER` (invite stays unused)                     |
+| Method and path                                | Who                   | Request             | Success                                                   | Errors (besides the above)                                                      |
+| ---------------------------------------------- | --------------------- | ------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `POST /api/households`                         | any user              | `{ name, locale? }` | 201 `{ household }`, caller is owner                      | 400                                                                             |
+| `GET /api/households`                          | any user              |                     | 200 `{ households }` (active memberships)                 |                                                                                 |
+| `GET /api/households/:id`                      | member                |                     | 200 `{ household }` with `members`                        |                                                                                 |
+| `PATCH /api/households/:id`                    | owner                 | `{ name }`          | 200 `{ household }`                                       | 400                                                                             |
+| `DELETE /api/households/:id`                   | owner                 |                     | 204, archived (404 for everyone after)                    | 409 `UNSETTLED_BALANCE` (anyone still owes anybody)                             |
+| `POST /api/households/:id/leave`               | member                |                     | 204                                                       | 409 `LAST_OWNER`, 409 `UNSETTLED_BALANCE`                                       |
+| `PATCH /api/households/:id/members/:userId`    | owner                 | `{ role }`          | 200 `{ member }`                                          | 404 `MEMBER_NOT_FOUND`, 409 `LAST_OWNER`                                        |
+| `DELETE /api/households/:id/members/:userId`   | owner                 |                     | 204                                                       | 400 `CANNOT_REMOVE_SELF`, 404 `MEMBER_NOT_FOUND`, 409 `UNSETTLED_BALANCE`       |
+| `POST /api/households/:id/invites`             | owner                 |                     | 201 `{ invite, token }`                                   |                                                                                 |
+| `GET /api/households/:id/invites`              | owner                 |                     | 200 `{ invites }` (pending only)                          |                                                                                 |
+| `DELETE /api/households/:id/invites/:inviteId` | owner                 |                     | 204                                                       | 404 `INVITE_NOT_FOUND` (unknown or no longer pending)                           |
+| `GET /api/invites/:token`                      | none, 60 / 15 min     |                     | 200 `{ invite: { householdName, invitedBy, expiresAt } }` | 404 `INVITE_NOT_FOUND`, 410 `INVITE_REVOKED` / `INVITE_USED` / `INVITE_EXPIRED` |
+| `POST /api/invites/:token/accept`              | any user, 30 / 15 min |                     | 200 `{ household }`, caller is member                     | same as preview, 409 `ALREADY_MEMBER` (invite stays unused)                     |
 
 Categories. Mounted under a household, so the same 404 rules apply first. Every member may manage them.
 
@@ -220,7 +220,7 @@ Categories. Mounted under a household, so the same 404 rules apply first. Every 
 | `DELETE /api/households/:id/categories/:categoryId`       | member |                                           | 204, archived                                | 404 `CATEGORY_NOT_FOUND`                      |
 | `POST /api/households/:id/categories/:categoryId/restore` | member |                                           | 200 `{ category }` (no-op if active)         | 404, 409 `CATEGORY_NAME_TAKEN` (name reused)  |
 
-`category` is `{ id, name, kind, icon, color, archivedAt }`; the list is sorted by kind (expense first), then name. New households get `DEFAULT_CATEGORIES` in the same transaction that creates them.
+`category` is `{ id, name, kind, icon, color, archivedAt }`; the list is sorted by kind (expense first), then name. New households get `defaultCategories(locale)` in the same transaction that creates them: the default set named in the language the household is created in (the web sends its UI language; English without one). Names are data from then on, never translated on display, so an existing household keeps its names when someone switches language.
 
 Transactions. Also under a household. "Visible" means shared, or private and created by the caller; anything else is 404 `TRANSACTION_NOT_FOUND`, exactly like an unknown id.
 
@@ -816,7 +816,8 @@ English and Hungarian (Phase 7; informal "te" in Hungarian). i18next + react-i18
 - Sentences with links or bold parts use `<Trans>` with `components` (`<a>`, `<strong>`). Never name a tag after a void HTML element (`<link>`): the parser closes it at once and the text falls out of the link (a test guards it).
 - Formatting outside React reads `intlLocale()` (`en-GB` or `hu-HU`) and caches formatters per language. Money keeps Hungarian conventions in both languages (Transactions above).
 - API errors: `errorMessage(error)` (`lib/query-client.ts`, used by the global toast and `FormError`) shows `errors:codes.<CODE>` in the UI language, `errors:network` without an answer, else `errors:generic`; never the API's English message. Tests read the English text, which keeps the API's wording where it was already written for people.
-- Done so far: the shell, auth screens, account settings, errors and the shared messages. The household pages follow (P7b, P7c) and are English until then.
+- Translated: the shell, auth screens, account settings, errors, the shared messages, household settings (details, members, categories with their color and icon names, rules, danger zone), the household switcher, onboarding, invites and the privacy notice (Hungarian is a draft for the controller to review; change both languages together). The money pages follow (P7c) and are English until then.
+- Text people typed (household names, rule texts) may go into `<Trans>` values: react-i18next escapes them, so they stay text (`trans.test.tsx`).
 
 ## 12. Web: theme, brand and UI building blocks
 

@@ -1,11 +1,13 @@
 import { useNavigate } from '@tanstack/react-router';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RouteDialog } from '@/components/route-dialog';
 import { useCloseModal } from '@/lib/route-modal';
 import { CreateHouseholdForm } from './create-household-form';
 
 /** Opened from anywhere with `?modal=new-household` (see the _authenticated layout). */
 export function NewHouseholdDialog() {
+  const { t } = useTranslation('households');
   const navigate = useNavigate();
   const close = useCloseModal(
     useCallback(() => {
@@ -14,11 +16,7 @@ export function NewHouseholdDialog() {
   );
 
   return (
-    <RouteDialog
-      title="New household"
-      description="A shared space for expenses. You can invite people once it exists."
-      onClose={close}
-    >
+    <RouteDialog title={t('newTitle')} description={t('newDescription')} onClose={close}>
       <CreateHouseholdForm
         onCreated={async (household) => {
           // Replace the modal entry, so back from the new household returns to where it started.

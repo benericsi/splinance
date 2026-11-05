@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { CategoryDialog } from '@/features/categories/components/category-dialog';
 import { categoryQueries } from '@/features/categories/queries';
+import { i18n } from '@/i18n';
 import { useCloseModal } from '@/lib/route-modal';
 
 /** Child route: the edit dialog renders over the settings page. */
@@ -14,7 +15,7 @@ export const Route = createFileRoute(
     const categories = await queryClient.query(categoryQueries.list(householdId));
     // Archived categories are read only (restore them first); unknown ids go back too.
     if (!categories.some((c) => c.id === categoryId && c.archivedAt === null)) {
-      toast.error('That category cannot be edited.');
+      toast.error(i18n.t('categories:cannotEdit'));
       throw redirect({ to: '/h/$householdId/settings', params: { householdId }, replace: true });
     }
   },

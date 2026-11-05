@@ -2,6 +2,7 @@ import { inviteTokenSchema } from '@splinance/shared';
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { FormError } from '@/components/form/form-error';
 import { PageTitle } from '@/components/page-title';
@@ -30,6 +31,7 @@ const validToken = (value: string | undefined) =>
   value && inviteTokenSchema.safeParse(value).success ? value : undefined;
 
 function InvitePage() {
+  const { t } = useTranslation('invites');
   const hash = useLocation({ select: (location) => location.hash });
   const navigate = useNavigate();
   // From the link itself, or, after a detour through login/register, from this tab's storage.
@@ -46,17 +48,16 @@ function InvitePage() {
 
   if (!token) {
     return (
-      <InviteLayout
-        title="This invite link is incomplete"
-        description="Open the full link you received, or ask for a new one."
-      >
+      <InviteLayout title={t('page.incompleteTitle')} description={t('page.incompleteDescription')}>
         <HomeLink />
       </InviteLayout>
     );
   }
 
   if (preview.isPending) {
-    return <InviteLayout title="Opening your invite" description="One moment." />;
+    return (
+      <InviteLayout title={t('page.openingTitle')} description={t('page.openingDescription')} />
+    );
   }
 
   if (preview.isError) {
@@ -71,8 +72,12 @@ function InvitePage() {
   const invite = preview.data;
   return (
     <InviteLayout
-      title={`Join ${invite.householdName}`}
-      description={`${invite.invitedBy.displayName} invited you to share expenses in ${invite.householdName}. The invite expires ${expiresIn(invite.expiresAt)}.`}
+      title={t('page.joinTitle', { household: invite.householdName })}
+      description={t('page.joinDescription', {
+        inviter: invite.invitedBy.displayName,
+        household: invite.householdName,
+        expires: expiresIn(invite.expiresAt),
+      })}
     >
       <JoinActions token={token} householdName={invite.householdName} />
     </InviteLayout>
@@ -80,6 +85,7 @@ function InvitePage() {
 }
 
 function JoinActions({ token, householdName }: { token: string; householdName: string }) {
+  const { t } = useTranslation('invites');
   const { status, user } = useAuth();
   const navigate = useNavigate();
   const accept = useAcceptInvite();
@@ -94,14 +100,14 @@ function JoinActions({ token, householdName }: { token: string; householdName: s
           search={{ redirect: '/invite' }}
           className={buttonVariants({ size: 'lg', className: 'h-10 w-full' })}
         >
-          Log in to join
+          {t('page.logInToJoin')}
         </Link>
         <Link
           to="/register"
           search={{ redirect: '/invite' }}
           className={buttonVariants({ variant: 'outline', size: 'lg', className: 'h-10 w-full' })}
         >
-          Create an account
+          {t('page.createAccount')}
         </Link>
       </div>
     );
@@ -112,8 +118,8 @@ function JoinActions({ token, householdName }: { token: string; householdName: s
   if (alreadyMember) {
     return (
       <div className="space-y-4">
-        <FormError message={`You're already a member of ${householdName}.`} />
-        <HomeLink label="Open Splinance" />
+        <FormError message={t('page.alreadyMember', { household: householdName })} />
+        <HomeLink label={t('page.openApp')} />
       </div>
     );
   }
@@ -131,7 +137,7 @@ function JoinActions({ token, householdName }: { token: string; householdName: s
             {
               onSuccess: (household) => {
                 clearInviteToken();
-                toast.success(`Welcome to ${household.name}`);
+                toast.success(t('page.welcome', { household: household.name }));
                 void navigate({
                   to: '/h/$householdId',
                   params: { householdId: household.id },
@@ -147,10 +153,10 @@ function JoinActions({ token, householdName }: { token: string; householdName: s
           );
         }}
       >
-        {accept.isPending ? 'Joining…' : `Join ${householdName}`}
+        {accept.isPending ? t('page.joining') : t('page.join', { household: householdName })}
       </Button>
       <p className="text-muted-foreground text-center text-sm">
-        Joining as {user?.displayName}.{' '}
+        {t('page.joiningAs', { name: user?.displayName ?? '' })}{' '}
         <button
           type="button"
           className="text-link font-medium underline-offset-4 hover:underline"
@@ -158,7 +164,7 @@ function JoinActions({ token, householdName }: { token: string; householdName: s
             logout.mutate();
           }}
         >
-          Not you? Log out
+          {t('page.notYou')}
         </button>
       </p>
     </div>
@@ -181,9 +187,10 @@ function InviteLayout({
   description: string;
   children?: React.ReactNode;
 }) {
+  const { t } = useTranslation('invites');
   return (
     <>
-      <PageTitle title="Join a household" />
+      <PageTitle title={t('page.pageTitle')} />
       <AuthLayout title={title} description={description} aside={null}>
         {children}
       </AuthLayout>
@@ -191,13 +198,14 @@ function InviteLayout({
   );
 }
 
-function HomeLink({ label = 'Go to Splinance' }: { label?: string }) {
+function HomeLink({ label }: { label?: string }) {
+  const { t } = useTranslation('invites');
   return (
     <Link
       to="/"
       className={buttonVariants({ variant: 'outline', size: 'lg', className: 'h-10 w-full' })}
     >
-      {label}
+      {label ?? t('page.goToApp')}
     </Link>
   );
 }

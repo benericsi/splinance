@@ -2,7 +2,13 @@ import { getValidationLocale, householdNameSchema } from '@splinance/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import { createAuthStore } from './auth-store';
-import { detectLocale, followUserLocale, LOCALE_STORAGE_KEY, localeStore } from './locale';
+import {
+  compareNames,
+  detectLocale,
+  followUserLocale,
+  LOCALE_STORAGE_KEY,
+  localeStore,
+} from './locale';
 import { testUser } from '../../test/utils';
 
 function browserLanguages(languages: string[]) {
@@ -48,6 +54,29 @@ describe('localeStore', () => {
     await Promise.all([localeStore.setLocale('hu'), localeStore.setLocale('en')]);
     expect(localeStore.getState()).toBe('en');
     expect(i18n.language).toBe('en');
+  });
+});
+
+describe('compareNames', () => {
+  it('sorts the way the UI language does, accents and digraphs included', async () => {
+    const names = ['Vásárlás', 'Étterem', 'Egyéb', 'Élelmiszer', 'Egészség', 'Zene'];
+    expect([...names].sort(compareNames)).toEqual([
+      'Egészség',
+      'Egyéb',
+      'Élelmiszer',
+      'Étterem',
+      'Vásárlás',
+      'Zene',
+    ]);
+    await localeStore.setLocale('hu', { persist: false });
+    // Hungarian: "gy" is its own letter, right after "g"; accented vowels sort with their base.
+    expect(['Ezer', 'Egyéb', 'Ágy', 'Egészség', 'Alma'].sort(compareNames)).toEqual([
+      'Ágy',
+      'Alma',
+      'Egészség',
+      'Egyéb',
+      'Ezer',
+    ]);
   });
 });
 
