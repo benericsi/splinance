@@ -1,6 +1,7 @@
 import type { Category, Currency } from '@splinance/shared';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CategoryTile } from '@/features/categories/components/category-tile';
 import { MoneyFlow } from '@/features/transactions/components/money-flow';
 import { formatMoney } from '@/features/transactions/money';
@@ -27,18 +28,20 @@ export function ReportSummaryCards({
   /** "October 2026", "2026 so far". */
   periodLabel: string;
 }) {
+  const { t } = useTranslation('reports');
   const { previous } = summary;
+  const period = summary.comparePeriod;
   const before = (minor: number | undefined) =>
     minor === undefined
-      ? `Nothing ${summary.compareLabel.replace(/^vs /, 'in ')}`
-      : `${summary.compareLabel}: ${formatMoney(minor, currency)}`;
+      ? t('summary.nothingBefore', { period })
+      : t('summary.before', { period, amount: formatMoney(minor, currency) });
   const top = summary.top;
   const topCategory = top?.categoryId ? categories.find((c) => c.id === top.categoryId) : undefined;
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <KpiCard
-        label={view === 'mine' ? 'You spent' : 'Spent'}
+        label={view === 'mine' ? t('summary.youSpent') : t('summary.spent')}
         value={<MoneyFlow minor={summary.spent} currency={currency} />}
         badge={<ChangeBadge value={summary.spent} before={previous?.spent} upIsGood={false} />}
         detail={before(previous?.spent)}
@@ -51,7 +54,7 @@ export function ReportSummaryCards({
         }
       />
       <KpiCard
-        label={view === 'mine' ? 'Your income' : 'Income'}
+        label={view === 'mine' ? t('summary.yourIncome') : t('summary.income')}
         value={<MoneyFlow minor={summary.income} currency={currency} />}
         badge={<ChangeBadge value={summary.income} before={previous?.income} upIsGood />}
         detail={before(previous?.income)}
@@ -64,7 +67,7 @@ export function ReportSummaryCards({
         }
       />
       <KpiCard
-        label="Left over"
+        label={t('summary.left')}
         value={
           <MoneyFlow
             minor={summary.left}
@@ -75,10 +78,10 @@ export function ReportSummaryCards({
         badge={<ChangeBadge value={summary.left} before={previous?.left} upIsGood />}
         detail={
           summary.savedPercent === null
-            ? 'No income'
+            ? t('summary.noIncome')
             : summary.savedPercent < 0
-              ? `${String(-summary.savedPercent)}% more than income`
-              : `${String(summary.savedPercent)}% of income saved`
+              ? t('summary.overIncome', { percent: -summary.savedPercent })
+              : t('summary.saved', { percent: summary.savedPercent })
         }
         sparkline={
           <Sparkline
@@ -89,24 +92,28 @@ export function ReportSummaryCards({
         }
       />
       <KpiCard
-        label="Top category"
+        label={t('summary.top')}
         value={
           top ? (
             <span className="flex min-w-0 items-center gap-2">
               <CategoryTile category={topCategory} size="sm" />
               <span className="truncate">
-                {top.categoryId === null ? 'No category' : (topCategory?.name ?? 'Unknown')}
+                {top.categoryId === null ? t('noCategory') : (topCategory?.name ?? t('unknown'))}
               </span>
             </span>
           ) : (
-            <span className="text-muted-foreground">None</span>
+            <span className="text-muted-foreground">{t('summary.none')}</span>
           )
         }
         // The share is in the line under it: a badge would squeeze the label on a phone.
         detail={
           top
-            ? `${String(top.percent)}% · ${formatMoney(top.amount, currency)} in ${periodLabel}`
-            : `No spending in ${periodLabel}`
+            ? t('summary.topDetail', {
+                percent: top.percent,
+                amount: formatMoney(top.amount, currency),
+                period: periodLabel,
+              })
+            : t('noSpendingShort', { period: periodLabel })
         }
       />
     </div>
@@ -155,6 +162,7 @@ function ChangeBadge({
   before: number | undefined;
   upIsGood: boolean;
 }) {
+  const { t } = useTranslation('reports');
   if (before === undefined) return null;
   const change = percentChange(value, before);
   if (change === null) return null;
@@ -174,7 +182,7 @@ function ChangeBadge({
       )}
     >
       <Arrow className="size-3" aria-hidden />
-      <span className="sr-only">{up ? 'up' : 'down'} </span>
+      <span className="sr-only">{up ? t('summary.up') : t('summary.down')} </span>
       {Math.abs(change)}%
     </span>
   );

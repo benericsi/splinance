@@ -4,6 +4,7 @@ import {
   MAX_AMOUNT_MINOR,
   PERCENT_SCALE,
 } from '@splinance/shared';
+import { i18n } from '@/i18n';
 
 /**
  * Amounts use Hungarian number formatting ("10 001 Ft", "12,50 €") whatever the UI
@@ -115,13 +116,15 @@ export function parseAmount(text: string, currency: Currency): number | undefine
 export function amountProblemMessage(problem: AmountProblem, currency: Currency): string {
   switch (problem) {
     case 'empty':
-      return 'Enter an amount';
+      return i18n.t('transactions:amount.empty');
     case 'zero':
-      return 'Amount must be more than zero';
+      return i18n.t('transactions:amount.zero');
     case 'too-large':
-      return `Amount can be at most ${formatMoney(MAX_AMOUNT_MINOR, currency)}`;
+      return i18n.t('transactions:amount.tooLarge', {
+        max: formatMoney(MAX_AMOUNT_MINOR, currency),
+      });
     case 'invalid':
-      return 'Enter an amount, like 12 500';
+      return i18n.t('transactions:amount.invalid');
   }
 }
 

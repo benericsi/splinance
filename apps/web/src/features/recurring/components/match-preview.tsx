@@ -7,6 +7,7 @@ import {
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { CircleCheck, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatMoney, readAmount } from '@/features/transactions/money';
 import { recurringQueries } from '../queries';
 import { shortDate } from '../view';
@@ -24,8 +25,6 @@ function useSettled(value: string, ms = 400): string {
   }, [value, ms]);
   return settled;
 }
-
-const payments = (count: number) => `${String(count)} past ${count === 1 ? 'payment' : 'payments'}`;
 
 /**
  * Under the pattern field: which of the viewer's past payments the series would own, so the
@@ -47,6 +46,7 @@ export function MatchPreview({
   /** As typed. */
   amount: string;
 }) {
+  const { t } = useTranslation('recurring');
   const minor = readAmount(amount, currency).minor;
   const typed: RecurringPreviewInput | null =
     recurringPatternSchema.safeParse(pattern).success && minor !== undefined
@@ -76,11 +76,13 @@ export function MatchPreview({
         <>
           <CircleCheck className="text-positive mt-0.5 size-4 shrink-0" aria-hidden />
           <div className="min-w-0">
-            <p className="font-medium">Matches {payments(preview.data.matches)}</p>
+            <p className="font-medium">{t('preview.matches', { count: preview.data.matches })}</p>
             {latest && (
               <p className="text-muted-foreground text-xs">
-                Latest {shortDate(latest.occurredOn)}, {formatMoney(latest.amount, currency)}.
-                Future imports are recognized too.
+                {t('preview.latest', {
+                  date: shortDate(latest.occurredOn),
+                  amount: formatMoney(latest.amount, currency),
+                })}
               </p>
             )}
           </div>
@@ -90,8 +92,8 @@ export function MatchPreview({
           <Search className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
           <p className="text-muted-foreground min-w-0">
             {preview.isPending
-              ? 'Looking for past payments…'
-              : `No past payments match yet. Imports containing "${matchKey(input.pattern)}" will.`}
+              ? t('preview.looking')
+              : t('preview.none', { key: matchKey(input.pattern) })}
           </p>
         </>
       )}

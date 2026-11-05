@@ -78,12 +78,39 @@ export interface ParseOptions {
   currency?: string;
 }
 
-/** A file that is not a supported export, or a row that cannot be read. */
+/** Why a file cannot be read, as data, so the web can say it in the UI language. */
+export type StatementProblem =
+  | { code: 'not-supported' }
+  | { code: 'empty' }
+  | { code: 'missing-column'; bank: string; column: string }
+  | { code: 'unreadable-amount'; value: string }
+  | { code: 'unreadable-date'; value: string };
+
+function describeProblem(problem: StatementProblem): string {
+  switch (problem.code) {
+    case 'not-supported':
+      return 'This file is not a Revolut or K&H export. Export the transaction history as CSV from your bank.';
+    case 'empty':
+      return 'The file is empty';
+    case 'missing-column':
+      return `Not a ${problem.bank} export: no "${problem.column}" column`;
+    case 'unreadable-amount':
+      return `Unreadable amount "${problem.value}"`;
+    case 'unreadable-date':
+      return `Unreadable date "${problem.value}"`;
+  }
+}
+
+/**
+ * A file that is not a supported export, or a row that cannot be read. `message` is
+ * English; `problem` and `line` are what a translated message is built from.
+ */
 export class StatementError extends Error {
   constructor(
-    message: string,
+    readonly problem: StatementProblem,
     readonly line?: number,
   ) {
+    const message = describeProblem(problem);
     super(line === undefined ? message : `Line ${String(line)}: ${message}`);
     this.name = 'StatementError';
   }

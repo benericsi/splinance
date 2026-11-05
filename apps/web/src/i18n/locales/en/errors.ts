@@ -68,6 +68,7 @@ export const errors = {
     archive: 'Settle all balances before archiving the household',
   },
   /** No answer at all (offline, server down). */
+  row: 'Row {{row}}: {{message}}',
   network: "Can't reach Splinance. Check your connection and try again.",
   generic: 'Something went wrong. Please try again.',
 };

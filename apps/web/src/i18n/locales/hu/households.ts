@@ -2,6 +2,10 @@ import type { en } from '../en';
 import type { Messages } from '../../types';
 
 export const households: Messages<typeof en.households> = {
+  notFound: {
+    title: 'A háztartás nem található',
+    description: 'Nem létezik, archiválták, vagy nem vagy a tagja.',
+  },
   settings: {
     pageTitle: 'Beállítások · {{household}}',
     title: 'Háztartás beállításai',

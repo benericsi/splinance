@@ -1,6 +1,7 @@
 import { daysBetween, type Notification } from '@splinance/shared';
-import { formatMonth, fromIsoDate } from '@/features/transactions/dates';
+import { formatDateWith, formatMonth, fromIsoDate } from '@/features/transactions/dates';
 import { formatMoney } from '@/features/transactions/money';
+import { i18n } from '@/i18n';
 
 /** A notification in words: a bold lead (a name), the rest of the sentence, a detail line. */
 export interface Described {
@@ -9,21 +10,17 @@ export interface Described {
   detail: string;
 }
 
-const plural = (count: number, one: string, many: string) =>
-  `${String(count)} ${count === 1 ? one : many}`;
-
-/** "today", "tomorrow", "on Thursday", "on 12 Nov". */
-function when(dueOn: string, today: string): string {
-  const days = daysBetween(today, dueOn);
-  if (days <= 0) return 'today';
-  if (days === 1) return 'tomorrow';
-  const date = fromIsoDate(dueOn);
-  if (days < 7) return `on ${date.toLocaleDateString('en-GB', { weekday: 'long' })}`;
-  return `on ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
-}
-
 const shortDay = (value: string) =>
-  fromIsoDate(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  formatDateWith(fromIsoDate(value), { day: 'numeric', month: 'short' });
+
+/** " renews today", " renews tomorrow", " renews on Thursday", " renews on 12 Nov". */
+function renews(dueOn: string, today: string): string {
+  const days = daysBetween(today, dueOn);
+  if (days <= 0) return i18n.t('notifications:renewal.today');
+  if (days === 1) return i18n.t('notifications:renewal.tomorrow');
+  const day = days < 7 ? formatDateWith(fromIsoDate(dueOn), { weekday: 'long' }) : shortDay(dueOn);
+  return i18n.t('notifications:renewal.on', { day });
+}
 
 /**
  * The sentence for a notification as `viewerId` reads it on `today`. Names come from the
@@ -31,21 +28,23 @@ const shortDay = (value: string) =>
  */
 export function describeNotification(n: Notification, viewerId: string, today: string): Described {
   const money = (minor: number | null) => formatMoney(minor ?? 0, n.currency);
-  const name = n.subjectName ?? 'A payment';
-  const actor = n.actor?.displayName ?? 'Someone';
+  const name = n.subjectName ?? i18n.t('notifications:aPayment');
+  const actor = n.actor?.displayName ?? i18n.t('notifications:someone');
 
   switch (n.type) {
     case 'renewal_due':
       return {
         lead: name,
-        rest: ` renews ${n.dueOn ? when(n.dueOn, today) : 'soon'}`,
-        detail: n.resolvedAt ? 'Paid' : money(n.amount),
+        rest: n.dueOn ? renews(n.dueOn, today) : i18n.t('notifications:renewal.soon'),
+        detail: n.resolvedAt ? i18n.t('notifications:renewal.paid') : money(n.amount),
       };
     case 'renewal_missed':
       return {
         lead: name,
-        rest: ' was not paid',
-        detail: n.dueOn ? `Expected ${shortDay(n.dueOn)}. Cancelled?` : 'Cancelled?',
+        rest: i18n.t('notifications:renewal.missed'),
+        detail: n.dueOn
+          ? i18n.t('notifications:renewal.expected', { date: shortDay(n.dueOn) })
+          : i18n.t('notifications:renewal.cancelled'),
       };
     case 'price_changed': {
       const previous = n.previousAmount ?? 0;
@@ -53,63 +52,97 @@ export function describeNotification(n: Notification, viewerId: string, today: s
       const percent = previous > 0 ? Math.round((Math.abs(amount - previous) / previous) * 100) : 0;
       return {
         lead: name,
-        rest: ` price went ${amount > previous ? 'up' : 'down'} ${String(percent)}%`,
-        detail: `${money(previous)} to ${money(amount)}`,
+        rest:
+          amount > previous
+            ? i18n.t('notifications:price.up', { percent })
+            : i18n.t('notifications:price.down', { percent }),
+        detail: i18n.t('notifications:price.change', { from: money(previous), to: money(amount) }),
       };
     }
     case 'budget_near':
     case 'budget_over': {
       const spent = n.amount ?? 0;
       const limit = n.previousAmount ?? 0;
-      // "in November", with the year only when it is not this one.
+      const amounts = { spent: money(spent), limit: money(limit) };
+      // "November", with the year only when it is not this one.
       const month = n.dueOn
-        ? ` in ${n.dueOn.slice(0, 4) === today.slice(0, 4) ? fromIsoDate(n.dueOn).toLocaleDateString('en-GB', { month: 'long' }) : formatMonth(n.dueOn.slice(0, 7))}`
-        : '';
+        ? n.dueOn.slice(0, 4) === today.slice(0, 4)
+          ? formatDateWith(fromIsoDate(n.dueOn), { month: 'long' })
+          : formatMonth(n.dueOn.slice(0, 7))
+        : undefined;
       return {
         lead: name,
         rest:
           n.type === 'budget_over'
-            ? ' is over budget'
-            : ` is at ${String(limit > 0 ? Math.round((spent / limit) * 100) : 0)}% of its budget`,
-        detail: `${money(spent)} of ${money(limit)}${month}`,
+            ? i18n.t('notifications:budget.over')
+            : i18n.t('notifications:budget.near', {
+                percent: limit > 0 ? Math.round((spent / limit) * 100) : 0,
+              }),
+        detail: month
+          ? i18n.t('notifications:budget.detailIn', { ...amounts, month })
+          : i18n.t('notifications:budget.detail', amounts),
       };
     }
     case 'tx_added':
       return {
         lead: actor,
-        rest: ` ${n.action === 'restore' ? 'restored' : 'added'} ${name}`,
-        detail: n.amount ? `Your share ${money(n.amount)}` : 'You are the payer',
+        rest:
+          n.action === 'restore'
+            ? i18n.t('notifications:tx.restored', { name })
+            : i18n.t('notifications:tx.added', { name }),
+        detail: n.amount
+          ? i18n.t('notifications:tx.share', { amount: money(n.amount) })
+          : i18n.t('notifications:tx.payer'),
       };
     case 'tx_changed':
       return {
         lead: actor,
-        rest: ` changed ${name}`,
-        detail: `Your share ${money(n.previousAmount)} to ${money(n.amount)}`,
+        rest: i18n.t('notifications:tx.changed', { name }),
+        detail: i18n.t('notifications:tx.shareChange', {
+          from: money(n.previousAmount),
+          to: money(n.amount),
+        }),
       };
     case 'tx_deleted':
       return {
         lead: actor,
-        rest: ` deleted ${name}`,
-        detail: n.amount ? `Your share was ${money(n.amount)}` : 'You were the payer',
+        rest: i18n.t('notifications:tx.deleted', { name }),
+        detail: n.amount
+          ? i18n.t('notifications:tx.shareWas', { amount: money(n.amount) })
+          : i18n.t('notifications:tx.wasPayer'),
       };
     case 'import_added': {
-      const what = plural(n.count ?? 0, 'shared transaction', 'shared transactions');
+      const count = n.count ?? 0;
       return {
         lead: actor,
-        rest: n.action === 'undo' ? ` undid an import of ${what}` : ` imported ${what}`,
-        detail: `Your share ${money(n.amount)}`,
+        rest:
+          n.action === 'undo'
+            ? i18n.t('notifications:import.undone', { count })
+            : i18n.t('notifications:import.added', { count }),
+        detail: i18n.t('notifications:tx.share', { amount: money(n.amount) }),
       };
     }
     case 'settlement_recorded': {
       const from = n.parties?.from;
       const to = n.parties?.to;
       const who = (person: typeof from) =>
-        !person ? 'someone' : person.userId === viewerId ? 'you' : person.displayName;
-      const payment = `${who(from)} to ${who(to)}`;
+        !person
+          ? i18n.t('notifications:someoneLower')
+          : person.userId === viewerId
+            ? i18n.t('notifications:you')
+            : person.displayName;
+      const payment = i18n.t('notifications:settlement.detail', {
+        from: who(from),
+        to: who(to),
+        amount: money(n.amount),
+      });
       return {
         lead: actor,
-        rest: n.action === 'delete' ? ' deleted a payment' : ' recorded a payment',
-        detail: `${payment.charAt(0).toUpperCase()}${payment.slice(1)}, ${money(n.amount)}`,
+        rest:
+          n.action === 'delete'
+            ? i18n.t('notifications:settlement.deleted')
+            : i18n.t('notifications:settlement.recorded'),
+        detail: `${payment.charAt(0).toUpperCase()}${payment.slice(1)}`,
       };
     }
   }
@@ -158,11 +191,11 @@ export function notificationTarget(n: Notification):
 /** "now", "5m", "2h", "3d", then a date. */
 export function timeAgo(iso: string, now = new Date()): string {
   const minutes = Math.floor((now.getTime() - new Date(iso).getTime()) / 60_000);
-  if (minutes < 1) return 'now';
-  if (minutes < 60) return `${String(minutes)}m`;
+  if (minutes < 1) return i18n.t('notifications:ago.now');
+  if (minutes < 60) return i18n.t('notifications:ago.minutes', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${String(hours)}h`;
+  if (hours < 24) return i18n.t('notifications:ago.hours', { count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${String(days)}d`;
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  if (days < 7) return i18n.t('notifications:ago.days', { count: days });
+  return formatDateWith(new Date(iso), { day: 'numeric', month: 'short' });
 }

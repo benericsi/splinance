@@ -61,7 +61,11 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, _next)
   }
 
   if (err instanceof HttpError) {
-    sendError(res, err.status, { code: err.code, message: err.message });
+    sendError(res, err.status, {
+      code: err.code,
+      message: err.message,
+      ...(err.details && { details: err.details }),
+    });
     return;
   }
 

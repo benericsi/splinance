@@ -1,5 +1,6 @@
 import { noop, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, notFound, Outlet } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import { StatusPage } from '@/components/status-page';
 import { buttonVariants } from '@/components/ui/button';
 import { HouseholdShell } from '@/features/households/components/household-shell';
@@ -37,15 +38,16 @@ function HouseholdLayout() {
 }
 
 function HouseholdNotFound() {
+  const { t } = useTranslation(['households', 'common']);
   return (
     <StatusPage
       fullPage
       code="404"
-      title="Household not found"
-      description="It does not exist, was archived, or you are not a member."
+      title={t('notFound.title')}
+      description={t('notFound.description')}
       actions={
         <Link to="/" className={buttonVariants()}>
-          Back to home
+          {t('common:backHome')}
         </Link>
       }
     />

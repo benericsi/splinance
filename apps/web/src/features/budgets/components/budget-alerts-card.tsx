@@ -1,5 +1,6 @@
 import type { BudgetList, Category } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -19,6 +20,7 @@ export function BudgetAlertsCard({
   data: BudgetList;
   categories: Category[];
 }) {
+  const { t } = useTranslation('budgets');
   const close = data.budgets.filter((budget) => budgetStatus(budget) !== 'ok').sort(byUsage);
   if (close.length === 0) return null;
   const nameOf = new Map(categories.map((category) => [category.id, category.name]));
@@ -26,14 +28,14 @@ export function BudgetAlertsCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Budgets this month</CardTitle>
+        <CardTitle>{t('alerts.title')}</CardTitle>
         <CardAction>
           <Link
             to="/h/$householdId/budgets"
             params={{ householdId }}
             className={buttonVariants({ variant: 'link', className: 'text-link h-auto px-0' })}
           >
-            All budgets
+            {t('alerts.all')}
           </Link>
         </CardAction>
       </CardHeader>
@@ -42,7 +44,7 @@ export function BudgetAlertsCard({
           {close.map((budget) => (
             <li key={budget.categoryId} className="space-y-1.5">
               <div className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="truncate">{nameOf.get(budget.categoryId) ?? 'Unknown'}</span>
+                <span className="truncate">{nameOf.get(budget.categoryId) ?? t('unknown')}</span>
                 <span
                   className={cn(
                     'shrink-0 tabular-nums',

@@ -1,5 +1,6 @@
 import { addMonths, monthsBetween, type Report } from '@splinance/shared';
 import type { ReportView } from './components/trend-chart';
+import { i18n } from '@/i18n';
 import { shortMonth } from './format';
 import type { ReportRange } from './window';
 
@@ -11,6 +12,8 @@ export interface ReportSummary {
   previous: { spent: number; income: number; left: number } | null;
   /** "vs Sept", "vs Jan–Oct 2025", "vs 2025". */
   compareLabel: string;
+  /** The period compared with alone: "Sept", "Jan–Oct 2025", "2025". */
+  comparePeriod: string;
   /** Share of income left over, in whole percent; null without income. */
   savedPercent: number | null;
   top: { categoryId: string | null; amount: number; percent: number } | null;
@@ -50,21 +53,26 @@ export function summarize(
 
   let current: string[];
   let previous: string[];
-  let compareLabel: string;
+  let comparePeriod: string;
   if (range.period === 'month') {
     current = [range.month];
     previous = [addMonths(range.month, -1)];
-    compareLabel = `vs ${shortMonth(previous[0] ?? '')}`;
+    comparePeriod = shortMonth(previous[0] ?? '');
   } else {
     // This year: so far, against the same months of last year.
     const last = range.year === now.slice(0, 4) ? now : `${range.year}-12`;
     current = monthsBetween(`${range.year}-01`, last);
     previous = current.map((month) => addMonths(month, -12));
     const lastYear = String(Number(range.year) - 1);
-    compareLabel = last.endsWith('-12')
-      ? `vs ${lastYear}`
-      : `vs Jan–${shortMonth(last)} ${lastYear}`;
+    comparePeriod = last.endsWith('-12')
+      ? lastYear
+      : i18n.t('reports:summary.yearSoFar', {
+          from: shortMonth(`${lastYear}-01`),
+          to: shortMonth(last),
+          year: lastYear,
+        });
   }
+  const compareLabel = i18n.t('reports:summary.compare', { period: comparePeriod });
 
   const shown = totals(current);
   const before = totals(previous);
@@ -90,6 +98,7 @@ export function summarize(
     ...shown,
     previous: hadBefore ? before : null,
     compareLabel,
+    comparePeriod,
     savedPercent: shown.income > 0 ? Math.round((shown.left / shown.income) * 100) : null,
     top,
     trend: {

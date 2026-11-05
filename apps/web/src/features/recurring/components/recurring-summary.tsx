@@ -1,5 +1,6 @@
 import type { Currency } from '@splinance/shared';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SegmentedControl } from '@/components/segmented-control';
 import { MoneyFlow } from '@/features/transactions/components/money-flow';
 import type { SeriesView } from '../view';
@@ -11,6 +12,7 @@ type Basis = 'household' | 'yours';
  * viewer's private ones) or the viewer's part. Payments gone quiet do not count.
  */
 export function RecurringSummary({ views, currency }: { views: SeriesView[]; currency: Currency }) {
+  const { t } = useTranslation('recurring');
   const [basis, setBasis] = useState<Basis>('household');
   const running = views.filter((view) => view.timing !== 'lapsed');
   const total = running.reduce(
@@ -21,22 +23,24 @@ export function RecurringSummary({ views, currency }: { views: SeriesView[]; cur
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <p className="text-muted-foreground text-sm">About</p>
+        <p className="text-muted-foreground text-sm">{t('summary.about')}</p>
         <p className="font-heading text-2xl font-semibold tabular-nums">
           <MoneyFlow minor={total} currency={currency} />
-          <span className="text-muted-foreground font-sans text-base font-normal"> a month</span>
+          <span className="text-muted-foreground font-sans text-base font-normal">
+            {t('summary.perMonth')}
+          </span>
         </p>
         <p className="text-muted-foreground text-xs">
-          {running.length} {running.length === 1 ? 'payment' : 'payments'}
+          {t('summary.payments', { count: running.length })}
         </p>
       </div>
       <SegmentedControl<Basis>
-        label="Count"
+        label={t('summary.count')}
         value={basis}
         onChange={setBasis}
         options={[
-          { value: 'household', label: 'Household' },
-          { value: 'yours', label: 'Your share' },
+          { value: 'household', label: t('summary.household') },
+          { value: 'yours', label: t('summary.yours') },
         ]}
         className="w-auto sm:w-56"
       />

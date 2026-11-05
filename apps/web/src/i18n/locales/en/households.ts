@@ -1,4 +1,8 @@
 export const households = {
+  notFound: {
+    title: 'Household not found',
+    description: 'It does not exist, was archived, or you are not a member.',
+  },
   settings: {
     pageTitle: 'Settings · {{household}}',
     title: 'Household settings',

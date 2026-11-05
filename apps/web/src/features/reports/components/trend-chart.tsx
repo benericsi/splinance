@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useTranslation } from 'react-i18next';
 import {
   type ChartConfig,
   ChartContainer,
@@ -20,11 +21,12 @@ import { compactNumber, shortMonth } from '../format';
 
 export type ReportView = 'household' | 'mine';
 
-const config = {
-  // App tokens, so the legend outside the chart can use the same colors.
-  spent: { label: 'Spent', color: 'var(--muted-foreground)' },
-  income: { label: 'Income', color: 'var(--positive)' },
-} satisfies ChartConfig;
+/** App tokens, so the legend outside the chart can use the same colors. */
+const chartConfig = (t: (key: 'trend.spent' | 'trend.income') => string) =>
+  ({
+    spent: { label: t('trend.spent'), color: 'var(--muted-foreground)' },
+    income: { label: t('trend.income'), color: 'var(--positive)' },
+  }) satisfies ChartConfig;
 
 /**
  * Spent and income per month, side by side. The selected month is solid, the others
@@ -45,6 +47,8 @@ export function TrendChart({
   selected?: string | undefined;
   onSelect: (month: string) => void;
 }) {
+  const { t } = useTranslation('reports');
+  const config = chartConfig(t);
   const data = months.map((m) => ({
     month: m.month,
     label: shortMonth(m.month),
@@ -59,9 +63,7 @@ export function TrendChart({
 
   // An empty range would get Recharts' default 0-4 axis.
   if (data.every((d) => d.spent === 0 && d.income === 0)) {
-    return (
-      <p className="text-muted-foreground py-10 text-center">No transactions in these months.</p>
-    );
+    return <p className="text-muted-foreground py-10 text-center">{t('trend.empty')}</p>;
   }
 
   return (
@@ -119,12 +121,12 @@ export function TrendChart({
           table itself would leave the caption on screen. */}
       <div className="sr-only">
         <table>
-          <caption>Spent and income per month</caption>
+          <caption>{t('trend.caption')}</caption>
           <thead>
             <tr>
-              <th scope="col">Month</th>
-              <th scope="col">Spent</th>
-              <th scope="col">Income</th>
+              <th scope="col">{t('trend.month')}</th>
+              <th scope="col">{t('trend.spent')}</th>
+              <th scope="col">{t('trend.income')}</th>
             </tr>
           </thead>
           <tbody>

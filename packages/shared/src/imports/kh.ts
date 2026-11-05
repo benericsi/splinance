@@ -44,13 +44,15 @@ function fromDotted(value: string): string | undefined {
  */
 export function parseKh(text: string, options: ParseOptions = {}): ParsedStatement {
   const [header, ...records] = readDelimited(text, '\t');
-  if (!header) throw new StatementError('The file is empty');
+  if (!header) throw new StatementError({ code: 'empty' });
 
   const names = header.cells.map((cell) => cell.trim().toLowerCase());
   const index = {} as Record<Column, number>;
   for (const column of Object.keys(COLUMNS) as Column[]) {
     const found = names.indexOf(COLUMNS[column]);
-    if (found === -1) throw new StatementError(`Not a K&H export: no "${COLUMNS[column]}" column`);
+    if (found === -1) {
+      throw new StatementError({ code: 'missing-column', bank: 'K&H', column: COLUMNS[column] });
+    }
     index[column] = found;
   }
 
@@ -74,11 +76,13 @@ export function parseKh(text: string, options: ParseOptions = {}): ParsedStateme
     const currency = cell('currency').toUpperCase() || accountCurrency;
 
     const amount = decimalToMinor(cell('amount'), currency);
-    if (!amount) throw new StatementError(`Unreadable amount "${cell('amount')}"`, line);
+    if (!amount)
+      throw new StatementError({ code: 'unreadable-amount', value: cell('amount') }, line);
     if (amount.minor === 0) continue;
 
     const bookedOn = fromDotted(cell('bookedOn'));
-    if (!bookedOn) throw new StatementError(`Unreadable date "${cell('bookedOn')}"`, line);
+    if (!bookedOn)
+      throw new StatementError({ code: 'unreadable-date', value: cell('bookedOn') }, line);
     const message = tidy(cell('message'));
     const purchased = /\b(\d{4})\/(\d{2})\/(\d{2})\b/.exec(message);
     const occurredOn = purchased

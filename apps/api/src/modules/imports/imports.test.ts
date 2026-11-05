@@ -178,7 +178,10 @@ describe('POST /imports', () => {
     ]);
     expect(res.status).toBe(400);
     expect(errorCode(res)).toBe('INVALID_MEMBER');
-    expect(apiErrorResponseSchema.parse(res.body).error.message).toMatch(/^Row 2: /);
+    const { error } = apiErrorResponseSchema.parse(res.body);
+    expect(error.message).toMatch(/^Row 2: /);
+    // The web says it in the UI language from the code and the row.
+    expect(error.details).toEqual({ row: 2 });
     expect(await db.$count(importBatches)).toBe(0);
     expect(await db.$count(transactions)).toBe(0);
   });

@@ -1,9 +1,11 @@
 import type { BudgetList as BudgetListData, Category } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { AnimatePresence, m } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { CategoryTile } from '@/features/categories/components/category-tile';
 import { MoneyFlow } from '@/features/transactions/components/money-flow';
 import { formatMoney } from '@/features/transactions/money';
+import { compareNames } from '@/lib/locale';
 import { useRevealRows } from '@/lib/reveal';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
@@ -23,10 +25,11 @@ export function BudgetList({
   data: BudgetListData;
   categories: Category[];
 }) {
+  const { t } = useTranslation('budgets');
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const rows = data.budgets
     .map((budget) => ({ budget, category: categoryById.get(budget.categoryId) }))
-    .sort((a, b) => (a.category?.name ?? '').localeCompare(b.category?.name ?? '', 'hu'));
+    .sort((a, b) => compareNames(a.category?.name ?? '', b.category?.name ?? ''));
   const budgeted = data.budgets.reduce((sum, b) => sum + b.amount, 0);
   const spent = data.budgets.reduce((sum, b) => sum + b.spent, 0);
   const left = budgeted - spent;
@@ -35,10 +38,10 @@ export function BudgetList({
   return (
     <div className="space-y-4">
       <dl className="grid grid-cols-3 gap-3">
-        <Total label="Budgeted" minor={budgeted} currency={data.currency} />
-        <Total label="Spent" minor={spent} currency={data.currency} />
+        <Total label={t('totals.budgeted')} minor={budgeted} currency={data.currency} />
+        <Total label={t('totals.spent')} minor={spent} currency={data.currency} />
         <Total
-          label={left < 0 ? 'Over' : 'Left'}
+          label={left < 0 ? t('totals.over') : t('totals.left')}
           minor={Math.abs(left)}
           currency={data.currency}
           className={left < 0 ? 'text-negative' : undefined}
@@ -65,7 +68,7 @@ export function BudgetList({
                   <div className="flex items-center gap-3">
                     <CategoryTile category={category} />
                     <span className="min-w-0 flex-1 truncate font-medium">
-                      {category?.name ?? 'Unknown'}
+                      {category?.name ?? t('unknown')}
                     </span>
                     <span className="tabular-nums">
                       {formatMoney(budget.spent, data.currency)}
@@ -92,9 +95,7 @@ export function BudgetList({
           })}
         </AnimatePresence>
       </ul>
-      <p className="text-muted-foreground text-xs">
-        Only shared expenses count. Private ones stay out of budgets.
-      </p>
+      <p className="text-muted-foreground text-xs">{t('sharedOnly')}</p>
     </div>
   );
 }

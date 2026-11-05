@@ -8,6 +8,8 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** `error.details` as the API sent it (validation trees, an import's row). */
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -65,7 +67,12 @@ async function readJson(res: Response): Promise<unknown> {
 async function toApiError(res: Response): Promise<ApiError> {
   const parsed = apiErrorResponseSchema.safeParse(await readJson(res));
   return parsed.success
-    ? new ApiError(res.status, parsed.data.error.code, parsed.data.error.message)
+    ? new ApiError(
+        res.status,
+        parsed.data.error.code,
+        parsed.data.error.message,
+        parsed.data.error.details,
+      )
     : new ApiError(res.status, 'UNKNOWN_ERROR', `Request failed with status ${String(res.status)}`);
 }
 

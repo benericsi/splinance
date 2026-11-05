@@ -1,25 +1,27 @@
 import type { TransactionSummary } from '@splinance/shared';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MonthNav } from '@/components/month-nav';
 import { cn } from '@/lib/utils';
 import { MoneyFlow } from './money-flow';
 
 /** The month switcher (the month lives in the URL) and the month's totals. */
 export function MonthHeader({ month, summary }: { month: string; summary: TransactionSummary }) {
+  const { t } = useTranslation('transactions');
   return (
     <div className="mb-6 space-y-4">
       <MonthNav month={month} page="/h/$householdId/transactions" />
       <dl className="grid grid-cols-3 gap-3">
         <Stat
-          label="Spent"
+          label={t('stats.spent')}
           value={<MoneyFlow minor={summary.expenses} currency={summary.currency} />}
         />
         <Stat
-          label="Your share"
+          label={t('stats.yourShare')}
           value={<MoneyFlow minor={summary.yourExpenses} currency={summary.currency} />}
         />
         <Stat
-          label="Income"
+          label={t('stats.income')}
           value={<MoneyFlow minor={summary.income} currency={summary.currency} signed />}
           className={summary.income > 0 ? 'text-positive' : undefined}
         />

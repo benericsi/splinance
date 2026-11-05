@@ -2,12 +2,13 @@ import type { Category, Currency } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { Lock } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { CategoryTile } from '@/features/categories/components/category-tile';
 import { formatMoney } from '@/features/transactions/money';
 import { useRevealRows } from '@/lib/reveal';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
-import { CADENCE_LABELS, dueLabel, formatChange, type SeriesView, shortDate } from '../view';
+import { cadenceLabel, dueLabel, formatChange, type SeriesView, shortDate } from '../view';
 
 /**
  * The viewer's recurring payments, soonest first. A row opens the series (payments, edit,
@@ -24,6 +25,7 @@ export function SeriesList({
   categories: Category[];
   currency: Currency;
 }) {
+  const { t } = useTranslation('recurring');
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const reveal = useRevealRows();
 
@@ -50,7 +52,7 @@ export function SeriesList({
                     {series.scope === 'private' && (
                       <Lock
                         className="text-muted-foreground size-3 shrink-0"
-                        aria-label="Only you"
+                        aria-label={t('onlyYou')}
                       />
                     )}
                     {change !== null && !lapsed && (
@@ -59,7 +61,7 @@ export function SeriesList({
                           'bg-muted shrink-0 rounded-full px-1.5 text-xs font-normal tabular-nums',
                           change > 0 ? 'text-negative' : 'text-positive',
                         )}
-                        title="Change from the payment before"
+                        title={t('change')}
                       >
                         {formatChange(change)}
                       </span>
@@ -68,12 +70,12 @@ export function SeriesList({
                   {lapsed ? (
                     <p className="text-negative text-xs">
                       {series.lastPaidOn
-                        ? `No payment since ${shortDate(series.lastPaidOn)}. Cancelled?`
-                        : 'No payment found yet'}
+                        ? t('noPaymentSince', { date: shortDate(series.lastPaidOn) })
+                        : t('noPaymentYet')}
                     </p>
                   ) : (
                     <p className="text-muted-foreground truncate text-xs">
-                      {CADENCE_LABELS[series.cadence]} · {dueLabel(view)}
+                      {cadenceLabel(series.cadence)} · {dueLabel(view)}
                     </p>
                   )}
                 </div>
@@ -83,7 +85,7 @@ export function SeriesList({
                   </p>
                   {series.scope === 'shared' && series.share !== null && (
                     <p className="text-muted-foreground text-xs">
-                      you {formatMoney(series.share, currency)}
+                      {t('yourPart', { amount: formatMoney(series.share, currency) })}
                     </p>
                   )}
                 </div>

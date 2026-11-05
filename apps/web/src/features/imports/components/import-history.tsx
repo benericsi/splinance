@@ -1,19 +1,18 @@
 import { type ImportBatch, STATEMENT_SOURCE_LABELS } from '@splinance/shared';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatDateWith } from '@/features/transactions/dates';
 import { errorMessage } from '@/lib/query-client';
 import { useUndoImport } from '../hooks';
 import { importQueries } from '../queries';
 
 const importDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-
-const transactionCount = (count: number) =>
-  `${String(count)} ${count === 1 ? 'transaction' : 'transactions'}`;
+  formatDateWith(new Date(iso), { day: 'numeric', month: 'short', year: 'numeric' });
 
 /**
  * The viewer's own imports, newest first, each undoable once (with a confirmation: it
@@ -22,6 +21,7 @@ const transactionCount = (count: number) =>
  * per-call callbacks of an unmounted component never run.
  */
 export function ImportHistory({ householdId }: { householdId: string }) {
+  const { t } = useTranslation(['imports', 'common']);
   const { data: batches } = useSuspenseQuery(importQueries.list(householdId));
   const undo = useUndoImport();
   const [confirming, setConfirming] = useState<ImportBatch | null>(null);
@@ -30,7 +30,7 @@ export function ImportHistory({ householdId }: { householdId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Your imports</CardTitle>
+        <CardTitle>{t('history.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <ul className="divide-y">
@@ -39,8 +39,8 @@ export function ImportHistory({ householdId }: { householdId: string }) {
               <div className="min-w-0 flex-1">
                 <p className={batch.undoneAt ? 'text-muted-foreground' : undefined}>
                   {STATEMENT_SOURCE_LABELS[batch.source]} · {importDate(batch.createdAt)} ·{' '}
-                  {transactionCount(batch.rowCount)}
-                  {batch.undoneAt ? ' · undone' : ''}
+                  {t('history.transactions', { count: batch.rowCount })}
+                  {batch.undoneAt ? ` · ${t('history.undone')}` : ''}
                 </p>
                 {batch.fileName && (
                   <p className="text-muted-foreground truncate text-xs">{batch.fileName}</p>
@@ -54,7 +54,7 @@ export function ImportHistory({ householdId }: { householdId: string }) {
                     setConfirming(batch);
                   }}
                 >
-                  Undo
+                  {t('common:undo')}
                 </Button>
               )}
             </li>
@@ -70,10 +70,10 @@ export function ImportHistory({ householdId }: { householdId: string }) {
             undo.reset();
           }
         }}
-        title="Undo this import?"
-        description={`The ${transactionCount(confirming?.rowCount ?? 0)} it added are deleted, edited ones too. You can import the file again later.`}
-        confirmLabel="Undo import"
-        pendingLabel="Undoing…"
+        title={t('history.confirmTitle')}
+        description={t('history.confirmDescription', { count: confirming?.rowCount ?? 0 })}
+        confirmLabel={t('done.undo')}
+        pendingLabel={t('done.undoing')}
         destructive
         pending={undo.isPending}
         error={undo.error ? errorMessage(undo.error) : undefined}
@@ -84,7 +84,7 @@ export function ImportHistory({ householdId }: { householdId: string }) {
             {
               onSuccess: () => {
                 setConfirming(null);
-                toast.success('Import undone');
+                toast.success(t('done.undone'));
               },
             },
           );

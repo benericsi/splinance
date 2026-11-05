@@ -2,6 +2,7 @@ import type { HouseholdDetail, Settlement } from '@splinance/shared';
 import { useSuspenseInfiniteQuery } from '@tanstack/react-query';
 import { ArrowLeftRight, Ellipsis, Trash2 } from 'lucide-react';
 import { AnimatePresence, m } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +27,7 @@ export function SettlementList({
   household: HouseholdDetail;
   viewerId: string;
 }) {
+  const { t } = useTranslation(['balances', 'common']);
   const list = useSuspenseInfiniteQuery(balanceQueries.settlements(household.id));
   // Here, not in the row: the row unmounts once the refetch drops it, and per-call
   // `mutate` callbacks of an unmounted component never run (no undo toast).
@@ -38,11 +40,11 @@ export function SettlementList({
     const ref = { householdId: household.id, settlementId: settlement.id };
     remove.mutate(ref, {
       onSuccess: () => {
-        toast('Payment deleted', {
+        toast(t('settlements.deleted'), {
           // Like transactions: an undo needs time to notice and reach.
           duration: 8000,
           action: {
-            label: 'Undo',
+            label: t('common:undo'),
             onClick: () => {
               restore.mutate(ref);
             },
@@ -60,7 +62,7 @@ export function SettlementList({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent settlements</CardTitle>
+        <CardTitle>{t('settlements.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <ul>
@@ -103,7 +105,7 @@ export function SettlementList({
               disabled={list.isFetchingNextPage}
               onClick={() => void list.fetchNextPage()}
             >
-              {list.isFetchingNextPage ? 'Loading…' : 'Load more'}
+              {list.isFetchingNextPage ? t('common:loading') : t('common:loadMore')}
             </Button>
           </div>
         )}
@@ -113,17 +115,18 @@ export function SettlementList({
 }
 
 function SettlementActions({ onDelete }: { onDelete: () => void }) {
+  const { t } = useTranslation(['balances', 'common']);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon" aria-label="Payment actions" />}
+        render={<Button variant="ghost" size="icon" aria-label={t('settlements.actions')} />}
       >
         <Ellipsis aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-40">
         <DropdownMenuItem variant="destructive" onClick={onDelete}>
           <Trash2 aria-hidden />
-          Delete
+          {t('common:delete')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

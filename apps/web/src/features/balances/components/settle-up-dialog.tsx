@@ -1,5 +1,6 @@
 import type { Balances, HouseholdDetail, TransactionPerson } from '@splinance/shared';
 import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { firstError } from '@/components/form/first-error';
 import { FormError } from '@/components/form/form-error';
@@ -79,12 +80,13 @@ export function SettleUpDialog({
   requestedUserId: string | undefined;
   onClose: () => void;
 }) {
+  const { t } = useTranslation('balances');
   const currency = balances.currency;
   const candidates = settleCandidates(household, balances, viewerId);
   const start = initialCounterpart(candidates, balances, viewerId, requestedUserId);
 
   return (
-    <RouteDialog title="Settle up" onClose={onClose}>
+    <RouteDialog title={t('settle.title')} onClose={onClose}>
       {start ? (
         <SettleUpForm
           householdId={household.id}
@@ -96,9 +98,7 @@ export function SettleUpDialog({
           onClose={onClose}
         />
       ) : (
-        <p className="text-muted-foreground">
-          Invite someone to {household.name} first: payments are between two people.
-        </p>
+        <p className="text-muted-foreground">{t('settle.nobody', { household: household.name })}</p>
       )}
     </RouteDialog>
   );
@@ -121,6 +121,7 @@ function SettleUpForm({
   currency: Balances['currency'];
   onClose: () => void;
 }) {
+  const { t } = useTranslation(['balances', 'transactions', 'common']);
   const create = useCreateSettlement();
   const form = useForm({
     defaultValues: newSettlementValues(
@@ -136,7 +137,7 @@ function SettleUpForm({
           householdId,
           input: parseSettlementInput(value, viewerId, currency),
         });
-        toast.success('Payment recorded');
+        toast.success(t('settle.recorded'));
         onClose();
       } catch {
         // Rendered from the mutation error below.
@@ -167,9 +168,9 @@ function SettleUpForm({
             <>
               {candidates.length > 1 && (
                 <div className="space-y-1.5">
-                  <p className="text-sm font-medium">With</p>
+                  <p className="text-sm font-medium">{t('settle.with')}</p>
                   <SegmentedControl
-                    label="With"
+                    label={t('settle.with')}
                     value={values.counterpartId}
                     onChange={(userId) => {
                       // A different person: start from their balance again.
@@ -195,22 +196,22 @@ function SettleUpForm({
                 <form.Field name="direction">
                   {(field) => (
                     <SegmentedControl
-                      label="Who paid"
+                      label={t('settle.whoPaid')}
                       value={field.state.value}
                       onChange={field.handleChange}
                       options={[
-                        { value: 'they-paid', label: `${name} paid you` },
-                        { value: 'you-paid', label: `You paid ${name}` },
+                        { value: 'they-paid', label: t('payment.paidYou', { name }) },
+                        { value: 'you-paid', label: t('payment.youPaid', { name }) },
                       ]}
                     />
                   )}
                 </form.Field>
                 <p className="text-muted-foreground text-sm">
                   {balance > 0
-                    ? `${name} owes you ${formatMoney(balance, currency)}`
+                    ? t('settle.owesYou', { name, amount: formatMoney(balance, currency) })
                     : balance < 0
-                      ? `You owe ${name} ${formatMoney(-balance, currency)}`
-                      : `You and ${name} are all square`}
+                      ? t('settle.youOwe', { name, amount: formatMoney(-balance, currency) })
+                      : t('settle.square', { name })}
                 </p>
               </div>
 
@@ -220,7 +221,7 @@ function SettleUpForm({
                   return (
                     <div className="space-y-1.5">
                       <Label htmlFor="settle-amount" className="sr-only">
-                        Amount
+                        {t('transactions:amount.label')}
                       </Label>
                       <HeroAmountInput
                         id="settle-amount"
@@ -262,24 +263,29 @@ function SettleUpForm({
 
       <div className="grid grid-cols-2 gap-3">
         <form.Field name="settledOn">
-          {(field) => <TextField field={field} required label="Date" type="date" />}
+          {(field) => (
+            <TextField field={field} required label={t('transactions:dialog.date')} type="date" />
+          )}
         </form.Field>
         <form.Field name="note">
           {(field) => (
-            <TextField field={field} label="Note" placeholder="Cash, Revolut" maxLength={200} />
+            <TextField
+              field={field}
+              label={t('settle.note')}
+              placeholder={t('settle.notePlaceholder')}
+              maxLength={200}
+            />
           )}
         </form.Field>
       </div>
 
-      <p className="text-muted-foreground text-xs">
-        Records a payment made outside Splinance. No money moves here.
-      </p>
+      <p className="text-muted-foreground text-xs">{t('settle.outside')}</p>
 
       <div className="flex justify-end pt-2">
         <form.Subscribe selector={(state) => state.isSubmitting}>
           {(isSubmitting) => (
             <Button type="submit" size="lg" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving…' : 'Record payment'}
+              {isSubmitting ? t('common:saving') : t('settle.submit')}
             </Button>
           )}
         </form.Subscribe>

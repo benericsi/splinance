@@ -2,6 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
+import { i18n } from '@/i18n';
 import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
 import { TransactionDialog } from '@/features/transactions/components/transaction-dialog';
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/transaction
     } catch (error) {
       // Deleted, private to someone else, or a mistyped link: back to the list.
       if (error instanceof ApiError && error.status === 404) {
-        toast.error('That transaction does not exist any more.');
+        toast.error(i18n.t('transactions:gone'));
         throw redirect({
           to: '/h/$householdId/transactions',
           params: { householdId },

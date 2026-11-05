@@ -23,6 +23,11 @@ const isApiErrorCode = (code: string): code is ApiErrorCode =>
  * error code (the API's own message is English, for logs). Never the raw message, which
  * would show English in a Hungarian UI.
  */
+function rowOf(details: unknown): number | undefined {
+  if (typeof details !== 'object' || details === null || !('row' in details)) return undefined;
+  return typeof details.row === 'number' ? details.row : undefined;
+}
+
 export function errorMessage(
   error: unknown,
   /** Words for a code in this place, e.g. UNSETTLED_BALANCE while leaving a household. */
@@ -30,7 +35,10 @@ export function errorMessage(
 ): string {
   if (error instanceof ApiError) {
     if (isApiErrorCode(error.code)) {
-      return overrides[error.code] ?? i18n.t(`errors:codes.${error.code}`);
+      const message = overrides[error.code] ?? i18n.t(`errors:codes.${error.code}`);
+      // An import names the row it stopped at.
+      const row = rowOf(error.details);
+      return row === undefined ? message : i18n.t('errors:row', { row, message });
     }
     if (error.code === 'NETWORK_ERROR') return i18n.t('errors:network');
   }

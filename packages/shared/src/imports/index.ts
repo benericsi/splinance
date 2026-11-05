@@ -16,7 +16,5 @@ export function parseStatement(text: string, options: ParseOptions = {}): Parsed
   const header = firstLine(text);
   if (looksLikeKh(header)) return parseKh(text, options);
   if (looksLikeRevolut(header)) return parseRevolut(text, options);
-  throw new StatementError(
-    'This file is not a Revolut or K&H export. Export the transaction history as CSV from your bank.',
-  );
+  throw new StatementError({ code: 'not-supported' });
 }

@@ -218,10 +218,12 @@ export async function createImport(
             });
           } catch (error) {
             if (error instanceof HttpError) {
+              const row = index + 1;
               throw new HttpError(
                 error.status,
-                `Row ${String(index + 1)}: ${error.message}`,
+                `Row ${String(row)}: ${error.message}`,
                 error.code,
+                { row },
               );
             }
             throw error;

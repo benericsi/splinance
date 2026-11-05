@@ -6,14 +6,11 @@ import {
   type SeriesTiming,
   seriesTiming,
 } from '@splinance/shared';
-import { fromIsoDate } from '@/features/transactions/dates';
+import { formatDateWith, fromIsoDate } from '@/features/transactions/dates';
+import { i18n } from '@/i18n';
 
-export const CADENCE_LABELS: Record<RecurringCadence, string> = {
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-  quarterly: 'Every 3 months',
-  yearly: 'Yearly',
-};
+/** "Monthly", "Every 3 months", in the UI language. */
+export const cadenceLabel = (cadence: RecurringCadence) => i18n.t(`recurring:cadence.${cadence}`);
 
 /** A series with what the page derives from it on the viewer's `today`. */
 export interface SeriesView {
@@ -57,7 +54,7 @@ export function viewSeries(
 /** "7 Nov", with the year when it is not this year. */
 export function shortDate(value: string, now = new Date()): string {
   const date = fromIsoDate(value);
-  return date.toLocaleDateString('en-GB', {
+  return formatDateWith(date, {
     day: 'numeric',
     month: 'short',
     ...(date.getFullYear() !== now.getFullYear() && { year: 'numeric' }),
@@ -67,11 +64,11 @@ export function shortDate(value: string, now = new Date()): string {
 /** When the next payment is, in words: "due today", "due tomorrow", "due in 3 days", "due 12 Nov", "2 days late". */
 export function dueLabel(view: Pick<SeriesView, 'nextOn' | 'daysUntil'>): string {
   const { daysUntil, nextOn } = view;
-  if (daysUntil < 0) return `${String(-daysUntil)} ${daysUntil === -1 ? 'day' : 'days'} late`;
-  if (daysUntil === 0) return 'due today';
-  if (daysUntil === 1) return 'due tomorrow';
-  if (daysUntil <= 6) return `due in ${String(daysUntil)} days`;
-  return `due ${shortDate(nextOn)}`;
+  if (daysUntil < 0) return i18n.t('recurring:due.late', { count: -daysUntil });
+  if (daysUntil === 0) return i18n.t('recurring:due.today');
+  if (daysUntil === 1) return i18n.t('recurring:due.tomorrow');
+  if (daysUntil <= 6) return i18n.t('recurring:due.inDays', { count: daysUntil });
+  return i18n.t('recurring:due.on', { date: shortDate(nextOn) });
 }
 
 /** "+11%", "-5%" */

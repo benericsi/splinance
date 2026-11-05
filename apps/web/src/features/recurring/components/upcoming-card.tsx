@@ -1,6 +1,7 @@
 import type { RecurringList } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { Sparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { today } from '@/features/transactions/dates';
@@ -23,6 +24,7 @@ export function UpcomingCard({
   data: RecurringList;
   memberCount: number;
 }) {
+  const { t } = useTranslation('recurring');
   const now = today();
   const upcoming = data.series
     .map((series) => viewSeries(series, now, memberCount))
@@ -34,14 +36,14 @@ export function UpcomingCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Coming up</CardTitle>
+        <CardTitle>{t('upcoming.title')}</CardTitle>
         <CardAction>
           <Link
             to="/h/$householdId/recurring"
             params={{ householdId }}
             className={buttonVariants({ variant: 'link', className: 'text-link h-auto px-0' })}
           >
-            All recurring
+            {t('upcoming.all')}
           </Link>
         </CardAction>
       </CardHeader>
@@ -78,8 +80,7 @@ export function UpcomingCard({
             className="text-link flex items-center gap-1.5 text-sm hover:underline"
           >
             <Sparkles className="size-3.5" aria-hidden />
-            {suggestions} possible recurring {suggestions === 1 ? 'payment' : 'payments'} found.
-            Review
+            {t('upcoming.found', { count: suggestions })}
           </Link>
         )}
       </CardContent>

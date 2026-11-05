@@ -47,7 +47,7 @@ export function looksLikeRevolut(header: string): boolean {
  */
 export function parseRevolut(text: string, options: ParseOptions = {}): ParsedStatement {
   const [header, ...records] = readDelimited(text, ',');
-  if (!header) throw new StatementError('The file is empty');
+  if (!header) throw new StatementError({ code: 'empty' });
 
   const index = {} as Record<Column, number>;
   for (const column of Object.keys(COLUMNS) as Column[]) {
@@ -55,7 +55,11 @@ export function parseRevolut(text: string, options: ParseOptions = {}): ParsedSt
       (COLUMNS[column] as readonly string[]).includes(cell.trim()),
     );
     if (found === -1) {
-      throw new StatementError(`Not a Revolut export: no "${COLUMNS[column][1]}" column`);
+      throw new StatementError({
+        code: 'missing-column',
+        bank: 'Revolut',
+        column: COLUMNS[column][1],
+      });
     }
     index[column] = found;
   }
@@ -72,7 +76,8 @@ export function parseRevolut(text: string, options: ParseOptions = {}): ParsedSt
     const currency = cell('currency').toUpperCase();
     const amount = decimalToMinor(cell('amount'), currency);
     const fee = decimalToMinor(cell('fee') || '0', currency);
-    if (!amount || !fee) throw new StatementError(`Unreadable amount "${cell('amount')}"`, line);
+    if (!amount || !fee)
+      throw new StatementError({ code: 'unreadable-amount', value: cell('amount') }, line);
     // Fees are charged on top: they make an expense larger and an income smaller.
     const total = amount.minor - fee.minor;
     if (total === 0) continue;
@@ -80,7 +85,7 @@ export function parseRevolut(text: string, options: ParseOptions = {}): ParsedSt
     const started = cell('started');
     const occurredOn = started.slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(occurredOn)) {
-      throw new StatementError(`Unreadable date "${started}"`, line);
+      throw new StatementError({ code: 'unreadable-date', value: started }, line);
     }
 
     const type = cell('type');

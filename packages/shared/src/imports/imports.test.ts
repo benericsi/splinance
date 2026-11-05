@@ -383,4 +383,19 @@ describe('parseStatement', () => {
     const bad = REVOLUT_EN.replace('-1857.00', 'lots');
     expect(() => parseStatement(bad)).toThrow('Line 2: Unreadable amount "lots"');
   });
+
+  it('carries the problem as data, for a message in the UI language', () => {
+    const bad = REVOLUT_EN.replace('-1857.00', 'lots');
+    try {
+      parseStatement(bad);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(StatementError);
+      expect((error as StatementError).problem).toEqual({
+        code: 'unreadable-amount',
+        value: 'lots',
+      });
+      expect((error as StatementError).line).toBe(2);
+    }
+  });
 });
