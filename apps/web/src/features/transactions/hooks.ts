@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { balanceQueries } from '@/features/balances/queries';
 import { budgetQueries } from '@/features/budgets/queries';
+import { calendarQueries } from '@/features/calendar/queries';
 import { notificationQueries } from '@/features/notifications/queries';
 import { recurringQueries } from '@/features/recurring/queries';
 import { reportQueries } from '@/features/reports/queries';
@@ -19,6 +20,7 @@ function useInvalidateHousehold() {
       queryClient.invalidateQueries({ queryKey: balanceQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: budgetQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: reportQueries.household(householdId) }),
+      queryClient.invalidateQueries({ queryKey: calendarQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: recurringQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: notificationQueries.all() }),
     ]);
@@ -62,6 +64,7 @@ export function useDeleteTransaction() {
         queryClient.invalidateQueries({ queryKey: balanceQueries.household(householdId) }),
         queryClient.invalidateQueries({ queryKey: budgetQueries.household(householdId) }),
         queryClient.invalidateQueries({ queryKey: reportQueries.household(householdId) }),
+        queryClient.invalidateQueries({ queryKey: calendarQueries.household(householdId) }),
         queryClient.invalidateQueries({ queryKey: recurringQueries.household(householdId) }),
       ]);
     },

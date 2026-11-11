@@ -28,6 +28,7 @@ export const shell: Messages<typeof en.shell> = {
     transactions: 'Tranzakciók',
     transactionsShort: 'Tételek',
     budgets: 'Keretek',
+    calendar: 'Naptár',
     recurring: 'Rendszeres',
     recurringShort: 'Díjak',
     reports: 'Kimutatások',

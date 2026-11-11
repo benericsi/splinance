@@ -195,6 +195,7 @@ export async function listTransactions(
     const [from, to] = monthRange(query.month);
     conditions.push(gte(transactions.occurredOn, from), lt(transactions.occurredOn, to));
   }
+  if (query.on) conditions.push(eq(transactions.occurredOn, query.on));
   if (query.kind) conditions.push(eq(transactions.kind, query.kind));
   if (query.visibility) conditions.push(eq(transactions.visibility, query.visibility));
   if (query.categoryId) conditions.push(eq(transactions.categoryId, query.categoryId));

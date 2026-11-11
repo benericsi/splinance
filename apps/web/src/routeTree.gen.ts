@@ -27,6 +27,7 @@ import { Route as AuthenticatedWelcomeInviteRouteImport } from './routes/_authen
 import { Route as AuthenticatedWelcomeJoinRouteImport } from './routes/_authenticated/welcome.join'
 import { Route as AuthenticatedHHouseholdIdOverviewRouteImport } from './routes/_authenticated/h/$householdId/_overview'
 import { Route as AuthenticatedHHouseholdIdBudgetsRouteImport } from './routes/_authenticated/h/$householdId/budgets'
+import { Route as AuthenticatedHHouseholdIdCalendarRouteImport } from './routes/_authenticated/h/$householdId/calendar'
 import { Route as AuthenticatedHHouseholdIdRecurringRouteImport } from './routes/_authenticated/h/$householdId/recurring'
 import { Route as AuthenticatedHHouseholdIdReportsRouteImport } from './routes/_authenticated/h/$householdId/reports'
 import { Route as AuthenticatedHHouseholdIdSettingsRouteImport } from './routes/_authenticated/h/$householdId/settings'
@@ -34,6 +35,7 @@ import { Route as AuthenticatedHHouseholdIdTransactionsRouteImport } from './rou
 import { Route as AuthenticatedHHouseholdIdOverviewIndexRouteImport } from './routes/_authenticated/h/$householdId/_overview.index'
 import { Route as AuthenticatedHHouseholdIdOverviewSettleRouteImport } from './routes/_authenticated/h/$householdId/_overview.settle'
 import { Route as AuthenticatedHHouseholdIdBudgetsSetRouteImport } from './routes/_authenticated/h/$householdId/budgets.set'
+import { Route as AuthenticatedHHouseholdIdCalendarDateRouteImport } from './routes/_authenticated/h/$householdId/calendar.$date'
 import { Route as AuthenticatedHHouseholdIdRecurringSeriesIdRouteImport } from './routes/_authenticated/h/$householdId/recurring.$seriesId'
 import { Route as AuthenticatedHHouseholdIdRecurringNewRouteImport } from './routes/_authenticated/h/$householdId/recurring.new'
 import { Route as AuthenticatedHHouseholdIdSettingsInviteRouteImport } from './routes/_authenticated/h/$householdId/settings.invite'
@@ -142,6 +144,12 @@ const AuthenticatedHHouseholdIdBudgetsRoute =
     path: '/budgets',
     getParentRoute: () => AuthenticatedHHouseholdIdRoute,
   } as any)
+const AuthenticatedHHouseholdIdCalendarRoute =
+  AuthenticatedHHouseholdIdCalendarRouteImport.update({
+    id: '/calendar',
+    path: '/calendar',
+    getParentRoute: () => AuthenticatedHHouseholdIdRoute,
+  } as any)
 const AuthenticatedHHouseholdIdRecurringRoute =
   AuthenticatedHHouseholdIdRecurringRouteImport.update({
     id: '/recurring',
@@ -183,6 +191,12 @@ const AuthenticatedHHouseholdIdBudgetsSetRoute =
     id: '/set',
     path: '/set',
     getParentRoute: () => AuthenticatedHHouseholdIdBudgetsRoute,
+  } as any)
+const AuthenticatedHHouseholdIdCalendarDateRoute =
+  AuthenticatedHHouseholdIdCalendarDateRouteImport.update({
+    id: '/$date',
+    path: '/$date',
+    getParentRoute: () => AuthenticatedHHouseholdIdCalendarRoute,
   } as any)
 const AuthenticatedHHouseholdIdRecurringSeriesIdRoute =
   AuthenticatedHHouseholdIdRecurringSeriesIdRouteImport.update({
@@ -261,12 +275,14 @@ export interface FileRoutesByFullPath {
   '/welcome/join': typeof AuthenticatedWelcomeJoinRoute
   '/welcome/': typeof AuthenticatedWelcomeIndexRoute
   '/h/$householdId/budgets': typeof AuthenticatedHHouseholdIdBudgetsRouteWithChildren
+  '/h/$householdId/calendar': typeof AuthenticatedHHouseholdIdCalendarRouteWithChildren
   '/h/$householdId/recurring': typeof AuthenticatedHHouseholdIdRecurringRouteWithChildren
   '/h/$householdId/reports': typeof AuthenticatedHHouseholdIdReportsRoute
   '/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
   '/h/$householdId/transactions': typeof AuthenticatedHHouseholdIdTransactionsRouteWithChildren
   '/h/$householdId/settle': typeof AuthenticatedHHouseholdIdOverviewSettleRoute
   '/h/$householdId/budgets/set': typeof AuthenticatedHHouseholdIdBudgetsSetRoute
+  '/h/$householdId/calendar/$date': typeof AuthenticatedHHouseholdIdCalendarDateRoute
   '/h/$householdId/recurring/$seriesId': typeof AuthenticatedHHouseholdIdRecurringSeriesIdRoute
   '/h/$householdId/recurring/new': typeof AuthenticatedHHouseholdIdRecurringNewRoute
   '/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
@@ -295,12 +311,14 @@ export interface FileRoutesByTo {
   '/welcome/join': typeof AuthenticatedWelcomeJoinRoute
   '/welcome': typeof AuthenticatedWelcomeIndexRoute
   '/h/$householdId/budgets': typeof AuthenticatedHHouseholdIdBudgetsRouteWithChildren
+  '/h/$householdId/calendar': typeof AuthenticatedHHouseholdIdCalendarRouteWithChildren
   '/h/$householdId/recurring': typeof AuthenticatedHHouseholdIdRecurringRouteWithChildren
   '/h/$householdId/reports': typeof AuthenticatedHHouseholdIdReportsRoute
   '/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
   '/h/$householdId/transactions': typeof AuthenticatedHHouseholdIdTransactionsRouteWithChildren
   '/h/$householdId/settle': typeof AuthenticatedHHouseholdIdOverviewSettleRoute
   '/h/$householdId/budgets/set': typeof AuthenticatedHHouseholdIdBudgetsSetRoute
+  '/h/$householdId/calendar/$date': typeof AuthenticatedHHouseholdIdCalendarDateRoute
   '/h/$householdId/recurring/$seriesId': typeof AuthenticatedHHouseholdIdRecurringSeriesIdRoute
   '/h/$householdId/recurring/new': typeof AuthenticatedHHouseholdIdRecurringNewRoute
   '/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
@@ -332,12 +350,14 @@ export interface FileRoutesById {
   '/_authenticated/welcome/': typeof AuthenticatedWelcomeIndexRoute
   '/_authenticated/h/$householdId/_overview': typeof AuthenticatedHHouseholdIdOverviewRouteWithChildren
   '/_authenticated/h/$householdId/budgets': typeof AuthenticatedHHouseholdIdBudgetsRouteWithChildren
+  '/_authenticated/h/$householdId/calendar': typeof AuthenticatedHHouseholdIdCalendarRouteWithChildren
   '/_authenticated/h/$householdId/recurring': typeof AuthenticatedHHouseholdIdRecurringRouteWithChildren
   '/_authenticated/h/$householdId/reports': typeof AuthenticatedHHouseholdIdReportsRoute
   '/_authenticated/h/$householdId/settings': typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
   '/_authenticated/h/$householdId/transactions': typeof AuthenticatedHHouseholdIdTransactionsRouteWithChildren
   '/_authenticated/h/$householdId/_overview/settle': typeof AuthenticatedHHouseholdIdOverviewSettleRoute
   '/_authenticated/h/$householdId/budgets/set': typeof AuthenticatedHHouseholdIdBudgetsSetRoute
+  '/_authenticated/h/$householdId/calendar/$date': typeof AuthenticatedHHouseholdIdCalendarDateRoute
   '/_authenticated/h/$householdId/recurring/$seriesId': typeof AuthenticatedHHouseholdIdRecurringSeriesIdRoute
   '/_authenticated/h/$householdId/recurring/new': typeof AuthenticatedHHouseholdIdRecurringNewRoute
   '/_authenticated/h/$householdId/settings/invite': typeof AuthenticatedHHouseholdIdSettingsInviteRoute
@@ -368,12 +388,14 @@ export interface FileRouteTypes {
     | '/welcome/join'
     | '/welcome/'
     | '/h/$householdId/budgets'
+    | '/h/$householdId/calendar'
     | '/h/$householdId/recurring'
     | '/h/$householdId/reports'
     | '/h/$householdId/settings'
     | '/h/$householdId/transactions'
     | '/h/$householdId/settle'
     | '/h/$householdId/budgets/set'
+    | '/h/$householdId/calendar/$date'
     | '/h/$householdId/recurring/$seriesId'
     | '/h/$householdId/recurring/new'
     | '/h/$householdId/settings/invite'
@@ -402,12 +424,14 @@ export interface FileRouteTypes {
     | '/welcome/join'
     | '/welcome'
     | '/h/$householdId/budgets'
+    | '/h/$householdId/calendar'
     | '/h/$householdId/recurring'
     | '/h/$householdId/reports'
     | '/h/$householdId/settings'
     | '/h/$householdId/transactions'
     | '/h/$householdId/settle'
     | '/h/$householdId/budgets/set'
+    | '/h/$householdId/calendar/$date'
     | '/h/$householdId/recurring/$seriesId'
     | '/h/$householdId/recurring/new'
     | '/h/$householdId/settings/invite'
@@ -438,12 +462,14 @@ export interface FileRouteTypes {
     | '/_authenticated/welcome/'
     | '/_authenticated/h/$householdId/_overview'
     | '/_authenticated/h/$householdId/budgets'
+    | '/_authenticated/h/$householdId/calendar'
     | '/_authenticated/h/$householdId/recurring'
     | '/_authenticated/h/$householdId/reports'
     | '/_authenticated/h/$householdId/settings'
     | '/_authenticated/h/$householdId/transactions'
     | '/_authenticated/h/$householdId/_overview/settle'
     | '/_authenticated/h/$householdId/budgets/set'
+    | '/_authenticated/h/$householdId/calendar/$date'
     | '/_authenticated/h/$householdId/recurring/$seriesId'
     | '/_authenticated/h/$householdId/recurring/new'
     | '/_authenticated/h/$householdId/settings/invite'
@@ -593,6 +619,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHHouseholdIdBudgetsRouteImport
       parentRoute: typeof AuthenticatedHHouseholdIdRoute
     }
+    '/_authenticated/h/$householdId/calendar': {
+      id: '/_authenticated/h/$householdId/calendar'
+      path: '/calendar'
+      fullPath: '/h/$householdId/calendar'
+      preLoaderRoute: typeof AuthenticatedHHouseholdIdCalendarRouteImport
+      parentRoute: typeof AuthenticatedHHouseholdIdRoute
+    }
     '/_authenticated/h/$householdId/recurring': {
       id: '/_authenticated/h/$householdId/recurring'
       path: '/recurring'
@@ -641,6 +674,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/h/$householdId/budgets/set'
       preLoaderRoute: typeof AuthenticatedHHouseholdIdBudgetsSetRouteImport
       parentRoute: typeof AuthenticatedHHouseholdIdBudgetsRoute
+    }
+    '/_authenticated/h/$householdId/calendar/$date': {
+      id: '/_authenticated/h/$householdId/calendar/$date'
+      path: '/$date'
+      fullPath: '/h/$householdId/calendar/$date'
+      preLoaderRoute: typeof AuthenticatedHHouseholdIdCalendarDateRouteImport
+      parentRoute: typeof AuthenticatedHHouseholdIdCalendarRoute
     }
     '/_authenticated/h/$householdId/recurring/$seriesId': {
       id: '/_authenticated/h/$householdId/recurring/$seriesId'
@@ -773,6 +813,21 @@ const AuthenticatedHHouseholdIdBudgetsRouteWithChildren =
     AuthenticatedHHouseholdIdBudgetsRouteChildren,
   )
 
+interface AuthenticatedHHouseholdIdCalendarRouteChildren {
+  AuthenticatedHHouseholdIdCalendarDateRoute: typeof AuthenticatedHHouseholdIdCalendarDateRoute
+}
+
+const AuthenticatedHHouseholdIdCalendarRouteChildren: AuthenticatedHHouseholdIdCalendarRouteChildren =
+  {
+    AuthenticatedHHouseholdIdCalendarDateRoute:
+      AuthenticatedHHouseholdIdCalendarDateRoute,
+  }
+
+const AuthenticatedHHouseholdIdCalendarRouteWithChildren =
+  AuthenticatedHHouseholdIdCalendarRoute._addFileChildren(
+    AuthenticatedHHouseholdIdCalendarRouteChildren,
+  )
+
 interface AuthenticatedHHouseholdIdRecurringRouteChildren {
   AuthenticatedHHouseholdIdRecurringSeriesIdRoute: typeof AuthenticatedHHouseholdIdRecurringSeriesIdRoute
   AuthenticatedHHouseholdIdRecurringNewRoute: typeof AuthenticatedHHouseholdIdRecurringNewRoute
@@ -839,6 +894,7 @@ const AuthenticatedHHouseholdIdTransactionsRouteWithChildren =
 interface AuthenticatedHHouseholdIdRouteChildren {
   AuthenticatedHHouseholdIdOverviewRoute: typeof AuthenticatedHHouseholdIdOverviewRouteWithChildren
   AuthenticatedHHouseholdIdBudgetsRoute: typeof AuthenticatedHHouseholdIdBudgetsRouteWithChildren
+  AuthenticatedHHouseholdIdCalendarRoute: typeof AuthenticatedHHouseholdIdCalendarRouteWithChildren
   AuthenticatedHHouseholdIdRecurringRoute: typeof AuthenticatedHHouseholdIdRecurringRouteWithChildren
   AuthenticatedHHouseholdIdReportsRoute: typeof AuthenticatedHHouseholdIdReportsRoute
   AuthenticatedHHouseholdIdSettingsRoute: typeof AuthenticatedHHouseholdIdSettingsRouteWithChildren
@@ -852,6 +908,8 @@ const AuthenticatedHHouseholdIdRouteChildren: AuthenticatedHHouseholdIdRouteChil
       AuthenticatedHHouseholdIdOverviewRouteWithChildren,
     AuthenticatedHHouseholdIdBudgetsRoute:
       AuthenticatedHHouseholdIdBudgetsRouteWithChildren,
+    AuthenticatedHHouseholdIdCalendarRoute:
+      AuthenticatedHHouseholdIdCalendarRouteWithChildren,
     AuthenticatedHHouseholdIdRecurringRoute:
       AuthenticatedHHouseholdIdRecurringRouteWithChildren,
     AuthenticatedHHouseholdIdReportsRoute:

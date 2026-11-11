@@ -360,6 +360,8 @@ describe('listing', () => {
     const sorted = (...items: Transaction[]) => items.map((t) => t.id).sort();
 
     expect(await ids({ month: '2026-09' })).toEqual(sorted(september));
+    expect(await ids({ on: '2026-09-30' })).toEqual(sorted(september));
+    expect(await ids({ on: '2026-09-29' })).toEqual([]);
     expect(await ids({ month: '2026-10', kind: 'income' })).toEqual(sorted(income));
     expect(await ids({ visibility: 'private' })).toEqual(sorted(mine));
     expect(await ids({ categoryId: groceries })).toEqual(sorted(filed));

@@ -10,6 +10,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Bank CSV import with duplicate detection
 - Categories, auto-categorization rules, monthly budgets
 - Reports: six-month trend and spending by category (household or your share)
+- Calendar: the month by day with spend tint, recurring payments (paid and expected) and settlements
 - Recurring payment and subscription detection with renewal reminders
 - Later: multi-currency (HUF/EUR), PWA, Hungarian/English i18n, demo mode
 

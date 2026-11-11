@@ -96,7 +96,7 @@ export function TransactionList({
   );
 }
 
-function TransactionRow({
+export function TransactionRow({
   householdId,
   transaction,
   category,

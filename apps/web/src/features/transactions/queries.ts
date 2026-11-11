@@ -14,6 +14,12 @@ export const transactionQueries = {
       initialPageParam: null as string | null,
       getNextPageParam: (lastPage) => lastPage.nextCursor,
     }),
+  /** One day's transactions, newest first (at most 100). */
+  day: (householdId: string, date: string) =>
+    queryOptions({
+      queryKey: [...transactionQueries.household(householdId), 'day', date],
+      queryFn: ({ signal }) => transactionsApi.listDay({ householdId, date, signal }),
+    }),
   summary: (householdId: string, month: string) =>
     queryOptions({
       queryKey: [...transactionQueries.household(householdId), 'summary', month],

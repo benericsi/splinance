@@ -1,12 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { calendarQueries } from '@/features/calendar/queries';
 import { balancesApi } from './api';
 import { balanceQueries } from './queries';
 
-/** A settlement changes the debts and the settlement list of its household. */
+/** A settlement changes the debts and the settlement list of its household, and its calendar. */
 function useInvalidateBalances() {
   const queryClient = useQueryClient();
   return (_data: unknown, { householdId }: { householdId: string }) =>
-    queryClient.invalidateQueries({ queryKey: balanceQueries.household(householdId) });
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: balanceQueries.household(householdId) }),
+      queryClient.invalidateQueries({ queryKey: calendarQueries.household(householdId) }),
+    ]);
 }
 
 // The dialog shows the error itself.

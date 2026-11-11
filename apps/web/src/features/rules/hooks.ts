@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { balanceQueries } from '@/features/balances/queries';
 import { budgetQueries } from '@/features/budgets/queries';
+import { calendarQueries } from '@/features/calendar/queries';
 import { reportQueries } from '@/features/reports/queries';
 import { transactionQueries } from '@/features/transactions/queries';
 import { i18n } from '@/i18n';
@@ -61,7 +62,7 @@ export function useApplyRule() {
         queryClient.invalidateQueries({ queryKey: balanceQueries.household(householdId) }),
         queryClient.invalidateQueries({ queryKey: budgetQueries.household(householdId) }),
         queryClient.invalidateQueries({ queryKey: reportQueries.household(householdId) }),
-        queryClient.invalidateQueries({ queryKey: reportQueries.household(householdId) }),
+        queryClient.invalidateQueries({ queryKey: calendarQueries.household(householdId) }),
       ]);
     },
   });

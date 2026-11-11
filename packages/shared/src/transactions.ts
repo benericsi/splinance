@@ -138,6 +138,8 @@ export type TransactionResponse = z.infer<typeof transactionResponseSchema>;
 /** Query string of the list endpoint. Every filter is optional; results are newest first. */
 export const transactionListQuerySchema = z.object({
   month: monthSchema.optional(),
+  /** One day (the calendar's day view). */
+  on: z.iso.date().optional(),
   kind: transactionKindSchema.optional(),
   visibility: transactionVisibilitySchema.optional(),
   categoryId: z.uuid().optional(),

@@ -5,7 +5,8 @@ import { buttonVariants } from '@/components/ui/button';
 import { addMonths, currentMonth, formatMonth } from '@/features/transactions/dates';
 
 /** Pages whose month lives in `?month=` (absent means the current one). */
-type MonthPage = '/h/$householdId/transactions' | '/h/$householdId/budgets';
+type MonthPage =
+  '/h/$householdId/transactions' | '/h/$householdId/budgets' | '/h/$householdId/calendar';
 
 /** Previous / next month links, the month as a heading, and "This month" when away from it. */
 export function MonthNav({ month, page }: { month: string; page: MonthPage }) {
