@@ -320,8 +320,68 @@ describe('GET /calendar', () => {
     }
   });
 
-  it('refuses a malformed month', async () => {
-    for (const query of [{}, { month: '2026-1' }, { month: '2026-13' }, { month: '2026-10-01' }]) {
+  it('narrows days and events to one category', async () => {
+    await add(anna, { amount: 8000 });
+    await add(anna, { amount: 3000, categoryId: entertainment.id });
+    await add(anna, { amount: 500, categoryId: null });
+    await add(ben, { ...PRIVATE, amount: 4000 });
+    // Netflix is filed under Entertainment (the helper's default), the market under Groceries.
+    await series(anna, {
+      name: 'Netflix',
+      pattern: 'netflix',
+      amount: 4490,
+      anchorOn: '2026-10-25',
+    });
+    await series(anna, {
+      name: 'Market',
+      pattern: 'market',
+      amount: 6000,
+      anchorOn: '2026-10-26',
+      categoryId: groceries.id,
+    });
+    await post(ben, '/settlements', {
+      fromUserId: ben.id,
+      toUserId: anna.id,
+      amount: 5000,
+      settledOn: '2026-10-12',
+      note: '',
+    });
+
+    const only = async (user: TestUser, categoryId: string) =>
+      calendarSchema.parse(
+        await getCalendar(
+          { userId: user.id, householdId },
+          { month: '2026-10', categoryId },
+          { today: TODAY },
+        ),
+      );
+    const tenth = (c: Awaited<ReturnType<typeof only>>) =>
+      c.days.find((d) => d.date === '2026-10-10');
+
+    const food = await only(anna, groceries.id);
+    expect(tenth(food)).toMatchObject({ expenses: 8000, yourExpenses: 4000, count: 1 });
+    expect(brief(food.events)).toEqual(['recurringExpected 2026-10-26 Market 6000/null']);
+
+    const fun = await only(anna, entertainment.id);
+    expect(tenth(fun)).toMatchObject({ expenses: 3000, count: 1 });
+    expect(brief(fun.events)).toEqual(['recurringExpected 2026-10-25 Netflix 4490/null']);
+
+    // Ben's private spending in the category still counts only for him.
+    expect(tenth(await only(ben, groceries.id))).toMatchObject({ expenses: 12_000, count: 2 });
+    // A category of no household here: nothing, not an error.
+    const none = await only(anna, '01a12509-0f61-75bc-b406-130108780599');
+    expect(none.days.every((d) => d.count === 0)).toBe(true);
+    expect(none.events).toEqual([]);
+  });
+
+  it('refuses a malformed month or category', async () => {
+    for (const query of [
+      {},
+      { month: '2026-1' },
+      { month: '2026-13' },
+      { month: '2026-10-01' },
+      { month: '2026-10', categoryId: 'groceries' },
+    ]) {
       const res = await request(app)
         .get(base('/calendar'))
         .query(query)

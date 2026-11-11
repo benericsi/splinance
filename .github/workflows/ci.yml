@@ -110,7 +110,10 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile --filter @splinance/e2e...
-      - run: pnpm --filter @splinance/e2e exec playwright install --with-deps chromium
+      # Like the e2e job: without the apt packages when Ubuntu's mirrors cannot be reached.
+      - run: |
+          timeout 300 pnpm --filter @splinance/e2e exec playwright install --with-deps chromium \
+            || pnpm --filter @splinance/e2e exec playwright install chromium
       - run: pnpm --filter @splinance/e2e e2e:smoke
 
       # The backup job against both smoke databases (as the backup roles, with the rows the suite
@@ -326,8 +329,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Chromium only (desktop and Pixel 7 emulation); --with-deps adds the system libraries.
-      - run: pnpm --filter @splinance/e2e exec playwright install --with-deps chromium
+      # Chromium only (desktop and Pixel 7 emulation); --with-deps adds system libraries and
+      # fonts through apt. When Ubuntu's mirrors cannot be reached (it hung the job for ten
+      # minutes once), the step gives up after five and installs the browser alone: if the
+      # runner image lacks a library, the suite says so when Chromium fails to start.
+      - run: |
+          timeout 300 pnpm --filter @splinance/e2e exec playwright install --with-deps chromium \
+            || pnpm --filter @splinance/e2e exec playwright install chromium
 
       - run: pnpm e2e
 

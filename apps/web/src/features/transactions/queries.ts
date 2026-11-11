@@ -14,11 +14,11 @@ export const transactionQueries = {
       initialPageParam: null as string | null,
       getNextPageParam: (lastPage) => lastPage.nextCursor,
     }),
-  /** One day's transactions, newest first (at most 100). */
-  day: (householdId: string, date: string) =>
+  /** One day's transactions, newest first (at most 100), of every category or one. */
+  day: (householdId: string, date: string, categoryId?: string) =>
     queryOptions({
-      queryKey: [...transactionQueries.household(householdId), 'day', date],
-      queryFn: ({ signal }) => transactionsApi.listDay({ householdId, date, signal }),
+      queryKey: [...transactionQueries.household(householdId), 'day', date, categoryId ?? 'all'],
+      queryFn: ({ signal }) => transactionsApi.listDay({ householdId, date, categoryId, signal }),
     }),
   summary: (householdId: string, month: string) =>
     queryOptions({

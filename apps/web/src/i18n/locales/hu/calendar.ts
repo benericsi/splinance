@@ -12,6 +12,10 @@ export const calendar: Messages<typeof en.calendar> = {
     list: 'Lista',
     calendar: 'Naptár',
   },
+  category: {
+    label: 'Kategória',
+    all: 'Minden kategória',
+  },
   stats: {
     spent: 'Elköltve',
     youSpent: 'Te költöttél',
@@ -20,6 +24,12 @@ export const calendar: Messages<typeof en.calendar> = {
     overBudget: 'Keret túllépve',
     income: 'Bevétel',
     yourIncome: 'A te bevételed',
+    days: 'Költéses napok',
+    dayCount_one: '{{count}} nap',
+    dayCount_other: '{{count}} nap',
+    compare: 'Előtte: {{period}}',
+    period: '{{month}} 1–{{day}}.',
+    nothingThen: 'Akkor nem volt',
   },
   grid: {
     label: 'Napok · {{month}}',
