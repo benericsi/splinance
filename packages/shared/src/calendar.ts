@@ -19,7 +19,14 @@ export function daysOfMonth(month: string): string[] {
   return Array.from({ length: count }, (_, day) => `${month}-${String(day + 1).padStart(2, '0')}`);
 }
 
-export const calendarQuerySchema = z.object({ month: monthSchema });
+export const calendarQuerySchema = z.object({
+  month: monthSchema,
+  /**
+   * Only this category: day totals count its transactions, events are the recurring
+   * series filed under it (settlements have no category, so none).
+   */
+  categoryId: z.uuid().optional(),
+});
 export type CalendarQuery = z.infer<typeof calendarQuerySchema>;
 
 const dateSchema = z.iso.date();

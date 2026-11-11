@@ -185,7 +185,10 @@ export function transactionRow(page: Page, description: string) {
 }
 
 /** A month total above the list or the calendar: 'Spent', 'Your share', 'Income', 'You spent'. */
-export function monthStat(page: Page, label: 'Spent' | 'Your share' | 'Income' | 'You spent') {
+export function monthStat(
+  page: Page,
+  label: 'Spent' | 'Your share' | 'Income' | 'You spent' | 'Days with spending',
+) {
   return page.locator(`dt:text-is("${label}") + dd`);
 }
 

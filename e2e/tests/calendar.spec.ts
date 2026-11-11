@@ -5,6 +5,7 @@ import {
   money,
   monthStat,
   openTransactions,
+  pickCategory,
   transactionRow,
 } from '../support/app';
 
@@ -12,7 +13,11 @@ test('the calendar shows the month by day, and opens a day', async ({ page, brow
   const { householdId, partnerContext } = await householdWithPartner(page, browser);
 
   await openTransactions(page, householdId);
-  await addTransaction(page, { amount: '12000', description: 'Weekly shop' });
+  await addTransaction(page, {
+    amount: '12000',
+    description: 'Weekly shop',
+    category: 'Groceries',
+  });
   await addTransaction(page, { amount: '2000', description: 'Snacks for me', private: true });
 
   await page
@@ -26,6 +31,15 @@ test('the calendar shows the month by day, and opens a day', async ({ page, brow
   const grid = page.getByRole('list', { name: /^Days of / });
   const today = grid.locator('a[aria-current="date"]');
   await expect(today).toHaveAccessibleName(money('today, spent 14 000 Ft'));
+
+  // One category: only the shop, on one day, with nothing to compare it with yet.
+  await pickCategory(page, 'Category', 'Groceries');
+  await expect(monthStat(page, 'Spent')).toContainText(money('12 000 Ft'));
+  await expect(monthStat(page, 'Days with spending')).toHaveText('1 day');
+  await expect(today).toHaveAccessibleName(money('today, spent 12 000 Ft'));
+  await expect(page).toHaveURL(/\/calendar\?category=[0-9a-f-]{36}$/);
+  await pickCategory(page, 'Category', 'All categories');
+  await expect(monthStat(page, 'Spent')).toContainText(money('14 000 Ft'));
 
   // Her share: half of the shared shop, all of the private snack.
   await page

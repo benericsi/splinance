@@ -6,17 +6,23 @@ export const calendarApi = {
   get: async ({
     householdId,
     month,
+    categoryId,
     signal,
   }: {
     householdId: string;
     month: string;
+    /** Only this category's spending and series. */
+    categoryId?: string | undefined;
     signal?: AbortSignal;
-  }) =>
-    (
+  }) => {
+    const query = new URLSearchParams({ month });
+    if (categoryId) query.set('categoryId', categoryId);
+    return (
       await http.get(
-        `${householdPath(householdId)}/calendar?${new URLSearchParams({ month }).toString()}`,
+        `${householdPath(householdId)}/calendar?${query.toString()}`,
         calendarResponseSchema,
         { signal },
       )
-    ).calendar,
+    ).calendar;
+  },
 };

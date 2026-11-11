@@ -21,11 +21,17 @@ const dateSchema = z.iso.date();
 
 /** Child route: one day (its events and transactions) over the calendar. */
 export const Route = createFileRoute('/_authenticated/h/$householdId/calendar/$date')({
-  loader: async ({ context: { queryClient }, params: { householdId, date } }) => {
+  // The parent's search: the day follows the category the month is narrowed to.
+  loaderDeps: ({ search }) => ({ category: search.category }),
+  loader: async ({
+    context: { queryClient },
+    params: { householdId, date },
+    deps: { category },
+  }) => {
     if (!dateSchema.safeParse(date).success) throw notFound();
     await Promise.all([
-      queryClient.query(calendarQueries.month(householdId, date.slice(0, 7))),
-      queryClient.query(transactionQueries.day(householdId, date)),
+      queryClient.query(calendarQueries.month(householdId, date.slice(0, 7), category)),
+      queryClient.query(transactionQueries.day(householdId, date, category)),
       queryClient.query(categoryQueries.list(householdId)),
     ]);
   },
@@ -39,8 +45,12 @@ function DayRoute() {
   const navigate = Route.useNavigate();
   const { user } = useAuth();
   const view: CalendarView = search.view ?? 'household';
-  const { data: calendar } = useSuspenseQuery(calendarQueries.month(householdId, date.slice(0, 7)));
-  const { data: transactions } = useSuspenseQuery(transactionQueries.day(householdId, date));
+  const { data: calendar } = useSuspenseQuery(
+    calendarQueries.month(householdId, date.slice(0, 7), search.category),
+  );
+  const { data: transactions } = useSuspenseQuery(
+    transactionQueries.day(householdId, date, search.category),
+  );
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const events = calendar.events.filter((event) => event.date === date);

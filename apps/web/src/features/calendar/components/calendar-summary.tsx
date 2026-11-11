@@ -52,7 +52,7 @@ export function CalendarSummary({
   );
 }
 
-function Stat({
+export function Stat({
   label,
   value,
   className,
