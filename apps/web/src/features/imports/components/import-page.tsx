@@ -11,7 +11,7 @@ import {
 } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { CircleCheck, FileSpreadsheet } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useEffect, useEffectEvent, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { FormError } from '@/components/form/form-error';
@@ -25,6 +25,7 @@ import { ApiError } from '@/lib/http';
 import { errorMessage } from '@/lib/query-client';
 import { readBankNames, rememberBankName } from '../bank-names';
 import { useCheckImport, useCreateImport, useUndoImport } from '../hooks';
+import { takeImportFile } from '../pending-file';
 import { readExport } from '../read-file';
 import { buildReview, type ReviewRow, rowsToCheck, toImportInput, updatePicked } from '../review';
 import { suggestRules } from '../suggestions';
@@ -150,6 +151,16 @@ export function ImportPage({
       setReading(false);
     }
   };
+
+  // A file dropped on the household map arrives with the page: start with it.
+  const startWithDropped = useEffectEvent(() => {
+    const dropped = takeImportFile(household.id);
+    // Read first: the page only changes once there is something to show.
+    if (dropped) void readExport(dropped).then((text) => analyze(text, dropped.name, bankName));
+  });
+  useEffect(() => {
+    startWithDropped();
+  }, []);
 
   if (stage.step === 'done') {
     const { batch, skipped } = stage.result;

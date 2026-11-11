@@ -5,6 +5,17 @@ export const map = {
     map: 'Map',
   },
   canvas: 'Household map',
+  hint: 'Click a card to open it. Drag yourself onto someone to settle up, or drop a bank export on the map to import it.',
+  drop: 'Drop the bank export to import it',
+  add: {
+    label: 'Add',
+    transaction: 'Transaction',
+    import: 'Bank import',
+    recurring: 'Recurring payment',
+    budget: 'Budget',
+    settle: 'Settle up',
+    invite: 'Invite someone',
+  },
   you: '{{name}} (you)',
   household: {
     members_one: '{{count}} member',

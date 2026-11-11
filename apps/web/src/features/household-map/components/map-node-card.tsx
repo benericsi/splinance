@@ -49,7 +49,8 @@ function Card({
   return (
     <div
       className={cn(
-        'w-52 rounded-xl border px-3 py-2.5 text-sm',
+        // Inside a link (`group`), the border answers the pointer.
+        'group-hover:border-foreground/30 w-52 rounded-xl border px-3 py-2.5 text-sm transition-colors',
         ghost ? 'border-dashed' : 'bg-card shadow-xs',
       )}
     >

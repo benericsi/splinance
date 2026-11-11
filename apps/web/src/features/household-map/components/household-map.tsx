@@ -9,18 +9,29 @@ import {
   type NodeProps,
   Position,
   ReactFlow,
+  ReactFlowProvider,
   useNodesState,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import type { Currency } from '@splinance/shared';
-import { type CSSProperties, useEffect } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatMoney } from '@/features/transactions/money';
+import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { useTheme } from '@/lib/theme';
-import type { HouseholdMap as HouseholdMapData, MapNodeData } from '../build-map';
-import { MapNodeCard } from './map-node-card';
+import {
+  type HouseholdMap as HouseholdMapData,
+  type MapNodeData,
+  settleByDrop,
+} from '../build-map';
+import { MapNodeLink } from './map-node-link';
 
-type CardNode = Node<{ node: MapNodeData; currency: Currency }, 'card'>;
+type CardNode = Node<{ node: MapNodeData; currency: Currency; householdId: string }, 'card'>;
+
+/** On the person a dragged person is held over, when letting go there would settle up. */
+const DROP_TARGET = 'rounded-xl ring-2 ring-ring';
 
 /** Edges attach here; nothing can be connected by hand, so the handles are invisible. */
 const HANDLE = '!pointer-events-none !size-px !min-h-0 !min-w-0 !border-0 !opacity-0';
@@ -29,7 +40,7 @@ function CardNodeView({ data }: NodeProps<CardNode>) {
   return (
     <>
       <Handle type="target" position={Position.Left} id="in" className={HANDLE} />
-      <MapNodeCard node={data.node} currency={data.currency} />
+      <MapNodeLink node={data.node} householdId={data.householdId} currency={data.currency} />
       <Handle type="source" position={Position.Right} id="out" className={HANDLE} />
       {data.node.kind === 'member' && (
         // Debts run between people in one column: straight through the gap to a neighbour,
@@ -73,7 +84,7 @@ function toNodes(map: HouseholdMapData): CardNode[] {
     id,
     type: 'card',
     position: { x, y },
-    data: { node, currency: map.currency },
+    data: { node, currency: map.currency, householdId: map.householdId },
   }));
 }
 
@@ -107,13 +118,36 @@ function toEdges(map: HouseholdMapData): Edge[] {
 
 /**
  * The canvas: the only file that knows about React Flow, loaded on demand so the cards
- * view never pays for it. Nodes can be moved around but nothing is saved; a refetch
- * updates what the nodes say and keeps where they were dragged.
+ * view never pays for it. Every node is a link to its page; nodes can be moved around but
+ * nothing is saved (a refetch updates what they say and keeps where they were dragged).
+ * Dropping yourself on someone, or someone on you, opens settle up with them and puts the
+ * dragged card back: a shortcut for what a click on that person does.
  */
 export default function HouseholdMap({ map }: { map: HouseholdMapData }) {
+  return (
+    <ReactFlowProvider>
+      <Canvas map={map} />
+    </ReactFlowProvider>
+  );
+}
+
+function Canvas({ map }: { map: HouseholdMapData }) {
   const { t } = useTranslation('map');
   const { resolved } = useTheme();
+  const navigate = useNavigate();
+  const { getIntersectingNodes } = useReactFlow<CardNode>();
   const [nodes, setNodes, onNodesChange] = useNodesState(toNodes(map));
+  const [dropId, setDropId] = useState<string>();
+  const dragOrigin = useRef<{ x: number; y: number }>(undefined);
+
+  /** The node under the dragged one that it could settle with, and who that settles with. */
+  const settleTarget = (dragged: CardNode) => {
+    for (const onto of getIntersectingNodes(dragged)) {
+      const userId = settleByDrop(dragged.data.node, onto.data.node);
+      if (userId) return { nodeId: onto.id, userId };
+    }
+    return undefined;
+  };
 
   useEffect(() => {
     setNodes((previous) => {
@@ -126,27 +160,50 @@ export default function HouseholdMap({ map }: { map: HouseholdMapData }) {
   }, [map, setNodes]);
 
   return (
-    <section
-      aria-label={t('canvas')}
-      className="bg-muted/40 h-[min(70vh,40rem)] overflow-hidden rounded-xl border"
-    >
+    <section aria-label={t('canvas')} className="bg-muted/40 h-full">
       <ReactFlow
-        nodes={nodes}
+        nodes={nodes.map((node) =>
+          node.id === dropId ? { ...node, className: DROP_TARGET } : node,
+        )}
         edges={toEdges(map)}
         nodeTypes={NODE_TYPES}
         onNodesChange={onNodesChange}
+        onNodeDragStart={(_, node) => {
+          dragOrigin.current = node.position;
+        }}
+        onNodeDrag={(_, node) => {
+          setDropId(settleTarget(node)?.nodeId);
+        }}
+        onNodeDragStop={(_, node) => {
+          const target = settleTarget(node);
+          const origin = dragOrigin.current;
+          setDropId(undefined);
+          if (!target) return;
+          if (origin) {
+            setNodes((current) =>
+              current.map((item) => (item.id === node.id ? { ...item, position: origin } : item)),
+            );
+          }
+          void navigate({
+            to: '/h/$householdId/settle',
+            params: { householdId: map.householdId },
+            search: { view: 'map', with: target.userId },
+            state: OPEN_MODAL_STATE,
+          });
+        }}
+        // The links inside the nodes are the tab stops.
+        nodesFocusable={false}
         colorMode={resolved}
         style={CANVAS_STYLE}
         fitView
-        fitViewOptions={{ padding: 0.12, maxZoom: 1 }}
+        fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
         minZoom={0.4}
         maxZoom={1.5}
         nodesConnectable={false}
         edgesFocusable={false}
         deleteKeyCode={null}
-        // The page scrolls with the wheel; zoom is on the buttons, pinch and ctrl+wheel.
-        zoomOnScroll={false}
-        preventScrolling={false}
+        // MIT licensed: the label is optional.
+        proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={18} size={1.5} color="var(--border)" />
         <Controls showInteractive={false} />

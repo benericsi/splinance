@@ -9,6 +9,17 @@ export const map: Messages<typeof en.map> = {
     map: 'Térkép',
   },
   canvas: 'A háztartás térképe',
+  hint: 'Kattints egy kártyára a megnyitásához. Húzd magad valakire az elszámoláshoz, vagy ejts a térképre egy banki exportot az importáláshoz.',
+  drop: 'Engedd el a banki exportot az importáláshoz',
+  add: {
+    label: 'Hozzáadás',
+    transaction: 'Tranzakció',
+    import: 'Banki import',
+    recurring: 'Rendszeres fizetés',
+    budget: 'Keret',
+    settle: 'Elszámolás',
+    invite: 'Tag meghívása',
+  },
   you: '{{name}} (te)',
   household: {
     members_one: '{{count}} tag',

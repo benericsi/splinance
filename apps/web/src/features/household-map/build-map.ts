@@ -42,6 +42,11 @@ export type MapNodeData =
       former: boolean;
       /** Across every open debt: positive when owed money, negative when owing. */
       net: number;
+      /**
+       * The viewer can record a payment with them: every other member, and someone who left
+       * only while a debt between the two is open (the settle up dialog's own rule).
+       */
+      canSettle: boolean;
     }
   | { kind: 'bank'; source: StatementSource; daysAgo: number; stale: boolean }
   | {
@@ -80,6 +85,7 @@ export interface MapEdge {
 }
 
 export interface HouseholdMap {
+  householdId: string;
   currency: Currency;
   nodes: MapNode[];
   edges: MapEdge[];
@@ -99,6 +105,17 @@ export interface MapInput {
   /** The viewer's date, as the recurring page computes it. */
   today: string;
   now: Date;
+}
+
+/**
+ * Dragging one person onto another means "settle up with them", as long as one of the two
+ * is the viewer (a payment is always between you and someone) and the other can be settled
+ * with. Returns the other person's user id.
+ */
+export function settleByDrop(dragged: MapNodeData, onto: MapNodeData): string | undefined {
+  if (dragged.kind !== 'member' || onto.kind !== 'member') return undefined;
+  const other = dragged.isViewer ? onto : onto.isViewer ? dragged : undefined;
+  return other?.canSettle ? other.userId : undefined;
 }
 
 const HOUSEHOLD_ID = 'household';
@@ -150,6 +167,11 @@ export function buildMap({
     }
   }
   const current = new Set(household.members.map((m) => m.userId));
+  const owesOrOwedByViewer = new Set(
+    balances.debts
+      .filter((debt) => debt.from.userId === viewerId || debt.to.userId === viewerId)
+      .flatMap((debt) => [debt.from.userId, debt.to.userId]),
+  );
   const people = [...names.keys()].sort((a, b) => Number(b === viewerId) - Number(a === viewerId));
   const memberNodes = people.map((userId) => ({
     id: memberId(userId),
@@ -159,6 +181,7 @@ export function buildMap({
     isViewer: userId === viewerId,
     former: !current.has(userId),
     net: net.get(userId) ?? 0,
+    canSettle: userId !== viewerId && (current.has(userId) || owesOrOwedByViewer.has(userId)),
   }));
   for (const node of memberNodes) if (!node.former) link(node.id, HOUSEHOLD_ID);
   for (const debt of balances.debts) {
@@ -247,6 +270,7 @@ export function buildMap({
   }
 
   return {
+    householdId: household.id,
     currency: balances.currency,
     nodes: [
       ...place(COLUMN.personal, personal),
