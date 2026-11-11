@@ -7,6 +7,16 @@ import { requireMembership } from '../households/households.service';
 import { type HouseholdScope, visibleTo } from '../transactions/transactions.service';
 
 /**
+ * The viewer's part of a transaction: the whole of a private one, their share of a shared
+ * one. Needs `transaction_splits` left-joined with `ownSplit`.
+ */
+export const yourPart = sql`case when ${transactions.visibility} = 'private' then ${transactions.amount} else coalesce(${transactionSplits.amount}, 0) end`;
+
+/** The join condition that brings the viewer's own split row (if any) to each transaction. */
+export const ownSplit = (userId: string) =>
+  and(eq(transactionSplits.transactionId, transactions.id), eq(transactionSplits.userId, userId));
+
+/**
  * Month totals and spending per category over a range of months, as the viewer sees them:
  * shared transactions and their own private ones (like the month summary), plus their own
  * part of each (the whole of a private one, their share of a shared one). Months without
@@ -19,7 +29,6 @@ export async function getReport(scope: HouseholdScope, query: ReportQuery): Prom
 
   const month = sql<string>`to_char(${transactions.occurredOn}, 'YYYY-MM')`;
   const isExpense = sql`${transactions.kind} = 'expense'`;
-  const yourPart = sql`case when ${transactions.visibility} = 'private' then ${transactions.amount} else coalesce(${transactionSplits.amount}, 0) end`;
   // Postgres returns bigint sums as strings; they stay far below 2^53 (see MAX_AMOUNT_MINOR).
   const total = (value: ReturnType<typeof sql>, filter: ReturnType<typeof sql>) =>
     sql<string>`coalesce(sum(${value}) filter (where ${filter}), 0)`;
@@ -35,13 +44,7 @@ export async function getReport(scope: HouseholdScope, query: ReportQuery): Prom
       yourIncome: total(yourPart, sql`not ${isExpense}`),
     })
     .from(transactions)
-    .leftJoin(
-      transactionSplits,
-      and(
-        eq(transactionSplits.transactionId, transactions.id),
-        eq(transactionSplits.userId, scope.userId),
-      ),
-    )
+    .leftJoin(transactionSplits, ownSplit(scope.userId))
     .where(
       and(
         eq(transactions.householdId, scope.householdId),

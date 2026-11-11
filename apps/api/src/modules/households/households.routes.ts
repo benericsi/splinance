@@ -15,6 +15,7 @@ import { createBalancesRouter } from '../balances/balances.routes';
 import { createBudgetsRouter } from '../budgets/budgets.routes';
 import { createCategoriesRouter } from '../categories/categories.routes';
 import { createImportsRouter } from '../imports/imports.routes';
+import { createCalendarRouter } from '../calendar/calendar.routes';
 import { createReportsRouter } from '../reports/reports.routes';
 import { createNotificationSettingsRouter } from '../notifications/notifications.routes';
 import { createRecurringRouter } from '../recurring/recurring.routes';
@@ -122,6 +123,7 @@ export function createHouseholdsRouter() {
   router.use('/:id/budgets', createBudgetsRouter());
   router.use('/:id/reports', createReportsRouter());
   router.use('/:id/recurring', createRecurringRouter());
+  router.use('/:id/calendar', createCalendarRouter());
   router.use('/:id/notification-settings', createNotificationSettingsRouter());
 
   return router;

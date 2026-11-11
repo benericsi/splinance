@@ -195,7 +195,7 @@ const toPayment = (row: Row): RecurringPayment => ({
 });
 
 /** The caller's part of each transaction (shared ones only). */
-async function sharesOf(executor: Db, userId: string, transactionIds: string[]) {
+export async function sharesOf(executor: Db, userId: string, transactionIds: string[]) {
   if (transactionIds.length === 0) return new Map<string, number>();
   const rows = await executor
     .select({ transactionId: transactionSplits.transactionId, amount: transactionSplits.amount })
@@ -292,6 +292,16 @@ export async function seriesForMember(
   today: string,
 ): Promise<RecurringSeries[]> {
   return buildSeriesList(executor, scope, await compute(executor, scope, today), today);
+}
+
+/**
+ * A member's series, each with every payment found in the scan window (the list keeps only
+ * the latest few), for the calendar. No membership check, like `seriesForMember`.
+ */
+export async function seriesWithPayments(executor: Db, scope: HouseholdScope, today: string) {
+  const computed = await compute(executor, scope, today);
+  const series = await buildSeriesList(executor, scope, computed, today);
+  return series.map((item) => ({ series: item, payments: computed.payments.get(item.id) ?? [] }));
 }
 
 /**

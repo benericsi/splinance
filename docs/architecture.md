@@ -60,6 +60,7 @@ Key files by concern:
 | Budgets                       | `packages/shared/src/budgets.ts`, `apps/api/src/modules/budgets/*`, `apps/web/src/features/budgets/*`                    |
 | Recurring payments            | `packages/shared/src/recurring/*` (matching, detection, dates), `apps/api/src/modules/recurring/*`                       |
 | Reports (charts)              | `packages/shared/src/reports.ts`, `apps/api/src/modules/reports/*`, `apps/web/src/features/reports/*`                    |
+| Calendar (API; page follows)  | `packages/shared/src/calendar.ts`, `apps/api/src/modules/calendar/*`                                                     |
 | Money and split math          | `packages/shared/src/money.ts`, `packages/shared/src/splits.ts`, `packages/shared/src/balances.ts`                       |
 | Demo data (story, bank files) | `packages/shared/src/demo/*`, `apps/api/src/modules/demo/bank-files.cli.ts`                                              |
 | Errors                        | `apps/api/src/lib/http-error.ts`, `apps/api/src/middleware/error-handler.ts`, `packages/shared/src/api-error.ts`         |
@@ -296,6 +297,18 @@ Recurring payments. Also under a household. A shared series belongs to the house
 
 - Nothing about payments is stored: every read takes the caller's visible expenses of the last 400 days (at most 20 000) and matches them (shared series first, then the caller's private ones, see hard part 34), then looks for suggestions in what no series' text covers, minus dismissed keys. A series in the list carries its latest 12 payments (`imported` or typed in), `paymentCount`, `lastPaidOn`, `latestAmount`, `previousAmount`, the caller's `share` of the latest payment (null for a private payment) and `monthlyAmount`; series come soonest next payment first, suggestions most expensive per month first (at most 100).
 - "Today" for detection (a rhythm that stopped is no suggestion) is Budapest's (`lib/today.ts`); the web computes due dates and states from the browser's date with the shared helpers.
+
+Calendar. One month for the calendar page, as the caller sees it. Nothing new is stored: it is the reports' sums per day, the recurring matching above and the month's settlements, read together. Limited to 240 reads per user and 15 minutes (every month opened runs the recurring matching again).
+
+| Method and path                    | Who    | Request                  | Success                                                      | Errors (besides the above) |
+| ---------------------------------- | ------ | ------------------------ | ------------------------------------------------------------ | -------------------------- |
+| `GET /api/households/:id/calendar` | member | query: `month` `YYYY-MM` | 200 `{ calendar: { month, today, currency, days, events } }` | 400                        |
+
+- `days` has every day of the month (zeros when empty) with `expenses`, `income`, `yourExpenses`, `yourIncome` (the same rule as a report month, from the same `yourPart` SQL) and `count`, the transactions the caller can see that day.
+- `events` come by date, then kind, then amount: `recurringPaid` (a transaction matched to one of the caller's series: `seriesId`, `name`, `scope`, `categoryId`, `amount`, `transactionId`, `yourAmount`), `recurringExpected` (a payment a series should still bring: the same fields without a transaction, plus `amountVaries`; `yourAmount` goes by the latest payment's split and is null before a shared series' first payment) and `settlement` (`settlementId`, `from`, `to`, `amount`; every member sees these).
+- Expected payments start at a series' next due date (`nextDueOn`) and follow its rhythm with `occurrence()`, so a series on the 31st stays on month ends. A series overdue past its grace window (`lapsed`) expects nothing; neither does a past month, or one more than `CALENDAR_MONTHS_AHEAD` (12) after the current one. A due payment still within grace keeps its date, so it can lie before `today`.
+- Paid events reach back as far as the matching does (400 days); older months have totals and settlements only.
+- Another member's private transactions and private series never count, in totals or events (`visibleTo`, the series' owner).
 - Adding a series whose text was dismissed replaces the dismissal. Confirming takes the suggestion's latest payment as the anchor, its description as the name and its key as the pattern, and the category if it is still active.
 - `DELETE` archives a series that has payments ("Stop tracking", the text is free again), deletes one that never matched anything, and deletes a dismissal ("Show again").
 - A suggestion is addressed by `{ scope, key }`; `private` always means the caller's own, so another person's private rhythm cannot be confirmed, dismissed or even probed.
@@ -536,6 +549,7 @@ Reads `Authorization: Bearer`, verifies the JWT (algorithm pinned to HS256, issu
 | `rules.ts`          | `matchKey()`, `ruleMatches()`, `firstMatchingRule()`, rule schemas                                                                       | API (uniqueness, applying), web import review (next PR)            |
 | `budgets.ts`        | budget schemas, `budgetUsage()`, `BUDGET_WARNING_RATIO`                                                                                  | API, web budgets (next PR)                                         |
 | `reports.ts`        | report schemas, `addMonths()`, `monthsBetween()`, `REPORT_MAX_MONTHS`                                                                    | API reports, web reports                                           |
+| `calendar.ts`       | calendar schemas (days, events), `daysOfMonth()`, `lastCalendarMonth()`, `CALENDAR_MONTHS_AHEAD`                                         | API calendar, web calendar page (next PR)                          |
 | `recurring/`        | `recurringKey()`, `suggestRecurringPattern()`, `assignPayments()`, `detectRecurring()`, `nextDueOn()`, `seriesTiming()`, schemas         | API recurring (next PR), web recurring page, demo tests            |
 | `imports/`          | `parseStatement()` (Revolut CSV, K&H transaction history CSV), `StatementRow`, flags, fingerprints, `nameKey()`                          | web import page (next PRs), parser tests                           |
 | `demo/`             | `buildDemoStory()` (a seeded year of a household), `renderDemoBankFiles()` (its monthly bank exports), `demoBalance()`                   | demo seeder (next PR), `demo:bank-files` CLI, data track           |
