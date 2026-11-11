@@ -5,7 +5,7 @@ import type {
   SettlementListFilters,
   SettlementListResponse,
 } from '@splinance/shared';
-import { and, desc, eq, inArray, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lt, type SQL, sql } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
 import {
   auditLog,
@@ -110,6 +110,31 @@ export async function listSettlements(
         ? encodeCursor({ date: last.settledOn, id: last.id })
         : null,
   };
+}
+
+/**
+ * A household's settlements from `start` up to (not including) `end`, oldest first, for
+ * the calendar. No membership check: the caller decides who is a member.
+ */
+export async function settlementsBetween(
+  executor: Db,
+  householdId: string,
+  start: string,
+  end: string,
+): Promise<Settlement[]> {
+  const rows = await executor
+    .select()
+    .from(settlements)
+    .where(
+      and(
+        eq(settlements.householdId, householdId),
+        isNull(settlements.deletedAt),
+        gte(settlements.settledOn, start),
+        lt(settlements.settledOn, end),
+      ),
+    )
+    .orderBy(settlements.settledOn, settlements.id);
+  return toSettlements(executor, rows);
 }
 
 /** The people involved and owners may record or remove a payment; other members may not. */
