@@ -754,6 +754,15 @@ invitee: opens /invite#<token>
 - `SettleUpDialog`: picks the person from `?with=` (else the viewer's largest debt, else any other member; people who left appear while a debt with them is open). "Who paid" defaults to whoever owes, the amount to the whole debt. Any amount is accepted; `remainingHint` says what is left ("Ben still owes you 2000 Ft"), when it is square, and when paying more flips the debt. Records a payment made outside the app; nothing moves money.
 - `SettlementList` ("Recent settlements", hidden while empty): a row menu deletes a payment the viewer may manage (the two people, who recorded it, owners, as the API decides) with an 8 second undo toast. The delete mutation lives in the list, not the row: the row unmounts when the refetch drops it, and per-call `mutate` callbacks of an unmounted component never run, so the toast would never appear.
 
+### Household map
+
+- The overview has a second layout on wide screens (from 768 px): `?view=map` on `_overview` (a "Cards / Map" `SegmentedControl` in the page header, hidden below that width; a narrow screen shows cards whatever the URL says). The map replaces the cards; the settle up child route still renders over it.
+- `features/household-map/build-map.ts` (`buildMap`) is a pure function from what the overview already loaded, plus the viewer's imports and (for owners) pending invites, to nodes, edges and positions. It has no text and makes no requests, so it is where the rules are tested: the viewer first, people who left stay while a debt with them is open, one bank node per source from the newest import that was not undone (amber after 30 days), at most three recurring payments per side with the rest folded into one node, the three most used budgets.
+- Left to right: what is only yours (your banks, your private recurring payments), the people, the household, what the household shares (shared recurring payments, budgets, pending invites). Imports are personal bank data and invites are owner-only in the API, so every member sees a different map; the map only arranges what the API returned.
+- Debts are edges from who owes to who is owed, with the amount: straight through the gap between neighbours in the members column, around the left side when someone stands between them. Chrome stays neutral: a debt is a stronger line, not a color.
+- `components/household-map.tsx` is the only file that imports React Flow (`@xyflow/react`) and is loaded with `lazy`, so the cards view never pays for it. Nodes can be dragged but positions are not saved; a refetch updates what nodes say and keeps where they were moved. The wheel scrolls the page (zoom: the buttons, pinch, ctrl+wheel). `MapNodeCard` renders a node without React Flow, which is what the web tests render (jsdom cannot lay out a canvas).
+- Read-only for now: nodes do not link anywhere yet.
+
 ### Transactions
 
 - The page shows one month (`?month=YYYY-MM`, absent means the current month, so a bookmark always opens "now"). The loader awaits the first page, the month summary and the categories; "Load more" fetches the next cursor page (`useSuspenseInfiniteQuery`).
@@ -857,7 +866,7 @@ English and Hungarian (Phase 7; informal "te" in Hungarian). i18next + react-i18
 
 - Theme store (`lib/theme.ts`): `light | dark | system`, saved in localStorage (wrapped in try/catch for blocked storage), applied as the `dark` class plus `color-scheme` on `<html>`, and follows OS changes live in system mode. The selector (`ThemeToggle`) is a shadcn ToggleGroup with tooltips inside the account menu.
 - Fonts: Inter (body, 14px base) and Bricolage Grotesque (headings, `font-heading`), self-hosted with fontsource. Never the Google Fonts CDN (GDPR).
-- Colors: the UI chrome stays neutral (shadcn tokens). Brand colors are fills only (`--color-brand-*`). Text uses role tokens tuned to at least 4.5:1 in both themes: `text-link`, `text-positive`, `text-negative`.
+- Colors: the UI chrome stays neutral (shadcn tokens). Brand colors are fills only (`--color-brand-*`). Text uses role tokens tuned to at least 4.5:1 in both themes: `text-link`, `text-positive`, `text-negative`, `text-warning` (needs a look, not wrong: a stale bank import on the household map).
 - Brand palette and logo pairings live in `packages/shared/src/brand.ts`; a test asserts every logo pairing is at least 3:1. The CSS mirrors the palette in `index.css`.
 - `LogoMark`: chunky split S with a pink-to-orange gradient on a radially lit blue tile. The glow is capped at `#1515E8` so the orange end keeps 3:1 contrast. `public/favicon.svg` (crisp) and `public/logo.svg` (grainy) must match the component.
 - `PosterWall` (auth panel): 8 hand-composed SVG cards (grainy gradients and geometric symbols). It is a CSS size container: a container query switches 4x2 (landscape) and 2x4 (portrait), and the grid width is `min(100cqw, 150cqh)` (or `37.5cqh`), the largest size that keeps cards at 3:4 without overflowing.
