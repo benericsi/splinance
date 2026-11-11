@@ -96,6 +96,23 @@ async function recordTour(browser: Browser, scheme: (typeof SCHEMES)[number]) {
   await page.mouse.wheel(0, 500);
   await pause(page, 1500);
 
+  // The calendar: the month by day, then the latest day with spending and its rows.
+  await glideAndClick(page, sections.getByRole('link', { name: 'Calendar' }));
+  await expect(page.getByRole('heading', { name: 'Calendar', level: 1 })).toBeVisible();
+  await pause(page, 2500);
+  await glideAndClick(
+    page,
+    page
+      .getByRole('list', { name: /^Days of / })
+      .getByRole('link', { name: /, spent / })
+      .last(),
+  );
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await pause(page, 2500);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await pause(page, 800);
+
   // Recurring payments: confirmed and hand-added ones, one gone quiet, suggestions below.
   await glideAndClick(page, sections.getByRole('link', { name: 'Recurring' }));
   await expect(page.getByRole('heading', { name: 'Recurring', level: 1 })).toBeVisible();
