@@ -9,6 +9,8 @@ import { PageTitle } from '@/components/page-title';
 import { PageSkeleton, Reveal, RevealPage } from '@/components/reveal';
 import { SkeletonActions, SkeletonLine, SkeletonRow, SkeletonStats } from '@/components/skeletons';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ActivityViewSwitch } from '@/features/calendar/components/activity-view-switch';
 import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
 import { MonthHeader } from '@/features/transactions/components/month-header';
@@ -39,6 +41,7 @@ function TransactionsPage() {
   const { t } = useTranslation(['transactions', 'common']);
   const { householdId } = Route.useParams();
   const { month } = Route.useLoaderDeps();
+  const search = Route.useSearch();
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: summary } = useSuspenseQuery(transactionQueries.summary(householdId, month));
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
@@ -64,6 +67,7 @@ function TransactionsPage() {
           </>
         }
       />
+      <ActivityViewSwitch householdId={householdId} active="list" month={search.month} />
       <Reveal index={0}>
         <MonthHeader month={month} summary={summary} />
       </Reveal>
@@ -130,6 +134,7 @@ function TransactionsSkeleton() {
         title={t('title')}
         actions={<SkeletonActions widths={['w-24', 'w-20 max-md:hidden']} />}
       />
+      <Skeleton className="mb-4 h-9 rounded-lg md:hidden" />
       <div className="mb-6 space-y-4">
         <div className="flex h-8 items-center gap-2">
           <SkeletonLine line="h-7" className="w-48" />

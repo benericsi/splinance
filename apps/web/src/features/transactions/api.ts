@@ -35,6 +35,23 @@ export const transactionsApi = {
       signal,
     });
   },
+  /** Everything on one day (the calendar's day view): one page, the API's largest. */
+  listDay: async ({
+    householdId,
+    date,
+    signal,
+  }: {
+    householdId: string;
+    date: string;
+    signal?: AbortSignal;
+  }) =>
+    (
+      await http.get(
+        `${listPath(householdId)}?${new URLSearchParams({ on: date, limit: '100' }).toString()}`,
+        transactionListResponseSchema,
+        { signal },
+      )
+    ).transactions,
   summary: async ({
     householdId,
     month,

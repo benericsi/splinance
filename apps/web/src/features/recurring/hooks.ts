@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { calendarQueries } from '@/features/calendar/queries';
 import { notificationQueries } from '@/features/notifications/queries';
 import { i18n } from '@/i18n';
 import { recurringApi } from './api';
@@ -10,6 +11,8 @@ function useInvalidateRecurring() {
   return (_data: unknown, { householdId }: { householdId: string }) =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: recurringQueries.household(householdId) }),
+      // The calendar shows a series' payments, found and expected.
+      queryClient.invalidateQueries({ queryKey: calendarQueries.household(householdId) }),
       // Renewal reminders follow the series.
       queryClient.invalidateQueries({ queryKey: notificationQueries.all() }),
     ]);
@@ -52,6 +55,7 @@ export function useDismissSuggestion() {
     mutationFn: recurringApi.dismiss,
     onSuccess: async (_data, { householdId, decision }) => {
       await queryClient.invalidateQueries({ queryKey: recurringQueries.household(householdId) });
+      void queryClient.invalidateQueries({ queryKey: calendarQueries.household(householdId) });
       toast(i18n.t('recurring:suggestion.hidden'), {
         duration: 8000,
         action: {

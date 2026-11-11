@@ -2,6 +2,7 @@ import type { Household } from '@splinance/shared';
 import { Link, useMatchRoute } from '@tanstack/react-router';
 import {
   ArrowLeftRight,
+  CalendarDays,
   ChartColumn,
   House,
   type LucideIcon,
@@ -27,6 +28,7 @@ interface NavItem {
     | '/h/$householdId'
     | '/h/$householdId/transactions'
     | '/h/$householdId/budgets'
+    | '/h/$householdId/calendar'
     | '/h/$householdId/recurring'
     | '/h/$householdId/reports'
     | '/h/$householdId/settings';
@@ -38,6 +40,12 @@ interface NavItem {
   exact?: boolean;
   /** Modal routes over this section's page that keep the section highlighted. */
   alsoActiveOn?: '/h/$householdId/settle';
+  /**
+   * Not a phone tab: six fill the bar. The calendar is reached from Transactions there
+   * (`ActivityViewSwitch`), so that tab stays highlighted on it (`tabAlsoActiveOn`).
+   */
+  sidebarOnly?: boolean;
+  tabAlsoActiveOn?: '/h/$householdId/calendar';
 }
 
 // New sections (expenses, balances, budgets, ...) are added here as they ship.
@@ -56,7 +64,9 @@ const NAV_ITEMS: NavItem[] = [
     label: 'transactions',
     shortLabel: 'transactionsShort',
     icon: ArrowLeftRight,
+    tabAlsoActiveOn: '/h/$householdId/calendar',
   },
+  { to: '/h/$householdId/calendar', label: 'calendar', icon: CalendarDays, sidebarOnly: true },
   { to: '/h/$householdId/budgets', label: 'budgets', icon: PiggyBank },
   {
     to: '/h/$householdId/recurring',
@@ -78,32 +88,42 @@ const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const TAB_ITEMS = NAV_ITEMS.filter((item) => !item.sidebarOnly);
+
 function NavLinks({ householdId, variant }: { householdId: string; variant: 'sidebar' | 'tabs' }) {
   const { t } = useTranslation('shell');
   const matchRoute = useMatchRoute();
-  return NAV_ITEMS.map(({ to, label, shortLabel, icon: Icon, exact, alsoActiveOn }) => (
-    <Link
-      key={to}
-      to={to}
-      params={{ householdId }}
-      activeOptions={{ exact: exact ?? false }}
-      // Same attributes the link sets when it is active itself.
-      inactiveProps={
-        alsoActiveOn && matchRoute({ to: alsoActiveOn, params: { householdId } })
-          ? { 'data-status': 'active', 'aria-current': 'page' }
-          : {}
-      }
-      className={cn(
-        'focus-visible:ring-ring/50 outline-none focus-visible:ring-[3px]',
-        variant === 'sidebar'
-          ? 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground flex items-center gap-3 rounded-lg px-3 py-2 font-medium'
-          : 'text-muted-foreground data-[status=active]:text-foreground flex flex-col items-center gap-1 py-2 text-xs font-medium',
-      )}
-    >
-      <Icon className="size-4" aria-hidden />
-      {t(`nav.${variant === 'tabs' ? (shortLabel ?? label) : label}`)}
-    </Link>
-  ));
+  const tabs = variant === 'tabs';
+  const items = tabs ? TAB_ITEMS : NAV_ITEMS;
+  return items.map(
+    ({ to, label, shortLabel, icon: Icon, exact, alsoActiveOn, tabAlsoActiveOn }) => (
+      <Link
+        key={to}
+        to={to}
+        params={{ householdId }}
+        activeOptions={{ exact: exact ?? false }}
+        // Same attributes the link sets when it is active itself.
+        inactiveProps={
+          (alsoActiveOn && matchRoute({ to: alsoActiveOn, params: { householdId } })) ||
+          // Fuzzy: a day's dialog over the calendar counts too.
+          (tabs &&
+            tabAlsoActiveOn &&
+            matchRoute({ to: tabAlsoActiveOn, params: { householdId }, fuzzy: true }))
+            ? { 'data-status': 'active', 'aria-current': 'page' }
+            : {}
+        }
+        className={cn(
+          'focus-visible:ring-ring/50 outline-none focus-visible:ring-[3px]',
+          variant === 'sidebar'
+            ? 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-accent-foreground flex items-center gap-3 rounded-lg px-3 py-2 font-medium'
+            : 'text-muted-foreground data-[status=active]:text-foreground flex flex-col items-center gap-1 py-2 text-xs font-medium',
+        )}
+      >
+        <Icon className="size-4" aria-hidden />
+        {t(`nav.${variant === 'tabs' ? (shortLabel ?? label) : label}`)}
+      </Link>
+    ),
+  );
 }
 
 /**
@@ -155,8 +175,8 @@ export function HouseholdShell({
 
         <nav
           aria-label={t('sections')}
-          // One column per section (NAV_ITEMS), so a new section never wraps the bar.
-          style={{ gridTemplateColumns: `repeat(${String(NAV_ITEMS.length)}, minmax(0, 1fr))` }}
+          // One column per tab (TAB_ITEMS), so a new section never wraps the bar.
+          style={{ gridTemplateColumns: `repeat(${String(TAB_ITEMS.length)}, minmax(0, 1fr))` }}
           className="bg-background fixed inset-x-0 bottom-0 z-40 grid border-t pb-[env(safe-area-inset-bottom)] md:hidden"
         >
           <NavLinks householdId={household.id} variant="tabs" />

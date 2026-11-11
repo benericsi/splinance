@@ -12,6 +12,7 @@ import { rules } from './rules';
 import { shell } from './shell';
 import { imports } from './imports';
 import { budgets } from './budgets';
+import { calendar } from './calendar';
 import { reports } from './reports';
 import { recurring } from './recurring';
 import { notifications } from './notifications';
@@ -37,6 +38,7 @@ export const hu: Catalog = {
   imports,
   budgets,
   reports,
+  calendar,
   recurring,
   notifications,
   demo,
