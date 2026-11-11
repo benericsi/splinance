@@ -16,6 +16,7 @@ import { reports } from './reports';
 import { recurring } from './recurring';
 import { notifications } from './notifications';
 import { demo } from './demo';
+import { map } from './map';
 import { balances } from './balances';
 import { transactions } from './transactions';
 
@@ -41,4 +42,5 @@ export const en = {
   recurring,
   notifications,
   demo,
+  map,
 };

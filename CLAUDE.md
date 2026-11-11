@@ -11,6 +11,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Categories, auto-categorization rules, monthly budgets
 - Reports: six-month trend and spending by category (household or your share)
 - Calendar: the month by day with spend tint, recurring payments (paid and expected) and settlements
+- Household map: the overview as a canvas (people, debts, your banks, recurring payments, budgets, pending invites)
 - Recurring payment and subscription detection with renewal reminders
 - Later: multi-currency (HUF/EUR), PWA, Hungarian/English i18n, demo mode
 
@@ -61,12 +62,13 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Boot: `index.html` holds a static splash (with a CSS-only "taking longer" fallback after 8 s); `main.tsx` awaits `router.load()` before rendering, so there is no blank frame or login flash
 - Not found / error states: `NotFoundPage` / `ErrorPage` (full page at the root, inline inside layouts via router defaults); throw `notFound()` for missing resources
 - shadcn/ui on Base UI; components in `src/components/ui` are owned code and may be edited. Icons: lucide only (one exception: sign-in providers' own marks in `components/brand/provider-logos.tsx`, required by their branding rules)
-- Brand: palette, logo pairings and contrast helpers live in `packages/shared/src/brand.ts` (mirrored as `--color-brand-*` in `apps/web/src/index.css`; keep both in sync). Brand colors are fills; text uses role tokens `text-link`, `text-positive`, `text-negative` (light/dark tuned to >= 4.5:1). UI chrome stays neutral. Every logo pairing must stay >= 3:1 (enforced by a test)
+- Brand: palette, logo pairings and contrast helpers live in `packages/shared/src/brand.ts` (mirrored as `--color-brand-*` in `apps/web/src/index.css`; keep both in sync). Brand colors are fills; text uses role tokens `text-link`, `text-positive`, `text-negative`, `text-warning` (light/dark tuned to >= 4.5:1). UI chrome stays neutral. Every logo pairing must stay >= 3:1 (enforced by a test)
 - Logo: pink-to-orange split S on a softly lit blue tile (`LogoMark` / `Logo`, crisp). `public/favicon.svg` (crisp) and `public/logo.svg` (grainy, for large static uses and the iOS icon) must match the component; PNGs via `pnpm --filter @splinance/web gen:icons`. Keep the S at >= 3:1 against the tile glow
 - Avatars only through wrappers: `UserAvatar` (facehash with brand colors, seeded with user id) and `HouseholdAvatar` (`@outpacelabs/avatars` mesh gradient in brand colors, seeded with household id, rounded square). The auth screen uses the hand-composed `PosterWall` (`components/brand`): curated art, not generated
 - Amounts that change in place (totals, balances) render with `MoneyFlow` (NumberFlow, digits roll; same formatting as `formatMoney`, `aria-hidden` digits plus an sr-only copy); static amounts use `formatMoney`. NumberFlow is mocked in web tests
 - Motion: `m.*` from `motion/react` (never `motion.*`: `LazyMotion strict`), tokens and `COLLAPSE` in `src/lib/motion.ts`, `Collapse` for open/close by height; `AnimatePresence initial={false}` so first renders are static; key lists by what swaps them (month, kind). Short (0.15-0.2 s), no page transitions, reduced motion respected
 - Loading: household pages have a `pendingComponent` skeleton (`PageSkeleton` + blocks from `components/skeletons.tsx`, mirroring the real boxes, real static h1); content that replaces a skeleton comes in with `RevealPage` / `Reveal` and `useRevealRows` (never on cached navigation). A new household page gets a skeleton too
+- Household map (`features/household-map`, architecture 9 "Household map"): rules live in the pure `buildMap` (tested there); only `components/household-map.tsx` imports `@xyflow/react`, and it stays lazy-loaded; the map shows nothing the cards could not (no new API reads beyond the viewer's imports and, for owners, invites)
 - Fonts: Inter (body, 14px base, use `tabular-nums` for amounts) and Bricolage Grotesque (headings, `font-heading`), self-hosted via fontsource (never Google Fonts CDN, GDPR)
 - Web tests mock the API with MSW (`test/msw.ts`, unhandled requests fail the test; `/api/auth/providers` defaults to none)
 - Tests run against a real Postgres (`splinance_test`); migrations are applied in Vitest global setup. API test files run sequentially (`fileParallelism: false`); tests that write data call `resetDatabase()` from `apps/api/test/db.ts` in `beforeEach`
