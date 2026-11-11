@@ -1,6 +1,7 @@
-import type { Calendar, CalendarDay, CalendarEvent } from '@splinance/shared';
+import type { Calendar, CalendarDay, CalendarEvent, Category } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
+import { CategoryTile } from '@/features/categories/components/category-tile';
 import {
   formatDateWith,
   formatMonth,
@@ -43,15 +44,20 @@ const tintOf = (level: number) =>
  * The month as weeks from Monday. Each day is a link to its dialog: the day number, what
  * was spent, a tint by how much, and its events (the first as a chip, the rest counted).
  * Phones have no room for chips: a dot per event, the details in the day's drawer.
+ * Showing one category, its days carry the category's tile, so the month reads as
+ * "which days", not only "how much".
  */
 export function CalendarGrid({
   householdId,
   calendar,
   view,
+  category,
 }: {
   householdId: string;
   calendar: Calendar;
   view: CalendarView;
+  /** The category the calendar is narrowed to, if any. */
+  category?: Category | undefined;
 }) {
   const { t } = useTranslation('calendar');
   const { user } = useAuth();
@@ -91,6 +97,7 @@ export function CalendarGrid({
               isToday={day.date === today}
               isAhead={day.date > today}
               viewerId={user?.id}
+              category={category}
             />
           </li>
         ))}
@@ -116,6 +123,7 @@ function DayCell({
   isToday,
   isAhead,
   viewerId,
+  category,
 }: {
   householdId: string;
   day: CalendarDay;
@@ -126,9 +134,11 @@ function DayCell({
   isToday: boolean;
   isAhead: boolean;
   viewerId: string | undefined;
+  category: Category | undefined;
 }) {
   const { t } = useTranslation('calendar');
   const spent = daySpent(day, view);
+  const marked = category !== undefined && spent > 0;
   const [first, ...rest] = events;
 
   const details = [
@@ -156,7 +166,7 @@ function DayCell({
       style={tintOf(level)}
       className="hover:ring-foreground/20 focus-visible:ring-ring/50 flex h-14 flex-col gap-1 p-1 outline-none hover:ring-2 hover:ring-inset focus-visible:ring-[3px] focus-visible:ring-inset sm:h-24 sm:p-1.5"
     >
-      <span className="flex items-center justify-between gap-1">
+      <span className="flex items-center gap-1">
         <span
           className={cn(
             'flex size-6 shrink-0 items-center justify-center rounded-full text-xs tabular-nums',
@@ -166,10 +176,11 @@ function DayCell({
         >
           {Number(day.date.slice(8))}
         </span>
+        {marked && <CategoryTile category={category} size="sm" className="max-sm:hidden" />}
         {spent > 0 && (
           // The number alone: the currency is in the totals above, and a narrow cell
           // has no room for it.
-          <span className="text-foreground/80 truncate text-xs tabular-nums max-sm:hidden">
+          <span className="text-foreground/80 ml-auto truncate text-xs tabular-nums max-sm:hidden">
             {formatAmountInput(spent, currency)}
           </span>
         )}
@@ -186,8 +197,15 @@ function DayCell({
         </span>
       )}
 
-      {events.length > 0 && (
-        <span className="flex flex-wrap justify-center gap-0.5 sm:hidden">
+      {(marked || events.length > 0) && (
+        <span className="flex flex-wrap items-center justify-center gap-0.5 sm:hidden">
+          {marked && (
+            <CategoryTile
+              category={category}
+              size="sm"
+              className="size-4 rounded-sm [&_svg]:size-2.5"
+            />
+          )}
           {events.slice(0, 3).map((event, index) => (
             <span key={index} className={cn('size-1.5 rounded-full', EVENT_DOTS[event.type])} />
           ))}

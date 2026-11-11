@@ -1,6 +1,7 @@
 import {
   type Calendar,
   type CalendarEvent,
+  type Category,
   daysOfMonth,
   type Transaction,
 } from '@splinance/shared';
@@ -12,7 +13,16 @@ import { localeStore } from '@/lib/locale';
 import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
 import { authResponse, householdDetail, testHousehold, testUser } from '../../../test/utils';
-import { budgetLeft, eventAmount, leadingBlanks, spendLevel, summarize } from './view';
+import {
+  budgetLeft,
+  changeAgainst,
+  daysElapsed,
+  eventAmount,
+  leadingBlanks,
+  spendLevel,
+  spentThrough,
+  summarize,
+} from './view';
 
 const anna = { userId: testUser.id, displayName: testUser.displayName };
 const ben = { userId: '01a112be-f8eb-73bb-b534-400e393821c4', displayName: 'Ben' };
@@ -106,6 +116,16 @@ const shop: Transaction = {
   updatedAt: '2026-10-10T10:00:00.000Z',
 };
 
+const groceries: Category = {
+  id: '01a12509-0f61-75bc-b406-130108780501',
+  name: 'Groceries',
+  kind: 'expense',
+  icon: 'tag',
+  color: 'green',
+  archivedAt: null,
+};
+const salary: Category = { ...groceries, id: `${SERIES}99`, name: 'Salary', kind: 'income' };
+
 const base = `/api/households/${testHousehold.id}`;
 const page = `/h/${testHousehold.id}/calendar?month=2026-10`;
 
@@ -114,13 +134,43 @@ const money = (text: string) => new RegExp(text.replace(/ /g, '\\s'));
 
 function fakeApi({ budgets = [] as { amount: number; spent: number }[] } = {}) {
   const asked = { months: [] as string[], days: [] as string[] };
+  const blank = (month: string) =>
+    daysOfMonth(month).map((date) => ({
+      date,
+      expenses: 0,
+      income: 0,
+      yourExpenses: 0,
+      yourIncome: 0,
+      count: 0,
+    }));
   server.use(
     mock.post('/api/auth/refresh', () => HttpResponse.json(authResponse())),
     mock.get('/api/households', () => HttpResponse.json({ households: [testHousehold] })),
     mock.get(base, () => HttpResponse.json({ household: householdDetail() })),
+    mock.get(`${base}/categories`, () => HttpResponse.json({ categories: [groceries, salary] })),
     mock.get(`${base}/calendar`, ({ request }) => {
-      const month = new URL(request.url).searchParams.get('month') ?? '';
-      asked.months.push(month);
+      const params = new URL(request.url).searchParams;
+      const month = params.get('month') ?? '';
+      const categoryId = params.get('categoryId');
+      asked.months.push(categoryId ? `${month} ${categoryId}` : month);
+      // One category: October without its events, and 10 000 Ft on 5 September before it.
+      if (categoryId) {
+        return HttpResponse.json({
+          calendar:
+            month === october.month
+              ? { ...october, events: [] }
+              : {
+                  ...october,
+                  month,
+                  events: [],
+                  days: blank(month).map((day) =>
+                    day.date === '2026-09-05'
+                      ? { ...day, expenses: 10_000, yourExpenses: 5000, count: 1 }
+                      : day,
+                  ),
+                },
+        });
+      }
       return HttpResponse.json({
         calendar:
           month === october.month
@@ -154,8 +204,10 @@ function fakeApi({ budgets = [] as { amount: number; spent: number }[] } = {}) {
       }),
     ),
     mock.get(`${base}/transactions`, ({ request }) => {
-      const on = new URL(request.url).searchParams.get('on') ?? '';
-      asked.days.push(on);
+      const params = new URL(request.url).searchParams;
+      const on = params.get('on') ?? '';
+      const categoryId = params.get('categoryId');
+      asked.days.push(categoryId ? `${on} ${categoryId}` : on);
       return HttpResponse.json({
         transactions: on === shop.occurredOn ? [shop] : [],
         nextCursor: null,
@@ -286,6 +338,51 @@ describe('calendar page', () => {
     expect(asked.months).toEqual(['2026-10', '2026-09']);
   });
 
+  it('narrows the month to a category, and compares it with the month before', async () => {
+    const asked = fakeApi();
+    const user = userEvent.setup();
+    renderRoute(page);
+    const grid = await days();
+
+    // Only categories spending can have.
+    await user.click(screen.getByRole('combobox', { name: 'Category' }));
+    expect(screen.queryByRole('option', { name: 'Salary' })).toBeNull();
+    await user.click(await screen.findByRole('option', { name: 'Groceries' }));
+
+    expect(await screen.findByText('Days with spending')).toBeVisible();
+    expect(asked.months).toEqual(['2026-10', `2026-10 ${groceries.id}`, `2026-09 ${groceries.id}`]);
+    expect(stat('Spent')).toHaveTextContent(money('17 490 Ft'));
+    expect(stat('Days with spending')).toHaveTextContent('2 days');
+    // October is over: all of it against all of September (30 days), 17 490 after 10 000.
+    expect(stat('vs 1–30 Sept')).toHaveTextContent(/^vs 1–30 Sept\+75\s?%$/);
+    expect(stat('vs 1–30 Sept')?.querySelector('dd')).toHaveClass('text-negative');
+
+    // Days with spending in it carry the category's tile; the others do not.
+    const tile = (name: RegExp) =>
+      within(grid).getByRole('link', { name }).querySelector('span.rounded-md[aria-hidden]');
+    expect(tile(/ 3 October/)).not.toBeNull();
+    expect(tile(/10 October/)).not.toBeNull();
+    expect(tile(/12 October/)).toBeNull();
+    expect(within(grid).getByRole('link', { name: /12 October/ })).toHaveAccessibleName(
+      /, nothing$/,
+    );
+
+    // The day follows the category.
+    await user.click(within(grid).getByRole('link', { name: /10 October/ }));
+    await screen.findByRole('dialog', { name: /10 Oct/ });
+    expect(asked.days).toEqual([`2026-10-10 ${groceries.id}`]);
+  });
+
+  it('says so when the category had nothing the month before', async () => {
+    fakeApi();
+    renderRoute(`/h/${testHousehold.id}/calendar?month=2026-08&category=${groceries.id}`);
+    await screen.findByRole('list', { name: 'Days of August 2026' });
+    // Nothing in August, nothing in July.
+    expect(stat('vs 1–31 Jul')).toHaveTextContent(/^vs 1–31 Jul–$/);
+    expect(stat('Days with spending')).toHaveTextContent('0 days');
+    expect(screen.getByRole('combobox', { name: 'Category' })).toHaveTextContent('Groceries');
+  });
+
   it('is in Hungarian when the language is', async () => {
     await localeStore.setLocale('hu', { persist: false });
     fakeApi({ budgets: [{ amount: 10_000, spent: 13_000 }] });
@@ -305,10 +402,23 @@ describe('calendar page', () => {
     expect(stat('Még várható')).toHaveTextContent(money('32 900 Ft'));
     expect(stat('Keret túllépve')).toHaveTextContent(money('3000 Ft'));
     expect(screen.getByRole('group', { name: 'Kinek a költése' })).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Kategória' })).toHaveTextContent(
+      'Minden kategória',
+    );
     expect(screen.getByRole('list', { name: 'A jelölések magyarázata' })).toHaveTextContent(
       'Rendszeres, kifizetveVárhatóElszámolásSötétebb nap: több költés',
     );
     expect(document.body).not.toHaveTextContent(/Still to come|Spent|Expected|Settle-up/);
+  });
+
+  it('is in Hungarian for a category too', async () => {
+    await localeStore.setLocale('hu', { persist: false });
+    fakeApi();
+    renderRoute(`${page}&category=${groceries.id}`);
+    await screen.findByRole('list', { name: 'Napok · 2026. október' });
+    expect(stat('Költéses napok')).toHaveTextContent('2 nap');
+    expect(stat('Előtte: szept. 1–30.')).toHaveTextContent(/\+75\s?%$/);
+    expect(document.body).not.toHaveTextContent(/Days with spending|All categories|vs /);
   });
 });
 
@@ -334,6 +444,19 @@ describe('calendar view logic', () => {
     expect(eventAmount(netflix, 'household')).toBe(4490);
     expect(eventAmount(settled, 'mine')).toBe(5000);
     expect(summarize(october, 'mine')).toEqual({ spent: 10_245, income: 0, toCome: 32_900 });
+  });
+
+  it('compares a month in progress with the same days of the month before', () => {
+    expect(daysElapsed('2026-10', '2026-10-11')).toBe(11);
+    expect(daysElapsed('2026-09', '2026-10-11')).toBe(31);
+    expect(daysElapsed('2026-11', '2026-10-11')).toBe(0);
+    // Through the 9th: only the 3rd counts; through the 10th both days do.
+    expect(spentThrough(october, 'household', 9)).toBe(4490);
+    expect(spentThrough(october, 'household', 10)).toBe(17_490);
+    expect(changeAgainst(104, 100)).toBeCloseTo(0.04);
+    expect(changeAgainst(50, 100)).toBe(-0.5);
+    expect(changeAgainst(50, 0)).toBe('new');
+    expect(changeAgainst(0, 0)).toBeNull();
   });
 
   it('adds up what is left of the budgets, or says there are none', () => {

@@ -27,7 +27,12 @@ interface Options {
 }
 
 /** Totals per day of what the viewer sees, and their own part of it (like a report month). */
-async function dayTotals(scope: HouseholdScope, start: string, end: string) {
+async function dayTotals(
+  scope: HouseholdScope,
+  start: string,
+  end: string,
+  categoryId: string | undefined,
+) {
   const isExpense = sql`${transactions.kind} = 'expense'`;
   // Postgres returns bigint sums as strings; they stay far below 2^53 (see MAX_AMOUNT_MINOR).
   const total = (value: ReturnType<typeof sql>, filter: ReturnType<typeof sql>) =>
@@ -50,6 +55,7 @@ async function dayTotals(scope: HouseholdScope, start: string, end: string) {
         visibleTo(scope.userId),
         gte(transactions.occurredOn, start),
         lt(transactions.occurredOn, end),
+        categoryId ? eq(transactions.categoryId, categoryId) : undefined,
       ),
     )
     .groupBy(transactions.occurredOn);
@@ -130,20 +136,22 @@ const EVENT_ORDER: Record<CalendarEvent['type'], number> = {
 /**
  * One month for the calendar page, as the viewer sees it: totals per day, the payments of
  * their tracked recurring series (found and still expected) and the household's
- * settlements. Other people's private transactions and series never count.
+ * settlements. Other people's private transactions and series never count. With a
+ * category, only what is filed under it (an id from elsewhere simply matches nothing).
  */
 export async function getCalendar(
   scope: HouseholdScope,
-  { month }: CalendarQuery,
+  { month, categoryId }: CalendarQuery,
   { today = budapestToday() }: Options = {},
 ): Promise<Calendar> {
   const { household } = await requireMembership(db, scope);
   const [start, end] = monthRange(month);
 
   const [totals, recurring, settled] = await Promise.all([
-    dayTotals(scope, start, end),
+    dayTotals(scope, start, end, categoryId),
     recurringEvents(scope, month, start, end, today),
-    settlementsBetween(db, scope.householdId, start, end),
+    // Settlements have no category: a category's calendar has none.
+    categoryId ? [] : settlementsBetween(db, scope.householdId, start, end),
   ]);
 
   const byDate = new Map(totals.map((row) => [row.date, row]));
@@ -160,7 +168,7 @@ export async function getCalendar(
   });
 
   const events: CalendarEvent[] = [
-    ...recurring,
+    ...recurring.filter((event) => !categoryId || event.categoryId === categoryId),
     ...settled.map((settlement): CalendarEvent => ({
       type: 'settlement',
       date: settlement.settledOn,

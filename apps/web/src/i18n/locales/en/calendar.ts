@@ -10,6 +10,10 @@ export const calendar = {
     list: 'List',
     calendar: 'Calendar',
   },
+  category: {
+    label: 'Category',
+    all: 'All categories',
+  },
   stats: {
     spent: 'Spent',
     youSpent: 'You spent',
@@ -18,6 +22,13 @@ export const calendar = {
     overBudget: 'Over budget',
     income: 'Income',
     yourIncome: 'Your income',
+    days: 'Days with spending',
+    dayCount_one: '{{count}} day',
+    dayCount_other: '{{count}} days',
+    /** "vs 1–11 Oct": the same days of the month before. */
+    compare: 'vs {{period}}',
+    period: '1–{{day}} {{month}}',
+    nothingThen: 'Nothing then',
   },
   grid: {
     label: 'Days of {{month}}',

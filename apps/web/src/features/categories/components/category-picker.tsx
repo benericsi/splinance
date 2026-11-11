@@ -33,6 +33,7 @@ export function CategoryPicker({
   onBlur,
   label,
   compact = false,
+  noneLabel,
 }: {
   id: string;
   /** Already narrowed to what may be picked (kind, active or current). */
@@ -44,9 +45,11 @@ export function CategoryPicker({
   label?: string | undefined;
   /** A shorter trigger for dense rows. */
   compact?: boolean;
+  /** What the empty choice is called where it does not mean "no category" (a filter's "All"). */
+  noneLabel?: string | undefined;
 }) {
   const { t } = useTranslation('categories');
-  const none: Option = { id: '', name: t('none'), category: undefined };
+  const none: Option = { id: '', name: noneLabel ?? t('none'), category: undefined };
   const options = [
     none,
     ...[...categories]

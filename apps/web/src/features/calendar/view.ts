@@ -44,6 +44,36 @@ export function eventsByDate(events: CalendarEvent[]): Map<string, CalendarEvent
   return byDate;
 }
 
+/** Days of the month with spending. */
+export const spendingDays = (calendar: Calendar, view: CalendarView) =>
+  calendar.days.filter((day) => daySpent(day, view) > 0).length;
+
+/** What was spent from the 1st through a day of the month. */
+export function spentThrough(calendar: Calendar, view: CalendarView, dayOfMonth: number): number {
+  return calendar.days
+    .filter((day) => Number(day.date.slice(8)) <= dayOfMonth)
+    .reduce((sum, day) => sum + daySpent(day, view), 0);
+}
+
+/**
+ * How many days of a month have begun by `today`: its day number in the current month,
+ * 0 in a month still ahead, more than any month has in a past one (all of it).
+ */
+export function daysElapsed(month: string, today: string): number {
+  const current = today.slice(0, 7);
+  if (month === current) return Number(today.slice(8));
+  return month < current ? 31 : 0;
+}
+
+/**
+ * The relative change from `before` to `now` (0.04 is 4% more); `'new'` when there was
+ * nothing before, null when there is nothing in either.
+ */
+export function changeAgainst(now: number, before: number): number | 'new' | null {
+  if (before > 0) return (now - before) / before;
+  return now > 0 ? 'new' : null;
+}
+
 export interface CalendarSummary {
   spent: number;
   income: number;

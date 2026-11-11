@@ -39,19 +39,26 @@ export const transactionsApi = {
   listDay: async ({
     householdId,
     date,
+    categoryId,
     signal,
   }: {
     householdId: string;
     date: string;
+    categoryId?: string | undefined;
     signal?: AbortSignal;
-  }) =>
-    (
+  }) => {
+    const query = new URLSearchParams({ on: date, limit: '100' });
+    if (categoryId) query.set('categoryId', categoryId);
+    return (
       await http.get(
-        `${listPath(householdId)}?${new URLSearchParams({ on: date, limit: '100' }).toString()}`,
+        `${listPath(householdId)}?${query.toString()}`,
         transactionListResponseSchema,
-        { signal },
+        {
+          signal,
+        },
       )
-    ).transactions,
+    ).transactions;
+  },
   summary: async ({
     householdId,
     month,
