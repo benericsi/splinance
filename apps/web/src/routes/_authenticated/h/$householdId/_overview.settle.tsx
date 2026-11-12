@@ -26,7 +26,13 @@ function SettleUpRoute() {
   const { data: balances } = useSuspenseQuery(balanceQueries.debts(householdId));
   const close = useCloseModal(
     useCallback(() => {
-      void navigate({ to: '/h/$householdId', params: { householdId }, replace: true });
+      void navigate({
+        to: '/h/$householdId',
+        params: { householdId },
+        // Back to the overview as it was: cards or map.
+        search: ({ view }) => ({ view }),
+        replace: true,
+      });
     }, [navigate, householdId]),
   );
 

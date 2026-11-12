@@ -16,6 +16,7 @@ import { balanceQueries } from '@/features/balances/queries';
 import { BudgetAlertsCard } from '@/features/budgets/components/budget-alerts-card';
 import { budgetQueries } from '@/features/budgets/queries';
 import { categoryQueries } from '@/features/categories/queries';
+import { MapAddMenu } from '@/features/household-map/components/map-add-menu';
 import { MapSkeleton, OverviewMap } from '@/features/household-map/components/overview-map';
 import { householdQueries } from '@/features/households/queries';
 import { importQueries } from '@/features/imports/queries';
@@ -82,34 +83,36 @@ function OverviewPage() {
       <PageHeader
         title={greeting(new Date().getHours(), user?.displayName ?? '')}
         actions={
-          <SegmentedControl
-            label={tMap('view.label')}
-            value={view ?? 'cards'}
-            onChange={(next) => {
-              void navigate({
-                search: (previous) => ({ ...previous, view: next === 'map' ? 'map' : undefined }),
-                replace: true,
-              });
-            }}
-            options={[
-              { value: 'cards', label: tMap('view.cards') },
-              { value: 'map', label: tMap('view.map') },
-            ]}
-            className="hidden w-auto md:flex"
-          />
+          <>
+            {showMap && <MapAddMenu household={household} />}
+            <SegmentedControl
+              label={tMap('view.label')}
+              value={view ?? 'cards'}
+              onChange={(next) => {
+                void navigate({
+                  search: (previous) => ({ ...previous, view: next === 'map' ? 'map' : undefined }),
+                  replace: true,
+                });
+              }}
+              options={[
+                { value: 'cards', label: tMap('view.cards') },
+                { value: 'map', label: tMap('view.map') },
+              ]}
+              className="hidden w-auto md:flex"
+            />
+          </>
         }
       />
       {showMap ? (
-        <Reveal index={0}>
-          <OverviewMap
-            household={household}
-            viewerId={viewerId}
-            balances={balances}
-            budgets={budgets}
-            categories={categories}
-            recurring={recurring}
-          />
-        </Reveal>
+        // Not inside `Reveal`: its transform would become what the map fills.
+        <OverviewMap
+          household={household}
+          viewerId={viewerId}
+          balances={balances}
+          budgets={budgets}
+          categories={categories}
+          recurring={recurring}
+        />
       ) : (
         <div className="space-y-6">
           <Reveal index={0}>

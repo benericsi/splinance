@@ -1,5 +1,5 @@
 import type { HouseholdMember, ImportBatch, Invite } from '@splinance/shared';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { http as mock, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -9,15 +9,21 @@ import { authResponse, householdDetail, testHousehold, testUser } from '../../..
 import type { HouseholdMap } from './build-map';
 
 // React Flow needs a real layout engine to measure and place nodes; jsdom has none. The
-// canvas is replaced by a list of the same cards, so everything up to it is real: the
-// route, the queries, buildMap and what each node says. The canvas itself is covered e2e.
+// canvas is replaced by a list of the same nodes, so everything up to it is real: the
+// route, the queries, buildMap, what each node says and where it leads. The canvas itself
+// (moving nodes, dropping one person on another) is covered e2e.
 vi.mock('./components/household-map', async () => {
-  const { MapNodeCard } = await import('./components/map-node-card');
+  const { MapNodeLink } = await import('./components/map-node-link');
   return {
     default: ({ map }: { map: HouseholdMap }) => (
       <section aria-label="Household map">
         {map.nodes.map((node) => (
-          <MapNodeCard key={node.id} node={node} currency={map.currency} />
+          <MapNodeLink
+            key={node.id}
+            node={node}
+            householdId={map.householdId}
+            currency={map.currency}
+          />
         ))}
       </section>
     ),
@@ -174,5 +180,101 @@ describe('the overview as a map', () => {
 
     expect(await screen.findByText('Bela owes you')).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Household map' })).not.toBeInTheDocument();
+  });
+
+  it('makes every node the way to its page, by keyboard too', async () => {
+    restore = wideScreen();
+    fakeApi();
+    const router = renderRoute(`${overview}?view=map`);
+    const user = userEvent.setup();
+
+    const map = await screen.findByRole('region', { name: 'Household map' });
+    const href = (name: RegExp) => within(map).getByRole('link', { name }).getAttribute('href');
+    expect(href(/Otthon/)).toBe(`${overview}/settings`);
+    expect(href(/Revolut/)).toBe(`${overview}/transactions/import`);
+    // The invite arrives on its own, after the rest.
+    expect(await within(map).findByRole('link', { name: /Pending invite/ })).toHaveAttribute(
+      'href',
+      `${overview}/settings`,
+    );
+    // Your own card leads nowhere: there is nobody to settle with.
+    expect(within(map).queryByRole('link', { name: /\(you\)/ })).not.toBeInTheDocument();
+
+    within(map).getByRole('link', { name: /Bela/ }).focus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByRole('dialog', { name: 'Settle up' })).toBeVisible();
+    expect(router.state.location.search).toEqual({ view: 'map', with: bela.userId });
+    // Still the map underneath (hidden from assistive tech while the dialog is open).
+    expect(screen.getByRole('region', { name: 'Household map', hidden: true })).toBeInTheDocument();
+  });
+
+  it('offers what can be added, the invite only to owners', async () => {
+    restore = wideScreen();
+    fakeApi();
+    renderRoute(`${overview}?view=map`);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Add' }));
+    const menu = await screen.findByRole('menu');
+    const items = Object.fromEntries(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => [item.textContent, item.getAttribute('href')]),
+    );
+    expect(items).toEqual({
+      Transaction: `${overview}/transactions/new`,
+      'Bank import': `${overview}/transactions/import`,
+      'Recurring payment': `${overview}/recurring/new`,
+      Budget: `${overview}/budgets/set`,
+      'Settle up': `${overview}/settle?view=map`,
+      'Invite someone': `${overview}/settings/invite`,
+    });
+  });
+
+  it('does not offer the invite to a member who is not an owner', async () => {
+    restore = wideScreen();
+    fakeApi({ role: 'member' });
+    renderRoute(`${overview}?view=map`);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Add' }));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).getByRole('menuitem', { name: 'Budget' })).toBeVisible();
+    expect(
+      within(menu).queryByRole('menuitem', { name: 'Invite someone' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('takes a bank export dropped on the map to the import page', async () => {
+    restore = wideScreen();
+    fakeApi();
+    const router = renderRoute(`${overview}?view=map`);
+
+    const map = await screen.findByRole('region', { name: 'Household map' });
+    const dataTransfer = {
+      types: ['Files'],
+      files: [new File(['not a statement'], 'export.csv', { type: 'text/csv' })],
+    };
+    fireEvent.dragOver(map, { dataTransfer });
+    expect(screen.getByText('Drop the bank export to import it')).toBeVisible();
+    fireEvent.drop(map, { dataTransfer });
+
+    // The import page opens and reads the file straight away.
+    expect(await screen.findByRole('heading', { name: 'Import from your bank' })).toBeVisible();
+    expect(router.state.location.pathname).toBe(`${overview}/transactions/import`);
+    expect(await screen.findByRole('alert')).toBeVisible();
+  });
+
+  it('ignores a drag that carries no file', async () => {
+    restore = wideScreen();
+    fakeApi();
+    const router = renderRoute(`${overview}?view=map`);
+
+    const map = await screen.findByRole('region', { name: 'Household map' });
+    const dataTransfer = { types: ['text/plain'], files: [] };
+    fireEvent.dragOver(map, { dataTransfer });
+    fireEvent.drop(map, { dataTransfer });
+    expect(screen.queryByText('Drop the bank export to import it')).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(overview);
   });
 });

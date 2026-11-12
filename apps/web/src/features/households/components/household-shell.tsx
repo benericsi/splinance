@@ -156,7 +156,7 @@ export function HouseholdShell({
       </aside>
 
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <header className="box-content flex h-14 items-center justify-between gap-3 border-b px-4 pt-[env(safe-area-inset-top)] md:absolute md:top-8 md:right-8 md:box-border md:h-auto md:border-0 md:p-0">
+        <header className="box-content flex h-14 items-center justify-between gap-3 border-b px-4 pt-[env(safe-area-inset-top)] md:absolute md:top-8 md:right-8 md:z-10 md:box-border md:h-auto md:border-0 md:p-0">
           <div className="min-w-0 md:hidden">
             <HouseholdSwitcher current={household} />
           </div>
@@ -168,7 +168,9 @@ export function HouseholdShell({
           )}
         </header>
 
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:pt-8 md:pb-12">
+        {/* A page that holds a `data-bleed` element (the household map) gets the whole area
+            beside the sidebar: no column, and that element may fill it behind the content. */}
+        <main className="group/main mx-auto w-full max-w-5xl flex-1 has-[[data-bleed]]:relative has-[[data-bleed]]:isolate has-[[data-bleed]]:max-w-none px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-8 md:pt-8 md:pb-12">
           {__DEMO_SITE__ && <DemoBanner />}
           {children}
         </main>

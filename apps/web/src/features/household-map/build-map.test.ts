@@ -1,7 +1,14 @@
 import type { Budget, ImportBatch, Invite, RecurringSeries } from '@splinance/shared';
 import { describe, expect, it } from 'vitest';
 import { householdDetail, testHousehold, testUser } from '../../../test/utils';
-import { BUDGET_CAP, buildMap, type MapInput, type MapNode, RECURRING_CAP } from './build-map';
+import {
+  BUDGET_CAP,
+  buildMap,
+  type MapInput,
+  type MapNode,
+  RECURRING_CAP,
+  settleByDrop,
+} from './build-map';
 
 const anna = { userId: testUser.id, displayName: testUser.displayName };
 const bela = { userId: '01a1216a-b248-781c-9cc6-cd68276fcdfc', displayName: 'Bela' };
@@ -147,6 +154,23 @@ describe('buildMap', () => {
     expect(edgeIds(map)).not.toContain(`member:${cili.userId}>household`);
   });
 
+  it('lets the viewer settle with members and with someone who left owing them, never themselves', () => {
+    const settle = (debts: MapInput['balances']['debts']) =>
+      Object.fromEntries(
+        ofKind(buildMap(input({ balances: { currency: 'HUF', debts } })).nodes, 'member').map(
+          (m) => [m.displayName, m.canSettle],
+        ),
+      );
+
+    expect(settle([{ from: cili, to: anna, amount: 900 }])).toEqual({
+      [anna.displayName]: false,
+      Bela: true,
+      Cili: true,
+    });
+    // Cili left owing Bela: that is between the two of them.
+    expect(settle([{ from: cili, to: bela, amount: 900 }])).toMatchObject({ Cili: false });
+  });
+
   it('shows one bank node per source from the newest import that was not undone', () => {
     const map = buildMap(
       input({
@@ -275,5 +299,37 @@ describe('buildMap', () => {
     expect(ofKind(map.nodes, 'household')[0]?.y).toBe(0);
     const banks = ofKind(map.nodes, 'bank').map((node) => node.y);
     expect((banks[0] ?? 0) + (banks[1] ?? 0)).toBe(0);
+  });
+});
+
+describe('settleByDrop', () => {
+  const map = buildMap(
+    input({
+      household: householdDetail(testHousehold, [
+        { ...anna, role: 'owner', joinedAt },
+        { ...bela, role: 'member', joinedAt },
+        { ...cili, role: 'member', joinedAt },
+      ]),
+      imports: [batch(1)],
+    }),
+  );
+  const node = (id: string) => {
+    const found = map.nodes.find((candidate) => candidate.id === id);
+    if (!found) throw new Error(`No node ${id}`);
+    return found;
+  };
+  const me = node(`member:${anna.userId}`);
+  const b = node(`member:${bela.userId}`);
+  const c = node(`member:${cili.userId}`);
+
+  it('settles with the other person, whichever of the two is dragged', () => {
+    expect(settleByDrop(me, b)).toBe(bela.userId);
+    expect(settleByDrop(b, me)).toBe(bela.userId);
+  });
+
+  it('does nothing between two other people, or with anything that is not a person', () => {
+    expect(settleByDrop(b, c)).toBeUndefined();
+    expect(settleByDrop(me, node('household'))).toBeUndefined();
+    expect(settleByDrop(node('bank:revolut'), me)).toBeUndefined();
   });
 });
