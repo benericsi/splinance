@@ -14,6 +14,7 @@ import { RouteDialog } from '@/components/route-dialog';
 import { SegmentedControl } from '@/components/segmented-control';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { usePreferences } from '@/features/account/preferences';
 import { CategoryPicker } from '@/features/categories/components/category-picker';
 import { useAuth } from '@/lib/auth-store';
 import { ApiError } from '@/lib/http';
@@ -58,6 +59,7 @@ export function TransactionDialog({
   const { t } = useTranslation(['transactions', 'common']);
   const { user } = useAuth();
   const viewerId = user?.id ?? '';
+  const { transactionVisibility } = usePreferences();
   const currency = household.baseCurrency;
   const queryClient = useQueryClient();
   const create = useCreateTransaction();
@@ -70,7 +72,7 @@ export function TransactionDialog({
   const form = useForm({
     defaultValues: base
       ? editTransactionValues(base, household.members, viewerId)
-      : newTransactionValues(household.members, viewerId),
+      : newTransactionValues(household.members, viewerId, transactionVisibility),
     validationLogic: revalidateLogic(),
     validators: { onDynamic: transactionFormSchema(currency) },
     onSubmit: async ({ value }) => {

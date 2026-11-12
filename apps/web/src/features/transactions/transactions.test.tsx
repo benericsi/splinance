@@ -306,6 +306,37 @@ describe('adding a transaction', () => {
     });
   });
 
+  it('starts a new transaction as private when that is the person’s default', async () => {
+    const api = fakeApi();
+    server.use(
+      mock.post('/api/auth/refresh', () =>
+        HttpResponse.json(
+          authResponse('access-1', {
+            ...testUser,
+            preferences: { ...testUser.preferences, transactionVisibility: 'private' },
+          }),
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderRoute(page);
+
+    await user.click(await screen.findByRole('link', { name: 'Add' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add transaction' });
+    expect(within(dialog).getByRole('button', { name: 'Just me' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.type(within(dialog).getByLabelText('Amount'), '1500');
+    await user.type(getField('Description'), 'Coffee');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => {
+      expect(writes(api)).toHaveLength(1);
+    });
+    expect(writes(api)[0]?.body).toMatchObject({ visibility: 'private', amount: 1500 });
+  });
+
   it('groups digits while typing and keeps the caret in place', async () => {
     fakeApi();
     const user = userEvent.setup();

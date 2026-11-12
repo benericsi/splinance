@@ -12,6 +12,7 @@ import { SkeletonLine } from '@/components/skeletons';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { unlessDefault, usePreferences } from '@/features/account/preferences';
 import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
 import { CategoryBreakdown } from '@/features/reports/components/category-breakdown';
@@ -26,7 +27,8 @@ import { currentMonth, formatMonth } from '@/features/transactions/dates';
 /**
  * `period`: six months (default) or a calendar year. Months: `to` is the trend's last month
  * (default now), `month` the one the categories show (default `to`). Year: `year` (default
- * the selected month's). `view`: the whole household's spending or the viewer's share.
+ * the selected month's). `view`: the whole household's spending or the viewer's share;
+ * absent means the person's default (`spendingView`).
  */
 const searchSchema = z.object({
   period: z.enum(['month', 'year']).optional().catch(undefined),
@@ -79,7 +81,8 @@ function ReportsPage() {
   const navigate = Route.useNavigate();
   const now = currentMonth();
   const range = reportRange(toRangeSearch(search), now);
-  const view: ReportView = search.view ?? 'household';
+  const { spendingView } = usePreferences();
+  const view: ReportView = search.view ?? spendingView;
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
   const fetched = fetchRange(range);
@@ -175,7 +178,7 @@ function ReportsPage() {
             className="min-w-0 flex-[3] sm:w-52 sm:flex-none"
             value={view}
             onChange={(next) => {
-              go({ view: next });
+              go({ view: unlessDefault(next, spendingView) });
             }}
             options={[
               { value: 'household', label: t('household') },

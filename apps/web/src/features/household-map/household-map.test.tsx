@@ -164,6 +164,34 @@ describe('the overview as a map', () => {
     expect(router.state.location.search).toEqual({});
   });
 
+  it('opens as a map when that is the person’s default; the URL says only what differs', async () => {
+    restore = wideScreen();
+    fakeApi();
+    server.use(
+      mock.post('/api/auth/refresh', () =>
+        HttpResponse.json(
+          authResponse('access-1', {
+            ...testUser,
+            preferences: { ...testUser.preferences, overviewView: 'map' },
+          }),
+        ),
+      ),
+    );
+    const router = renderRoute(overview);
+    const user = userEvent.setup();
+
+    expect(await screen.findByRole('region', { name: 'Household map' })).toBeVisible();
+    const group = screen.getByRole('group', { name: 'Overview layout' });
+
+    await user.click(within(group).getByRole('button', { name: 'Cards' }));
+    expect(await screen.findByText('Bela owes you')).toBeVisible();
+    expect(router.state.location.search).toEqual({ view: 'cards' });
+
+    await user.click(within(group).getByRole('button', { name: 'Map' }));
+    expect(await screen.findByRole('region', { name: 'Household map' })).toBeVisible();
+    expect(router.state.location.search).toEqual({});
+  });
+
   it('does not ask for invites as a member who is not an owner', async () => {
     restore = wideScreen();
     fakeApi({ role: 'member' });
@@ -174,8 +202,18 @@ describe('the overview as a map', () => {
     expect(within(map).queryByText('Pending invite')).not.toBeInTheDocument();
   });
 
-  it('stays on cards on a narrow screen, whatever the URL says', async () => {
+  it('stays on cards on a narrow screen, whatever the URL or the default says', async () => {
     fakeApi();
+    server.use(
+      mock.post('/api/auth/refresh', () =>
+        HttpResponse.json(
+          authResponse('access-1', {
+            ...testUser,
+            preferences: { ...testUser.preferences, overviewView: 'map' },
+          }),
+        ),
+      ),
+    );
     renderRoute(`${overview}?view=map`);
 
     expect(await screen.findByText('Bela owes you')).toBeVisible();
