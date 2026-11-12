@@ -134,6 +134,30 @@ async function recordTour(browser: Browser, scheme: (typeof SCHEMES)[number]) {
   await expect(page.getByRole('heading', { name: 'Balance' })).toBeVisible();
   await pause(page, 1500);
 
+  // The same overview as a map; dropping yourself on your partner opens settle up.
+  await glideAndClick(
+    page,
+    page.getByRole('group', { name: 'Overview layout' }).getByRole('button', { name: 'Map' }),
+  );
+  const map = page.getByRole('region', { name: 'Household map' });
+  const nodes = map.locator('.react-flow__node');
+  await expect(nodes.first()).toBeVisible();
+  await pause(page, 3000);
+  const from = await nodes.filter({ hasText: '(you)' }).boundingBox();
+  const to = await nodes.filter({ hasText: 'Jane Doe' }).boundingBox();
+  if (!from || !to) throw new Error('No people on the map');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2, { steps: 30 });
+  await pause(page, 250);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 40 });
+  await pause(page, 600);
+  await page.mouse.up();
+  await expect(page.getByRole('dialog', { name: 'Settle up' })).toBeVisible();
+  await pause(page, 2500);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await pause(page, 1200);
+
   // The bell: the partner's week, a renewal and a budget alert.
   await glideAndClick(page, page.getByRole('button', { name: /^Notifications/ }));
   await expect(page.getByRole('list', { name: 'Notifications' })).toBeVisible();
