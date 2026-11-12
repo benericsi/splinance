@@ -1,6 +1,7 @@
 import {
   accountResponseSchema,
   authResponseSchema,
+  DEFAULT_PREFERENCES,
   householdDetailResponseSchema,
   profileResponseSchema,
   revokeSessionsResponseSchema,
@@ -203,6 +204,76 @@ describe('PATCH /api/account', () => {
       expect(errorCode(bad)).toBe('VALIDATION_ERROR');
     }
   });
+});
+
+describe('PATCH /api/account/preferences', () => {
+  function savePreferences(annaDevice: Device, body: object) {
+    return request(app)
+      .patch('/api/account/preferences')
+      .set('Authorization', annaDevice.auth)
+      .send(body);
+  }
+
+  it('starts with the defaults and returns them on sign-in', async () => {
+    const annaDevice = await registerAnna(app);
+    const me = await request(app).get('/api/me').set('Authorization', annaDevice.auth);
+    expect(profileResponseSchema.parse(me.body).user.preferences).toEqual(DEFAULT_PREFERENCES);
+    const res = await login(app).expect(200);
+    expect(authResponseSchema.parse(res.body).user.preferences).toEqual(DEFAULT_PREFERENCES);
+  });
+
+  it('saves any of them and keeps the others, the name and the language', async () => {
+    const annaDevice = await registerAnna(app);
+    await request(app)
+      .patch('/api/account')
+      .set('Authorization', annaDevice.auth)
+      .send({ locale: 'hu' })
+      .expect(200);
+
+    const first = await savePreferences(annaDevice, { overviewView: 'map' }).expect(200);
+    expect(profileResponseSchema.parse(first.body).user).toMatchObject({
+      displayName: 'Anna',
+      locale: 'hu',
+      preferences: { ...DEFAULT_PREFERENCES, overviewView: 'map' },
+    });
+
+    await savePreferences(annaDevice, {
+      transactionVisibility: 'private',
+      spendingView: 'mine',
+    }).expect(200);
+    // Another device sees them on its next refresh.
+    const res = await login(app).expect(200);
+    expect(authResponseSchema.parse(res.body).user.preferences).toEqual({
+      overviewView: 'map',
+      transactionVisibility: 'private',
+      spendingView: 'mine',
+    });
+  });
+
+  it('rejects unknown values and an empty change', async () => {
+    const annaDevice = await registerAnna(app);
+    for (const body of [
+      { overviewView: 'list' },
+      { transactionVisibility: 'secret' },
+      { spendingView: 'theirs' },
+      { overviewView: null },
+      {},
+      { theme: 'dark' },
+    ]) {
+      const bad = await savePreferences(annaDevice, body).expect(400);
+      expect(errorCode(bad)).toBe('VALIDATION_ERROR');
+    }
+    const [row] = await db.select().from(users).where(eq(users.id, annaDevice.userId));
+    expect(row?.overviewView).toBe('cards');
+  });
+
+  it('needs a signed-in user', async () => {
+    const res = await request(app)
+      .patch('/api/account/preferences')
+      .send({ overviewView: 'map' })
+      .expect(401);
+    expect(errorCode(res)).toBe('UNAUTHENTICATED');
+  });
 
   it('validates the name', async () => {
     const annaDevice = await registerAnna(app);
@@ -341,5 +412,16 @@ describe('on the demo instance', () => {
       const res = await write.set('Authorization', here.auth).expect(403);
       expect(errorCode(res)).toBe('DEMO_MODE');
     }
+  });
+
+  it('keeps preferences open: fixed values a visitor can try', async () => {
+    const here = await registerAnna(app);
+    const demo = createApp({ demo: { ttlDays: 7, maxActive: 10 } });
+    const res = await request(demo)
+      .patch('/api/account/preferences')
+      .set('Authorization', here.auth)
+      .send({ overviewView: 'map' })
+      .expect(200);
+    expect(profileResponseSchema.parse(res.body).user.preferences.overviewView).toBe('map');
   });
 });

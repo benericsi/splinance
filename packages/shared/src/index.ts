@@ -17,6 +17,7 @@ export * from './money';
 export * from './notifications';
 export * from './oauth';
 export * from './password/rules';
+export * from './preferences';
 export * from './recurring';
 export * from './reports';
 export * from './rules';

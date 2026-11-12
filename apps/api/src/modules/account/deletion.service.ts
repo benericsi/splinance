@@ -1,4 +1,8 @@
-import type { AccountDeletionPreview, DeleteAccountInput } from '@splinance/shared';
+import {
+  type AccountDeletionPreview,
+  DEFAULT_PREFERENCES,
+  type DeleteAccountInput,
+} from '@splinance/shared';
 import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
 import {
@@ -197,6 +201,7 @@ async function erase(
       email: `deleted-${user.id}@deleted.invalid`,
       passwordHash: null,
       locale: null,
+      ...DEFAULT_PREFERENCES,
       deletedAt: now,
     })
     .where(eq(users.id, user.id));

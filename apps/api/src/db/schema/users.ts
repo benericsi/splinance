@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { check, pgTable, text } from 'drizzle-orm/pg-core';
 import { createdAt, id, timestamptz, updatedAt } from './columns';
-import { locale } from './enums';
+import { locale, overviewView, spendingView, transactionVisibility } from './enums';
 
 export const users = pgTable(
   'users',
@@ -15,6 +15,13 @@ export const users = pgTable(
     // The chosen UI language; null follows the device. Only the web uses it (the API speaks
     // English and in error codes).
     locale: locale(),
+    // Preferences (shared `preferencesSchema`): defaults that fill in what a URL leaves open.
+    // How the overview opens on a wide screen.
+    overviewView: overviewView().notNull().default('cards'),
+    // What a new transaction starts as (editing one keeps its own visibility).
+    transactionVisibility: transactionVisibility().notNull().default('shared'),
+    // Whose spending Reports and the Calendar show.
+    spendingView: spendingView().notNull().default('household'),
     // Set when the person deleted their account: the row stays (history references it) but
     // holds nothing personal any more (see account deletion in docs/data-model.md).
     deletedAt: timestamptz(),

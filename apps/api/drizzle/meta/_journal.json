@@ -148,6 +148,13 @@
       "when": 1794474379091,
       "tag": "0020_recurring_income",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794499736348,
+      "tag": "0021_users_preferences",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, requiredPasswordIssues } from './password/rules';
 import { localeSchema } from './i18n/locales';
+import { preferencesSchema } from './preferences';
 import { msg } from './i18n/validation';
 
 // Normalized before validation so "Anna@Example.com " and "anna@example.com" are the same account.
@@ -51,6 +52,7 @@ export const userSchema = z.object({
   displayName: z.string(),
   /** The chosen UI language; null follows the device (browser language). */
   locale: localeSchema.nullable(),
+  preferences: preferencesSchema,
   createdAt: z.iso.datetime({ offset: true }),
 });
 
