@@ -240,8 +240,9 @@ describe('the story as recurring payments', () => {
     [99, '2026-12-31'],
   ])('finds the subscriptions and bills for seed %i on %s', (seed, today) => {
     const s = buildDemoStory({ seed, today });
-    const keys = (viewer: DemoPerson) =>
+    const keys = (viewer: DemoPerson, kind: 'expense' | 'income' = 'expense') =>
       detectRecurring(seenBy(s, viewer), { today })
+        .filter((found) => found.kind === kind)
         .map((found) => `${found.scope}:${found.key}`)
         .filter((key) => key !== `shared:${SOMETIMES}`)
         .sort();
@@ -252,6 +253,9 @@ describe('the story as recurring payments', () => {
     expect(keys('partner')).toEqual(
       [...shared, 'private:account fee', 'private:bkk online'].sort(),
     );
+    // Income: each one's salary, private like the income itself.
+    expect(keys('you', 'income')).toEqual(['private:acme kft']);
+    expect(keys('partner', 'income')).toEqual(['private:globex zrt.']);
   });
 
   it.each([
@@ -263,7 +267,12 @@ describe('the story as recurring payments', () => {
     const s = buildDemoStory({ seed, today });
     for (const confirmed of s.recurring.confirmed) {
       const found = detectRecurring(seenBy(s, confirmed.person), { today });
-      expect(found.some((f) => f.scope === confirmed.scope && f.key === confirmed.key)).toBe(true);
+      expect(
+        found.some(
+          (f) =>
+            f.scope === confirmed.scope && f.kind === confirmed.kind && f.key === confirmed.key,
+        ),
+      ).toBe(true);
     }
     const categories = new Set(DEFAULT_CATEGORIES.map((c) => c.name));
     for (const added of s.recurring.added) {

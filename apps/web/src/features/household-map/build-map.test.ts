@@ -20,6 +20,7 @@ const uuid = (n: number) => `01a12509-0f61-75bc-b406-${String(n).padStart(12, '0
 function series(n: number, overrides: Partial<RecurringSeries> = {}): RecurringSeries {
   return {
     id: uuid(n),
+    kind: 'expense',
     source: 'manual',
     createdBy: anna.userId,
     name: `Series ${String(n)}`,

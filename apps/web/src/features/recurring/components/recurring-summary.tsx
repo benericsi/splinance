@@ -9,12 +9,15 @@ type Basis = 'household' | 'yours';
 
 /**
  * What the recurring payments cost per month: all of them (shared ones in full, plus the
- * viewer's private ones) or the viewer's part. Payments gone quiet do not count.
+ * viewer's private ones) or the viewer's part. Payments gone quiet do not count, and
+ * neither does recurring income: this is money going out.
  */
 export function RecurringSummary({ views, currency }: { views: SeriesView[]; currency: Currency }) {
   const { t } = useTranslation('recurring');
   const [basis, setBasis] = useState<Basis>('household');
-  const running = views.filter((view) => view.timing !== 'lapsed');
+  const running = views.filter(
+    (view) => view.timing !== 'lapsed' && view.series.kind === 'expense',
+  );
   const total = running.reduce(
     (sum, view) => sum + (basis === 'household' ? view.series.monthlyAmount : view.yourMonthly),
     0,

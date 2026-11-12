@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { currencySchema } from '../households';
 import { amountMinorSchema } from '../money';
 import { matchKey } from '../rules';
-import { occurredOnSchema } from '../transactions';
+import { occurredOnSchema, transactionKindSchema } from '../transactions';
 import { msg } from '../i18n/validation';
 
 export const RECURRING_CADENCES = ['weekly', 'monthly', 'quarterly', 'yearly'] as const;
@@ -69,6 +69,13 @@ const seriesFields = z.object({
   remind: z.boolean(),
 });
 
+/**
+ * What a series tracks: money going out (a subscription, a bill) or coming in (a salary).
+ * Fixed at creation, like the scope. Left out, it is an expense (clients from before income
+ * series).
+ */
+const kindWithDefault = transactionKindSchema.default('expense');
+
 const startsBeforeAnchor = (value: {
   startsOn?: string | null | undefined;
   anchorOn?: string | undefined;
@@ -79,13 +86,12 @@ const STARTS_AFTER_ANCHOR = {
 };
 
 /** Adding a series by hand. */
-export const recurringSeriesInputSchema = seriesFields.refine(
-  startsBeforeAnchor,
-  STARTS_AFTER_ANCHOR,
-);
+export const recurringSeriesInputSchema = seriesFields
+  .extend({ kind: kindWithDefault })
+  .refine(startsBeforeAnchor, STARTS_AFTER_ANCHOR);
 export type RecurringSeriesInput = z.infer<typeof recurringSeriesInputSchema>;
 
-/** Editing one: any field except its scope (who it belongs to does not change). */
+/** Editing one: any field except its scope and kind (what it is does not change). */
 export const updateRecurringSeriesInputSchema = seriesFields
   .omit({ scope: true })
   .partial()
@@ -93,18 +99,21 @@ export const updateRecurringSeriesInputSchema = seriesFields
 export type UpdateRecurringSeriesInput = z.infer<typeof updateRecurringSeriesInputSchema>;
 
 /** "Which payments would this match?", asked while the person types the pattern. */
-export const recurringPreviewInputSchema = seriesFields.pick({
-  pattern: true,
-  amount: true,
-  amountVaries: true,
-  scope: true,
-  startsOn: true,
-});
+export const recurringPreviewInputSchema = seriesFields
+  .pick({
+    pattern: true,
+    amount: true,
+    amountVaries: true,
+    scope: true,
+    startsOn: true,
+  })
+  .extend({ kind: kindWithDefault });
 export type RecurringPreviewInput = z.infer<typeof recurringPreviewInputSchema>;
 
 /** Confirming or dismissing a suggestion, addressed by what detection calls it. */
 export const recurringSuggestionDecisionSchema = z.object({
   scope: recurringScopeSchema,
+  kind: kindWithDefault,
   key: recurringKeySchema,
 });
 export type RecurringSuggestionDecision = z.infer<typeof recurringSuggestionDecisionSchema>;
@@ -112,7 +121,7 @@ export type RecurringSuggestionDecision = z.infer<typeof recurringSuggestionDeci
 const dateSchema = z.iso.date();
 const positiveAmount = z.number().int().positive();
 
-/** A transaction found to be one of a series' payments. */
+/** A transaction found to be one of a series' payments (for an income series: money received). */
 export const recurringPaymentSchema = z.object({
   transactionId: z.uuid(),
   occurredOn: dateSchema,
@@ -124,6 +133,7 @@ export type RecurringPayment = z.infer<typeof recurringPaymentSchema>;
 
 export const recurringSeriesSchema = seriesFields.extend({
   id: z.uuid(),
+  kind: transactionKindSchema,
   source: recurringSourceSchema,
   createdBy: z.uuid(),
   /** The latest payments found, newest first (at most 12). */
@@ -143,6 +153,7 @@ export type RecurringSeries = z.infer<typeof recurringSeriesSchema>;
 export const recurringSuggestionSchema = z.object({
   key: recurringKeySchema,
   scope: recurringScopeSchema,
+  kind: transactionKindSchema,
   cadence: recurringCadenceSchema,
   amount: positiveAmount,
   previousAmount: positiveAmount.nullable(),
@@ -163,6 +174,7 @@ export const dismissedRecurringSchema = z.object({
   id: z.uuid(),
   pattern: z.string(),
   scope: recurringScopeSchema,
+  kind: transactionKindSchema,
 });
 export type DismissedRecurring = z.infer<typeof dismissedRecurringSchema>;
 

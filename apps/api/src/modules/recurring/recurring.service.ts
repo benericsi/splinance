@@ -17,6 +17,7 @@ import {
   type RecurringSuggestion,
   type RecurringSuggestionDecision,
   seriesCovers,
+  type TransactionKind,
   type SeriesMatcher,
   seriesPayments,
   type UpdateRecurringSeriesInput,
@@ -46,8 +47,8 @@ const suggestionNotFound = () =>
 const patternTaken = () =>
   new HttpError(409, 'A recurring payment matches this text already', 'SERIES_PATTERN_TAKEN');
 
-const invalidCategory = () =>
-  new HttpError(400, 'Choose an active expense category', 'INVALID_CATEGORY');
+const invalidCategory = (kind: TransactionKind) =>
+  new HttpError(400, `Choose an active ${kind} category`, 'INVALID_CATEGORY');
 
 const PATTERN_UNIQUE = 'recurring_series_pattern_unique';
 
@@ -91,8 +92,11 @@ async function mapPatternTaken<T>(write: Promise<T>): Promise<T> {
   }
 }
 
-/** The expense transactions the caller can see from the last `SCAN_DAYS`, newest first. */
-async function visibleExpenses(executor: Db, scope: HouseholdScope, today: string) {
+/**
+ * The transactions (expenses and income) the caller can see from the last `SCAN_DAYS`,
+ * newest first. A series and a suggestion only ever take rows of their own kind.
+ */
+async function visibleRows(executor: Db, scope: HouseholdScope, today: string) {
   const rows = await executor
     .select({
       id: transactions.id,
@@ -110,7 +114,6 @@ async function visibleExpenses(executor: Db, scope: HouseholdScope, today: strin
     .where(
       and(
         eq(transactions.householdId, scope.householdId),
-        eq(transactions.kind, 'expense'),
         isNull(transactions.deletedAt),
         gte(transactions.occurredOn, minusDays(today, SCAN_DAYS)),
         visibleTo(scope.userId),
@@ -158,17 +161,17 @@ interface Computed {
  * Shared series go first, over every row: they only ever take shared transactions, which
  * every member sees, so a shared series has the same payments for everyone. Private series
  * then take from what is left. Suggestions come from what no series covers, minus the
- * dismissed ones (same scope and key).
+ * dismissed ones (same scope, kind and key).
  */
 async function compute(executor: Db, scope: HouseholdScope, today: string): Promise<Computed> {
-  const [seriesRows, expenses] = await Promise.all([
+  const [seriesRows, visible] = await Promise.all([
     visibleSeriesRows(executor, scope),
-    visibleExpenses(executor, scope, today),
+    visibleRows(executor, scope, today),
   ]);
   const active = seriesRows.filter((row) => row.status === 'active');
   const shared = assignPayments(
     active.filter((row) => row.userId === null).map(toMatcher),
-    expenses,
+    visible,
   );
   const own = assignPayments(
     active.filter((row) => row.userId !== null).map(toMatcher),
@@ -179,10 +182,10 @@ async function compute(executor: Db, scope: HouseholdScope, today: string): Prom
   const dismissed = new Set(
     seriesRows
       .filter((row) => row.status === 'dismissed')
-      .map((row) => `${scopeOf(row)}:${row.patternKey}`),
+      .map((row) => `${scopeOf(row)}:${row.kind}:${row.patternKey}`),
   );
   const suggestions = detectRecurring(own.unowned, { today })
-    .filter((found) => !dismissed.has(`${found.scope}:${found.key}`))
+    .filter((found) => !dismissed.has(`${found.scope}:${found.kind}:${found.key}`))
     .slice(0, MAX_SUGGESTIONS);
   return { rows: seriesRows, payments, suggestions };
 }
@@ -228,6 +231,7 @@ function toSeries(
   const latestAmount = latest?.amount ?? amount;
   return {
     id: row.id,
+    kind: row.kind,
     source: row.source,
     createdBy: row.createdBy,
     name,
@@ -253,6 +257,7 @@ function toSeries(
 const toSuggestion = (found: DetectedSeries): RecurringSuggestion => ({
   key: found.key,
   scope: found.scope,
+  kind: found.kind,
   cadence: found.cadence,
   amount: found.amount,
   previousAmount: found.previousAmount,
@@ -316,7 +321,7 @@ export async function listRecurring(
   const computed = await compute(db, scope, today);
   const dismissed: DismissedRecurring[] = computed.rows
     .filter((row) => row.status === 'dismissed')
-    .map((row) => ({ id: row.id, pattern: row.pattern, scope: scopeOf(row) }));
+    .map((row) => ({ id: row.id, pattern: row.pattern, scope: scopeOf(row), kind: row.kind }));
   return {
     currency: household.baseCurrency,
     series: await buildSeriesList(db, scope, computed, today),
@@ -333,8 +338,13 @@ async function seriesView(scope: HouseholdScope, seriesId: string, today: string
   return series;
 }
 
-/** An active expense category of this household (or none). */
-async function checkCategory(executor: Db, householdId: string, categoryId: string | null) {
+/** An active category of this household and of the series' kind (or none). */
+async function checkCategory(
+  executor: Db,
+  householdId: string,
+  kind: TransactionKind,
+  categoryId: string | null,
+) {
   if (categoryId === null) return;
   const [row] = await executor
     .select({ id: categories.id })
@@ -343,11 +353,11 @@ async function checkCategory(executor: Db, householdId: string, categoryId: stri
       and(
         eq(categories.id, categoryId),
         eq(categories.householdId, householdId),
-        eq(categories.kind, 'expense'),
+        eq(categories.kind, kind),
         isNull(categories.archivedAt),
       ),
     );
-  if (!row) throw invalidCategory();
+  if (!row) throw invalidCategory(kind);
 }
 
 async function checkRoom(executor: Db, householdId: string) {
@@ -369,6 +379,7 @@ async function dropDismissal(
   executor: Db,
   scope: HouseholdScope,
   recurringScope: RecurringScope,
+  kind: TransactionKind,
   patternKey: string,
 ) {
   const owner = ownerFor(recurringScope, scope.userId);
@@ -378,6 +389,7 @@ async function dropDismissal(
       and(
         eq(recurringSeries.householdId, scope.householdId),
         eq(recurringSeries.status, 'dismissed'),
+        eq(recurringSeries.kind, kind),
         eq(recurringSeries.patternKey, patternKey),
         owner === null ? isNull(recurringSeries.userId) : eq(recurringSeries.userId, owner),
         isNull(recurringSeries.archivedAt),
@@ -392,17 +404,18 @@ export async function createSeries(
   { today = budapestToday() }: Options = {},
 ): Promise<RecurringSeries> {
   const { household } = await requireMembership(db, scope);
-  await checkCategory(db, scope.householdId, input.categoryId);
+  await checkCategory(db, scope.householdId, input.kind, input.categoryId);
   const patternKey = matchKey(input.pattern);
   const id = await db.transaction(async (tx) => {
     await checkRoom(tx, scope.householdId);
-    await dropDismissal(tx, scope, input.scope, patternKey);
+    await dropDismissal(tx, scope, input.scope, input.kind, patternKey);
     const [row] = await mapPatternTaken(
       tx
         .insert(recurringSeries)
         .values({
           householdId: scope.householdId,
           userId: ownerFor(input.scope, scope.userId),
+          kind: input.kind,
           status: 'active',
           source: 'manual',
           name: input.name,
@@ -439,17 +452,17 @@ export async function previewSeries(
   await requireMembership(db, scope);
   const matcher: SeriesMatcher = {
     id: 'preview',
-    kind: 'expense',
+    kind: input.kind,
     ownerId: ownerFor(input.scope, scope.userId),
     pattern: input.pattern,
     amount: input.amount,
     amountVaries: input.amountVaries,
     startsOn: input.startsOn,
   };
-  const expenses = await visibleExpenses(db, scope, today);
+  const visible = await visibleRows(db, scope, today);
   const payments = seriesPayments(
     matcher,
-    expenses.filter((row) => seriesCovers(matcher, row)),
+    visible.filter((row) => seriesCovers(matcher, row)),
   );
   return { matches: payments.length, recent: payments.slice(0, 3).map(toPayment) };
 }
@@ -460,7 +473,9 @@ async function findSuggestion(
   today: string,
 ) {
   const { suggestions } = await compute(db, scope, today);
-  const found = suggestions.find((s) => s.scope === decision.scope && s.key === decision.key);
+  const found = suggestions.find(
+    (s) => s.scope === decision.scope && s.kind === decision.kind && s.key === decision.key,
+  );
   if (!found) throw suggestionNotFound();
   return found;
 }
@@ -474,7 +489,7 @@ export async function confirmSuggestion(
   const { household } = await requireMembership(db, scope);
   const found = await findSuggestion(scope, decision, today);
   // The category may have been archived since the payment was categorized.
-  const categoryId = await checkCategory(db, scope.householdId, found.categoryId).then(
+  const categoryId = await checkCategory(db, scope.householdId, found.kind, found.categoryId).then(
     () => found.categoryId,
     () => null,
   );
@@ -486,6 +501,7 @@ export async function confirmSuggestion(
         .values({
           householdId: scope.householdId,
           userId: ownerFor(found.scope, scope.userId),
+          kind: found.kind,
           status: 'active',
           source: 'detected',
           name: found.description.slice(0, 60).trim() || found.key.slice(0, 60),
@@ -521,6 +537,7 @@ export async function dismissSuggestion(
       .values({
         householdId: scope.householdId,
         userId: ownerFor(found.scope, scope.userId),
+        kind: found.kind,
         status: 'dismissed',
         source: 'detected',
         pattern: found.key,
@@ -558,7 +575,7 @@ export async function updateSeries(
   const existing = await findRow(db, scope);
   if (existing.status !== 'active') throw seriesNotFound();
   if (input.categoryId !== undefined) {
-    await checkCategory(db, scope.householdId, input.categoryId);
+    await checkCategory(db, scope.householdId, existing.kind, input.categoryId);
   }
   const startsOn = input.startsOn === undefined ? existing.startsOn : input.startsOn;
   const anchorOn = input.anchorOn ?? existing.anchorOn;

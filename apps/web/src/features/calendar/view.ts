@@ -77,7 +77,7 @@ export function changeAgainst(now: number, before: number): number | 'new' | nul
 export interface CalendarSummary {
   spent: number;
   income: number;
-  /** Expected payments of the month that have not shown up yet. */
+  /** Expected payments of the month that have not shown up yet (never expected income). */
   toCome: number;
 }
 
@@ -89,7 +89,7 @@ export function summarize(calendar: Calendar, view: CalendarView): CalendarSumma
     income += view === 'mine' ? day.yourIncome : day.income;
   }
   const toCome = calendar.events
-    .filter((event) => event.type === 'recurringExpected')
+    .filter((event) => event.type === 'recurringExpected' && event.kind === 'expense')
     .reduce((sum, event) => sum + eventAmount(event, view), 0);
   return { spent, income, toCome };
 }

@@ -54,7 +54,11 @@ function daysBetween(from: string, to: string): number {
   return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
 }
 
-/** What should be in each member's bell about the household's recurring payments. */
+/**
+ * What should be in each member's bell about the household's recurring payments and income.
+ * Income gets no "due soon": money about to arrive needs nothing done. One that did not
+ * arrive, or came in a different amount, is news like for a payment.
+ */
 async function wantedForSeries(
   householdId: string,
   members: { userId: string }[],
@@ -76,7 +80,7 @@ async function wantedForSeries(
           dedupeKey: `renewal_missed:${item.id}:${next}`,
           previousAmount: null,
         });
-      } else if (daysUntil >= 0 && daysUntil <= RENEWAL_LEAD_DAYS) {
+      } else if (item.kind === 'expense' && daysUntil >= 0 && daysUntil <= RENEWAL_LEAD_DAYS) {
         wanted.push({
           ...fact,
           type: 'renewal_due',

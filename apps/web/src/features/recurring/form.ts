@@ -104,8 +104,10 @@ export function parseSeriesInput(
   values: SeriesFormValues,
   currency: Currency,
   startsOn: string | null = null,
+  kind: RecurringSeriesInput['kind'] = 'expense',
 ): RecurringSeriesInput {
   return {
+    kind,
     name: values.name.trim(),
     pattern: values.pattern.trim(),
     cadence: values.cadence,

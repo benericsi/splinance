@@ -35,7 +35,11 @@ export function SuggestionList({
     <ul className="divide-y overflow-hidden rounded-xl border">
       <AnimatePresence initial={reveal.active}>
         {suggestions.map((suggestion, index) => {
-          const decision = { scope: suggestion.scope, key: suggestion.key };
+          const decision = {
+            scope: suggestion.scope,
+            kind: suggestion.kind,
+            key: suggestion.key,
+          };
           const category = suggestion.categoryId
             ? categoryById.get(suggestion.categoryId)
             : undefined;

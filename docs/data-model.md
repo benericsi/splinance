@@ -217,32 +217,33 @@ Monthly budgets per expense category, effective-dated: a row sets the amount fro
 
 ### `recurring_series`
 
-Recurring payments people track, and suggestions they turned down. Which transactions are a series' payments is never stored: the pattern decides on every read (architecture section 4, `packages/shared/src/recurring`).
+Recurring payments and recurring income (a salary) people track, and suggestions they turned down. Which transactions are a series' payments is never stored: the pattern decides on every read (architecture section 4, `packages/shared/src/recurring`).
 
-| Column                 | Type                               | Notes                                                                                                  |
-| ---------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| id                     | uuid PK                            | uuidv7; `(household_id, id)` unique                                                                    |
-| household_id           | uuid                               | Part of the composite FKs                                                                              |
-| user_id                | uuid, nullable                     | Null: a shared series (the household's). Set: private to that member. Composite FK -> members          |
-| kind                   | enum `category_kind`               | Always `expense` for now (`recurring_series_expense_only`); kept for income series and the category FK |
-| status                 | enum `recurring_status`            | `active` (a series) or `dismissed` ("Not recurring": only the pattern matters)                         |
-| source                 | enum `recurring_source`            | `manual` (added by hand) or `detected` (a confirmed suggestion, or a dismissal)                        |
-| name                   | text, nullable                     | 1-60 characters                                                                                        |
-| pattern, pattern_key   | text                               | As typed (2-60) and `matchKey(pattern)`; a detected series' pattern is its `recurringKey`              |
-| cadence                | enum `recurring_cadence`, nullable | weekly, monthly, quarterly, yearly                                                                     |
-| amount                 | bigint, nullable                   | The expected amount when set up, minor units 1 to 10^12; later payments carry it along                 |
-| amount_varies          | boolean                            | Wider tolerance (60% instead of 25%) for bills that swing                                              |
-| currency               | enum `currency`                    | The household's base currency                                                                          |
-| anchor_on              | date, nullable                     | A payment date that sets the rhythm (the next or the last one)                                         |
-| starts_on              | date, nullable                     | The earliest payment it may claim; `starts_on <= anchor_on` (CHECK)                                    |
-| category_id            | uuid, nullable                     | Composite FK `(household_id, category_id, kind)` -> categories                                         |
-| remind                 | boolean                            | Default true: renewal notifications (Phase 6, next PRs)                                                |
-| archived_at            | timestamptz, nullable              | "Stop tracking" a series that has payments                                                             |
-| created_by             | uuid                               | Composite FK -> members                                                                                |
-| created_at, updated_at | timestamptz                        |                                                                                                        |
+| Column                 | Type                               | Notes                                                                                           |
+| ---------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------- |
+| id                     | uuid PK                            | uuidv7; `(household_id, id)` unique                                                             |
+| household_id           | uuid                               | Part of the composite FKs                                                                       |
+| user_id                | uuid, nullable                     | Null: a shared series (the household's). Set: private to that member. Composite FK -> members   |
+| kind                   | enum `category_kind`               | `expense` (a payment) or `income` (money coming in); fixed at creation, part of the category FK |
+| status                 | enum `recurring_status`            | `active` (a series) or `dismissed` ("Not recurring": only the pattern matters)                  |
+| source                 | enum `recurring_source`            | `manual` (added by hand) or `detected` (a confirmed suggestion, or a dismissal)                 |
+| name                   | text, nullable                     | 1-60 characters                                                                                 |
+| pattern, pattern_key   | text                               | As typed (2-60) and `matchKey(pattern)`; a detected series' pattern is its `recurringKey`       |
+| cadence                | enum `recurring_cadence`, nullable | weekly, monthly, quarterly, yearly                                                              |
+| amount                 | bigint, nullable                   | The expected amount when set up, minor units 1 to 10^12; later payments carry it along          |
+| amount_varies          | boolean                            | Wider tolerance (60% instead of 25%) for bills that swing                                       |
+| currency               | enum `currency`                    | The household's base currency                                                                   |
+| anchor_on              | date, nullable                     | A payment date that sets the rhythm (the next or the last one)                                  |
+| starts_on              | date, nullable                     | The earliest payment it may claim; `starts_on <= anchor_on` (CHECK)                             |
+| category_id            | uuid, nullable                     | Composite FK `(household_id, category_id, kind)` -> categories                                  |
+| remind                 | boolean                            | Default true: renewal notifications (Phase 6, next PRs)                                         |
+| archived_at            | timestamptz, nullable              | "Stop tracking" a series that has payments                                                      |
+| created_by             | uuid                               | Composite FK -> members                                                                         |
+| created_at, updated_at | timestamptz                        |                                                                                                 |
 
 - `recurring_series_active_complete`: an active row has a name, cadence, amount and anchor; a dismissal needs none of them.
-- Unique index `recurring_series_pattern_unique` on `(household_id, coalesce(user_id, nil uuid), kind, pattern_key) WHERE archived_at IS NULL`: one live series or dismissal per text and owner. The coalesce makes shared rows (null owner) collide, like `NULLS NOT DISTINCT`, which Drizzle cannot declare on an index.
+- Unique index `recurring_series_pattern_unique` on `(household_id, coalesce(user_id, nil uuid), kind, pattern_key) WHERE archived_at IS NULL`: one live series or dismissal per text, kind and owner (the same text may be tracked once as a payment and once as income). The coalesce makes shared rows (null owner) collide, like `NULLS NOT DISTINCT`, which Drizzle cannot declare on an index.
+- A series only ever takes transactions of its own kind, and its category is of that kind (the composite FK). Migration `0020_recurring_income` dropped the `recurring_series_expense_only` CHECK that held income series back until the app handled them.
 - Settings, not money records: no audit log, plain updates. "Show again" deletes a dismissal; a series that never matched anything is deleted, one with payments archived (its text is free again).
 - Private rows go with the person on account deletion; shared rows they created stay. Not in the `analytics` views (names and bank-derived merchant text, no consumer); backed up like every table.
 

@@ -52,6 +52,7 @@ const entertainment: Category = {
 function series(overrides: Partial<RecurringSeries>): RecurringSeries {
   return {
     id: '01a12509-0f61-75bc-b406-1301087805a1',
+    kind: 'expense',
     source: 'detected',
     createdBy: testUser.id,
     name: 'Netflix',
@@ -133,6 +134,7 @@ const phone = series({
 const spotify: RecurringSuggestion = {
   key: 'spotify',
   scope: 'shared',
+  kind: 'expense',
   cadence: 'monthly',
   amount: 3_290,
   previousAmount: 3_290,
@@ -217,7 +219,12 @@ describe('recurring page', () => {
           ...state.list,
           suggestions: [],
           dismissed: [
-            { id: '01a12509-0f61-75bc-b406-1301087805b1', pattern: 'spotify', scope: 'shared' },
+            {
+              id: '01a12509-0f61-75bc-b406-1301087805b1',
+              pattern: 'spotify',
+              scope: 'shared',
+              kind: 'expense',
+            },
           ],
         };
         return new HttpResponse(null, { status: 204 });
@@ -252,10 +259,10 @@ describe('recurring page', () => {
       expect(state.requests.at(-1)).toEqual({
         method: 'POST',
         path: '/recurring/suggestions/confirm',
-        body: { scope: 'shared', key: 'spotify' },
+        body: { scope: 'shared', kind: 'expense', key: 'spotify' },
       });
     });
-    expect(state.requests[0]?.body).toEqual({ scope: 'shared', key: 'spotify' });
+    expect(state.requests[0]?.body).toEqual({ scope: 'shared', kind: 'expense', key: 'spotify' });
     await waitFor(() => {
       expect(screen.queryByRole('region', { name: 'Suggestions' })).not.toBeInTheDocument();
     });
@@ -310,6 +317,7 @@ describe('adding and editing', () => {
       amount: 3_290,
       amountVaries: false,
       scope: 'shared',
+      kind: 'expense',
       startsOn: null,
     });
 
@@ -319,6 +327,7 @@ describe('adding and editing', () => {
     expect(
       state.requests.find((r) => r.method === 'POST' && r.path === '/recurring')?.body,
     ).toEqual({
+      kind: 'expense',
       name: 'Spotify xyz',
       pattern: 'spotify',
       cadence: 'monthly',

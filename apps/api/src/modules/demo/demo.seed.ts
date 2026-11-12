@@ -167,7 +167,7 @@ export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<st
   for (const confirmed of story.recurring.confirmed) {
     await confirmSuggestion(
       scopeOf(confirmed.person),
-      { scope: confirmed.scope, key: confirmed.key },
+      { scope: confirmed.scope, kind: confirmed.kind, key: confirmed.key },
       options,
     );
   }
@@ -184,6 +184,7 @@ export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<st
         startsOn: null,
         categoryId: categoryId('expense', added.category),
         scope: added.scope,
+        kind: 'expense',
         remind: true,
       },
       options,

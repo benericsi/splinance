@@ -391,6 +391,7 @@ describe('state', () => {
     );
     const [renewal] = (await bell(anna)).notifications.filter((n) => n.type === 'renewal_due');
     expect(renewal?.resolvedAt).not.toBeNull();
+    expect(renewal?.subjectKind).toBe('expense');
   });
 
   it('asks about a renewal that never came, and does nothing twice', async () => {
@@ -400,6 +401,21 @@ describe('state', () => {
     await syncNotifications(householdId);
     await syncNotifications(householdId);
     expect(await db.$count(notifications, eq(notifications.userId, anna.id))).toBe(1);
+  });
+
+  it('does not remind of income about to arrive, but says when it did not', async () => {
+    const salary = { kind: 'income', name: 'Salary', pattern: 'acme', amount: 690_000 };
+    await series(anna, { ...salary, scope: 'private' });
+    expect((await bell(anna)).notifications).toEqual([]);
+
+    await series(anna, {
+      ...salary,
+      pattern: 'globex',
+      anchorOn: occurrence(today, 'monthly', -2),
+    });
+    expect(
+      (await bell(anna)).notifications.map((n) => [n.type, n.subjectName, n.subjectKind]),
+    ).toEqual([['renewal_missed', 'Salary', 'income']]);
   });
 
   it('warns at 80% of a budget and again when it is over, for every member', async () => {

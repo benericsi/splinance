@@ -64,8 +64,8 @@ async function dayTotals(
 type RecurringEvent = Extract<CalendarEvent, { type: 'recurringPaid' | 'recurringExpected' }>;
 
 /**
- * The month's payments of the viewer's tracked series: the ones found among their
- * transactions, and the ones still expected. Expected dates start at the series' next due
+ * The month's payments (and, for income series, receipts) of the viewer's tracked series:
+ * the ones found among their transactions, and the ones still expected. Expected dates start at the series' next due
  * date and follow its rhythm; a series whose payment is overdue past its grace window
  * (cancelled?) expects nothing, and neither does a month too far ahead.
  */
@@ -94,6 +94,7 @@ async function recurringEvents(
     seriesId: series.id,
     name: series.name,
     scope: series.scope,
+    kind: series.kind,
     categoryId: series.categoryId,
     amount: payment.amount,
     transactionId: payment.id,
@@ -116,6 +117,7 @@ async function recurringEvents(
         seriesId: series.id,
         name: series.name,
         scope: series.scope,
+        kind: series.kind,
         categoryId: series.categoryId,
         amount: series.latestAmount,
         amountVaries: series.amountVaries,
