@@ -2,6 +2,7 @@ import {
   type AccountResponse,
   type ChangePasswordInput,
   requiredPasswordIssues,
+  type UpdatePreferencesInput,
   type UpdateProfileInput,
   type User,
 } from '@splinance/shared';
@@ -149,6 +150,29 @@ export async function updateProfile(userId: string, input: UpdateProfileInput): 
     .set({
       ...(input.displayName !== undefined && { displayName: input.displayName }),
       ...(input.locale !== undefined && { locale: input.locale }),
+    })
+    .where(eq(users.id, userId))
+    .returning();
+  if (!user) throw sessionEnded();
+  return toUser(user);
+}
+
+/**
+ * Saves any of the preferences (the others stay). Nothing about signing in changes, so no
+ * step-up, and it stays open on the demo: a choice among fixed values is no free text.
+ */
+export async function updatePreferences(
+  userId: string,
+  input: UpdatePreferencesInput,
+): Promise<User> {
+  const [user] = await db
+    .update(users)
+    .set({
+      ...(input.overviewView !== undefined && { overviewView: input.overviewView }),
+      ...(input.transactionVisibility !== undefined && {
+        transactionVisibility: input.transactionVisibility,
+      }),
+      ...(input.spendingView !== undefined && { spendingView: input.spendingView }),
     })
     .where(eq(users.id, userId))
     .returning();

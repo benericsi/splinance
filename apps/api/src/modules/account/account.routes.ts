@@ -10,6 +10,7 @@ import {
   type RevokeSessionsResponse,
   safeRedirectPath,
   stepUpInputSchema,
+  updatePreferencesInputSchema,
   updateProfileInputSchema,
 } from '@splinance/shared';
 import { type Request, type Response, Router } from 'express';
@@ -28,6 +29,7 @@ import {
   prepareConnect,
   prepareReauth,
   revokeOtherSessions,
+  updatePreferences,
   updateProfile,
 } from './account.service';
 import { deleteAccount, previewDeletion } from './deletion.service';
@@ -38,7 +40,8 @@ import { deleteAccount, previewDeletion } from './deletion.service';
  *
  * On the demo every write is closed: the demo story's people keep their names (the data
  * track shows demo display names, so a typed one would be free text from outside the
- * story), and demo accounts have no usable password.
+ * story), and demo accounts have no usable password. Preferences are the exception: fixed
+ * values, nothing about signing in, and part of what a visitor can try.
  */
 export function createAccountRouter({
   demo = false,
@@ -181,6 +184,12 @@ export function createAccountRouter({
   router.patch('/', rateLimiter(30, { perUser: true }), async (req, res) => {
     const input = updateProfileInputSchema.parse(req.body);
     const body: ProfileResponse = { user: await updateProfile(getAuth(req).userId, input) };
+    res.json(body);
+  });
+
+  router.patch('/preferences', rateLimiter(30, { perUser: true }), async (req, res) => {
+    const input = updatePreferencesInputSchema.parse(req.body);
+    const body: ProfileResponse = { user: await updatePreferences(getAuth(req).userId, input) };
     res.json(body);
   });
 

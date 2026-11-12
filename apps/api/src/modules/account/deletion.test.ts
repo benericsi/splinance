@@ -220,6 +220,10 @@ describe('delete', () => {
     await db
       .insert(userIdentities)
       .values({ userId: anna.id, provider: 'google', subject: 'g-anna' });
+    await db
+      .update(users)
+      .set({ locale: 'hu', overviewView: 'map', spendingView: 'mine' })
+      .where(eq(users.id, anna.id));
 
     const res = await remove(anna).expect(204);
     expect(String(res.headers['set-cookie'])).toContain(`${REFRESH_COOKIE}=;`);
@@ -230,6 +234,10 @@ describe('delete', () => {
       displayName: FORMER_MEMBER_NAME,
       email: `deleted-${anna.id}@deleted.invalid`,
       passwordHash: null,
+      locale: null,
+      overviewView: 'cards',
+      transactionVisibility: 'shared',
+      spendingView: 'household',
     });
     expect(row?.deletedAt).toBeInstanceOf(Date);
     expect(

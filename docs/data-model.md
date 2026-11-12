@@ -20,17 +20,22 @@ Living document: it describes the tables that exist today plus the conventions e
 
 ### `users`
 
-| Column                 | Type                                 | Notes                                                                                                                                         |
-| ---------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| id                     | uuid PK                              | uuidv7                                                                                                                                        |
-| email                  | text, unique (`users_email_unique`)  | Lowercased by the shared `emailSchema`; `CHECK (email = lower(email))`                                                                        |
-| password_hash          | text, nullable                       | Argon2id (`@node-rs/argon2`, m=19456 KiB, t=2, p=1), PHC string with salt and parameters; null for accounts that only sign in with a provider |
-| display_name           | text                                 | 1-50 characters (CHECK)                                                                                                                       |
-| locale                 | enum `locale` (`en`, `hu`), nullable | The chosen UI language, saved so every device follows it; null follows the device (browser language). Only the web reads it                   |
-| deleted_at             | timestamptz, nullable                | Set when the person deleted their account (the row then holds nothing personal, see below)                                                    |
-| created_at, updated_at | timestamptz                          |                                                                                                                                               |
+| Column                 | Type                                                            | Notes                                                                                                                                         |
+| ---------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| id                     | uuid PK                                                         | uuidv7                                                                                                                                        |
+| email                  | text, unique (`users_email_unique`)                             | Lowercased by the shared `emailSchema`; `CHECK (email = lower(email))`                                                                        |
+| password_hash          | text, nullable                                                  | Argon2id (`@node-rs/argon2`, m=19456 KiB, t=2, p=1), PHC string with salt and parameters; null for accounts that only sign in with a provider |
+| display_name           | text                                                            | 1-50 characters (CHECK)                                                                                                                       |
+| locale                 | enum `locale` (`en`, `hu`), nullable                            | The chosen UI language, saved so every device follows it; null follows the device (browser language). Only the web reads it                   |
+| overview_view          | enum `overview_view` (`cards`, `map`), default `cards`          | Preference: how the household overview opens on a wide screen when the URL does not say (`?view=`)                                            |
+| transaction_visibility | enum `transaction_visibility`, default `shared`                 | Preference: what a new transaction starts as; editing one keeps its own visibility                                                            |
+| spending_view          | enum `spending_view` (`household`, `mine`), default `household` | Preference: whose spending Reports and the Calendar show when the URL does not say                                                            |
+| deleted_at             | timestamptz, nullable                                           | Set when the person deleted their account (the row then holds nothing personal, see below)                                                    |
+| created_at, updated_at | timestamptz                                                     |                                                                                                                                               |
 
-Account deletion keeps the row (history references it) and anonymizes it: `display_name` "Former member", `email` `deleted-<id>@deleted.invalid` (frees the address and keeps the unique and lowercase checks), `password_hash` and `locale` null, `deleted_at` set; identities and sessions are deleted, private transactions erased with their audit rows, households only the person was ever in deleted whole (architecture.md 6, "Account deletion"). Users are never hard deleted outside the demo.
+Account deletion keeps the row (history references it) and anonymizes it: `display_name` "Former member", `email` `deleted-<id>@deleted.invalid` (frees the address and keeps the unique and lowercase checks), `password_hash` and `locale` null, preferences back to their defaults, `deleted_at` set; identities and sessions are deleted, private transactions erased with their audit rows, households only the person was ever in deleted whole (architecture.md 6, "Account deletion"). Users are never hard deleted outside the demo.
+
+Preferences are columns, not a JSON blob: each is an enum with a default, so Postgres rejects an unknown value and a new account needs no row of its own. A new preference is one migration (adding a column with a constant default rewrites nothing). The theme is not here: it must apply before first paint, so it stays in the browser (`splinance-theme`). The `analytics.users` view names its columns, so preferences never reach the data track.
 
 Deliberately not stored: first/last name, phone number. No feature needs them yet (data minimization, GDPR). Add them with the feature that does.
 

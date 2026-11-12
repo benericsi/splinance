@@ -5,7 +5,14 @@ import { describe, expect, it } from 'vitest';
 import { authStore } from '@/lib/auth-store';
 import { server } from '../../test/msw';
 import { renderRoute as renderAt } from '../../test/router';
-import { apiError, authResponse, getField, householdDetail, testHousehold } from '../../test/utils';
+import {
+  apiError,
+  authResponse,
+  getField,
+  householdDetail,
+  testHousehold,
+  testUser,
+} from '../../test/utils';
 
 const signedIn = [
   mock.post('/api/auth/refresh', () => HttpResponse.json(authResponse())),
@@ -88,6 +95,7 @@ describe('where login leads after the session ended', () => {
     email: 'nora@example.com',
     displayName: 'Nora',
     locale: null,
+    preferences: testUser.preferences,
     createdAt: '2026-10-09T16:06:43.492Z',
   };
   const norasHome = {

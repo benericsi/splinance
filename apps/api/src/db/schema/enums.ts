@@ -6,9 +6,11 @@ import {
   LOCALES,
   NOTIFICATION_ACTIONS,
   NOTIFICATION_TYPES,
+  OVERVIEW_VIEWS,
   RECURRING_CADENCES,
   RECURRING_SOURCES,
   RECURRING_STATUSES,
+  SPENDING_VIEWS,
   SPLIT_METHODS,
   STATEMENT_SOURCES,
   TRANSACTION_VISIBILITIES,
@@ -31,3 +33,5 @@ export const recurringStatus = pgEnum('recurring_status', RECURRING_STATUSES);
 export const recurringSource = pgEnum('recurring_source', RECURRING_SOURCES);
 export const notificationType = pgEnum('notification_type', NOTIFICATION_TYPES);
 export const notificationAction = pgEnum('notification_action', NOTIFICATION_ACTIONS);
+export const overviewView = pgEnum('overview_view', OVERVIEW_VIEWS);
+export const spendingView = pgEnum('spending_view', SPENDING_VIEWS);

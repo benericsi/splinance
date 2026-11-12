@@ -51,6 +51,11 @@ export function toUser(row: UserRow): User {
     email: row.email,
     displayName: row.displayName,
     locale: row.locale,
+    preferences: {
+      overviewView: row.overviewView,
+      transactionVisibility: row.transactionVisibility,
+      spendingView: row.spendingView,
+    },
     createdAt: row.createdAt.toISOString(),
   };
 }

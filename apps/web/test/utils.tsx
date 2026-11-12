@@ -1,4 +1,9 @@
-import type { Household, HouseholdDetail, User } from '@splinance/shared';
+import {
+  DEFAULT_PREFERENCES,
+  type Household,
+  type HouseholdDetail,
+  type User,
+} from '@splinance/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
@@ -17,6 +22,7 @@ export const testUser: User = {
   email: 'anna@example.com',
   displayName: 'Anna',
   locale: null,
+  preferences: DEFAULT_PREFERENCES,
   createdAt: '2026-10-06T19:44:27.880Z',
 };
 
