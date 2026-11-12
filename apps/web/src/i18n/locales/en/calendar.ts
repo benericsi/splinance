@@ -60,6 +60,13 @@ export const calendar = {
       title: 'See what is left each month',
       text: 'Track your salary and this card shows what you can still spend.',
       action: 'Add income',
+      hide: 'Hide',
+    },
+    /** Income is tracked, but none has arrived or is expected this month. */
+    waiting: {
+      title: 'No income yet this month',
+      text: 'Your tracked income has not shown up yet. Add it by hand or import your bank export, and this card shows what is left.',
+      action: 'Add transaction',
     },
   },
   grid: {

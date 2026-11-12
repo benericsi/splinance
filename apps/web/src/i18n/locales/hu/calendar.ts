@@ -59,6 +59,12 @@ export const calendar: Messages<typeof en.calendar> = {
       title: 'Lásd, mennyi marad a hónapból',
       text: 'Kövesd a fizetésedet, és ez a kártya megmutatja, mennyit költhetsz még.',
       action: 'Bevétel hozzáadása',
+      hide: 'Elrejtés',
+    },
+    waiting: {
+      title: 'Ebben a hónapban még nincs bevétel',
+      text: 'A követett bevételed még nem érkezett meg. Vedd fel kézzel vagy importáld a bankszámlakivonatot, és ez a kártya megmutatja, mennyi marad.',
+      action: 'Tranzakció hozzáadása',
     },
   },
   grid: {

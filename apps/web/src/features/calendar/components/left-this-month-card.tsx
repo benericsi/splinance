@@ -1,17 +1,19 @@
 import type { Calendar } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Collapse } from '@/components/collapse';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { MoneyFlow } from '@/features/transactions/components/money-flow';
 import { formatShortDate } from '@/features/transactions/dates';
 import { formatMoney } from '@/features/transactions/money';
+import { useAuth } from '@/lib/auth-store';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
 import { type LeftSegment, leftSegments, leftThisMonth } from '../left';
+import { hideLeftNudge, isLeftNudgeHidden } from '../left-nudge';
 
 /** Fills only: the legend next to the bar says the same in words. */
 const SEGMENT_FILL: Record<LeftSegment['key'], string> = {
@@ -25,17 +27,23 @@ const SEGMENT_FILL: Record<LeftSegment['key'], string> = {
 /**
  * Overview: what is left of the viewer's income this month after what they spent and the
  * recurring payments still expected, as one number, a bar and (on request) the sum behind
- * it. Without any income to measure against it offers to track a salary instead.
+ * it. Without any income to measure against it offers to track a salary instead (or, with
+ * one tracked, to add the income itself); that offer can be hidden, per person and browser.
  */
 export function LeftThisMonthCard({
   householdId,
   calendar,
+  tracksIncome,
 }: {
   householdId: string;
   calendar: Calendar;
+  /** The viewer follows a recurring income: the empty state stops offering to add one. */
+  tracksIncome: boolean;
 }) {
   const { t } = useTranslation('calendar');
   const [open, setOpen] = useState(false);
+  const userId = useAuth().user?.id ?? '';
+  const [hidden, setHidden] = useState(() => isLeftNudgeHidden(userId, householdId));
   const headingId = useId();
   const detailsId = useId();
   const month = leftThisMonth(calendar);
@@ -43,22 +51,50 @@ export function LeftThisMonthCard({
   const money = (minor: number) => formatMoney(minor, currency);
 
   if (!month) {
+    if (hidden) return null;
+    // With a salary tracked the offer would loop: say what is missing instead.
+    const said = tracksIncome ? 'waiting' : 'nudge';
     return (
       <Card>
         <CardContent className="space-y-3">
-          <div>
-            <h2 className="font-heading text-lg font-semibold">{t('left.nudge.title')}</h2>
-            <p className="text-muted-foreground">{t('left.nudge.text')}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-heading text-lg font-semibold">{t(`left.${said}.title`)}</h2>
+              <p className="text-muted-foreground">{t(`left.${said}.text`)}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t('left.nudge.hide')}
+              className="text-muted-foreground -mt-1 -mr-2 shrink-0"
+              onClick={() => {
+                hideLeftNudge(userId, householdId);
+                setHidden(true);
+              }}
+            >
+              <X aria-hidden />
+            </Button>
           </div>
-          <Link
-            to="/h/$householdId/recurring/new"
-            params={{ householdId }}
-            search={{ kind: 'income' }}
-            state={OPEN_MODAL_STATE}
-            className={buttonVariants({ variant: 'outline' })}
-          >
-            {t('left.nudge.action')}
-          </Link>
+          {tracksIncome ? (
+            <Link
+              to="/h/$householdId/transactions/new"
+              params={{ householdId }}
+              state={OPEN_MODAL_STATE}
+              className={buttonVariants({ variant: 'outline' })}
+            >
+              {t('left.waiting.action')}
+            </Link>
+          ) : (
+            <Link
+              to="/h/$householdId/recurring/new"
+              params={{ householdId }}
+              search={{ kind: 'income' }}
+              state={OPEN_MODAL_STATE}
+              className={buttonVariants({ variant: 'outline' })}
+            >
+              {t('left.nudge.action')}
+            </Link>
+          )}
         </CardContent>
       </Card>
     );
