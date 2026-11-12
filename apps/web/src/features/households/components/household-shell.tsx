@@ -13,6 +13,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { ReactNode } from 'react';
 import { Logo } from '@/components/logo';
+import { HideAmountsToggle } from '@/components/hide-amounts-toggle';
 import { UserMenu } from '@/features/auth/components/user-menu';
 import { NotificationBell } from '@/features/notifications/components/notification-bell';
 import { DemoBanner } from '@/features/demo/components/demo-banner';
@@ -162,6 +163,7 @@ export function HouseholdShell({
           </div>
           {user && (
             <div className="flex items-center gap-3">
+              <HideAmountsToggle />
               <NotificationBell household={household} />
               <UserMenu user={user} />
             </div>

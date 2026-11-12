@@ -19,7 +19,8 @@ export function MoneyFlow({
   className?: string | undefined;
 }) {
   return (
-    <span className={className}>
+    // data-amount: blurs while amounts are hidden (src/lib/hide-amounts.ts).
+    <span data-amount="" className={className}>
       {/* The rolling digits live in a shadow root; assistive tech, find-in-page and tests
           read the plain copy instead, so nobody depends on how the element exposes itself. */}
       <NumberFlow

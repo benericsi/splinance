@@ -233,6 +233,7 @@ function ReviewItem({
         </>
       )}
       <span
+        data-amount=""
         className={cn(
           'ml-auto w-28 shrink-0 text-right font-medium tabular-nums',
           income && 'text-positive',
@@ -348,7 +349,9 @@ function LeftOut({ rows }: { rows: ReviewRow[] }) {
               </span>
               <span className="min-w-0 flex-1 truncate">{review.description}</span>
               <span className="hidden sm:inline">{review.reason && reasonText(review.reason)}</span>
-              <span className="w-28 shrink-0 text-right tabular-nums">{rowAmount(review.row)}</span>
+              <span data-amount="" className="w-28 shrink-0 text-right tabular-nums">
+                {rowAmount(review.row)}
+              </span>
             </li>
           ))}
         </ul>

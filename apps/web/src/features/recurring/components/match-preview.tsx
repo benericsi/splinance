@@ -8,6 +8,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { CircleCheck, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MaskMoney } from '@/features/transactions/components/amount';
 import { formatMoney, readAmount } from '@/features/transactions/money';
 import { recurringQueries } from '../queries';
 import { shortDate } from '../view';
@@ -81,10 +82,12 @@ export function MatchPreview({
             <p className="font-medium">{t(`${words}.matches`, { count: preview.data.matches })}</p>
             {latest && (
               <p className="text-muted-foreground text-xs">
-                {t('preview.latest', {
-                  date: shortDate(latest.occurredOn),
-                  amount: formatMoney(latest.amount, currency),
-                })}
+                <MaskMoney>
+                  {t('preview.latest', {
+                    date: shortDate(latest.occurredOn),
+                    amount: formatMoney(latest.amount, currency),
+                  })}
+                </MaskMoney>
               </p>
             )}
           </div>

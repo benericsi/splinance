@@ -4,6 +4,7 @@ import { userEvent } from '@testing-library/user-event';
 import { http as mock, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import { authStore } from '@/lib/auth-store';
+import { HIDE_AMOUNTS_STORAGE_KEY, hideAmountsStore } from '@/lib/hide-amounts';
 import { THEME_STORAGE_KEY, themeStore } from '@/lib/theme';
 import { setDemoSite } from '../../../test/demo-site';
 import { server } from '../../../test/msw';
@@ -35,6 +36,8 @@ function setting(name: string) {
 afterEach(() => {
   themeStore.setPreference('system');
   localStorage.removeItem(THEME_STORAGE_KEY);
+  hideAmountsStore.setHidden(false);
+  localStorage.removeItem(HIDE_AMOUNTS_STORAGE_KEY);
 });
 
 describe('preferences page', () => {
@@ -53,7 +56,8 @@ describe('preferences page', () => {
 
     expect(screen.getByRole('heading', { name: 'Display' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('This device')).toBeVisible();
+    // Theme and hidden amounts stay on the device.
+    expect(screen.getAllByText('This device')).toHaveLength(2);
     expect(setting('Overview opens as').getByRole('button', { name: 'Cards' })).toHaveAttribute(
       'aria-pressed',
       'true',
@@ -118,6 +122,22 @@ describe('preferences page', () => {
     expect(themeStore.getState().preference).toBe('dark');
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
     expect(saves).toEqual([]);
+  });
+
+  it('hides amounts on this device, without asking the API', async () => {
+    const saves = fakeApi();
+    renderRoute('/account/preferences');
+    const user = userEvent.setup();
+
+    await screen.findByRole('group', { name: 'Amounts' });
+    await user.click(setting('Amounts').getByRole('button', { name: 'Hide' }));
+
+    expect(document.documentElement).toHaveClass('hide-amounts');
+    expect(localStorage.getItem(HIDE_AMOUNTS_STORAGE_KEY)).toBe('true');
+    expect(saves).toEqual([]);
+
+    await user.click(setting('Amounts').getByRole('button', { name: 'Show' }));
+    expect(document.documentElement).not.toHaveClass('hide-amounts');
   });
 
   it('stays open on the demo site, without the account tab', async () => {

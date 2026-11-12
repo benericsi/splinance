@@ -15,6 +15,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
+import { Amount } from '@/features/transactions/components/amount';
 import { formatMonth } from '@/features/transactions/dates';
 import { formatMoney, toMajor } from '@/features/transactions/money';
 import { compactNumber, shortMonth } from '../format';
@@ -76,7 +77,8 @@ export function TrendChart({
           </span>
         ))}
       </div>
-      <ChartContainer config={config} className="aspect-auto h-56 w-full" aria-hidden>
+      {/* amount-chart: index.css blurs the y axis ticks while amounts are hidden. */}
+      <ChartContainer config={config} className="amount-chart aspect-auto h-56 w-full" aria-hidden>
         <BarChart data={data} barGap={2} margin={{ left: 0, right: 0, top: 4 }}>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
@@ -94,7 +96,7 @@ export function TrendChart({
                   const month = (payload[0]?.payload as { month?: string } | undefined)?.month;
                   return month ? formatMonth(month) : '';
                 }}
-                valueFormatter={money}
+                valueFormatter={(minor) => <Amount minor={minor} currency={currency} />}
               />
             }
           />

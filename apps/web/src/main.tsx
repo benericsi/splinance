@@ -6,6 +6,8 @@ import { ErrorPage, NotFoundPage } from '@/components/route-states';
 import { watchInstallPrompt } from '@/features/pwa/install';
 import { startServiceWorker } from '@/features/pwa/register';
 import { authStore } from '@/lib/auth-store';
+// Applies a saved "hide amounts" before the first render.
+import '@/lib/hide-amounts';
 import { detectLocale, followUserLocale, localeStore } from '@/lib/locale';
 import { createQueryClient } from '@/lib/query-client';
 import { rerunGuardsOnSessionEnd } from '@/lib/session-watch';

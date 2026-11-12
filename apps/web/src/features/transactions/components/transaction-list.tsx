@@ -13,6 +13,7 @@ import { formatDayHeading } from '../dates';
 import { describeTransaction, signedAmount, viewerShare } from '../describe';
 import { formatMoney } from '../money';
 import { MoneyFlow } from './money-flow';
+import { Amount, MaskMoney } from './amount';
 
 interface DayGroup {
   day: string;
@@ -133,11 +134,13 @@ export function TransactionRow({
       </div>
       <div className="shrink-0 text-right tabular-nums">
         <p className={cn('font-medium', income && 'text-positive')}>
-          {formatMoney(signedAmount(transaction), transaction.currency, { signed: true })}
+          <Amount minor={signedAmount(transaction)} currency={transaction.currency} signed />
         </p>
         {share !== undefined && transaction.split && transaction.split.shares.length > 1 && (
           <p className="text-muted-foreground text-xs">
-            {t('yourPart', { amount: formatMoney(share, transaction.currency) })}
+            <MaskMoney>
+              {t('yourPart', { amount: formatMoney(share, transaction.currency) })}
+            </MaskMoney>
           </p>
         )}
       </div>

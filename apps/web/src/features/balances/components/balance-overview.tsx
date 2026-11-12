@@ -6,10 +6,10 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAvatar } from '@/components/user-avatar';
 import { MoneyFlow } from '@/features/transactions/components/money-flow';
-import { formatMoney } from '@/features/transactions/money';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
 import { counterpart, describeDebt, splitDebts } from '../debts';
+import { Amount } from '@/features/transactions/components/amount';
 
 /** Opens the settle up dialog for the debt with `userId`. */
 function SettleLink({
@@ -110,7 +110,7 @@ export function BalanceOverview({
                             : 'text-negative',
                       )}
                     >
-                      {formatMoney(debt.amount, balances.currency)}
+                      <Amount minor={debt.amount} currency={balances.currency} />
                     </span>
                     {involved ? (
                       <SettleLink householdId={household.id} userId={person.userId} />

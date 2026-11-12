@@ -18,6 +18,13 @@ export const account = {
     theme: {
       description: "System follows your device's setting.",
     },
+    amounts: {
+      title: 'Amounts',
+      description:
+        'Blurs every amount, for sharing your screen. The eye at the top of household pages does the same.',
+      shown: 'Show',
+      hidden: 'Hide',
+    },
     overview: {
       title: 'Overview opens as',
       description: 'On wide screens. Phones always show cards.',

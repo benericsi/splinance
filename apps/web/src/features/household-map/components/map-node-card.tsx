@@ -8,6 +8,7 @@ import { BudgetBar } from '@/features/budgets/components/budget-bar';
 import { budgetNote } from '@/features/budgets/status';
 import { expiresIn } from '@/features/invites/format';
 import { dueLabel } from '@/features/recurring/view';
+import { MaskMoney } from '@/features/transactions/components/amount';
 import { formatMoney } from '@/features/transactions/money';
 import { cn } from '@/lib/utils';
 import type { MapNodeData } from '../build-map';
@@ -58,7 +59,9 @@ function Card({
         {lead}
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{title}</p>
-          <p className={cn('truncate text-xs', TONE[tone])}>{status}</p>
+          <p className={cn('truncate text-xs', TONE[tone])}>
+            <MaskMoney>{status}</MaskMoney>
+          </p>
         </div>
         {Icon && (
           <Icon

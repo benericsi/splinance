@@ -10,6 +10,7 @@ import {
   authResponse,
   getField,
   householdDetail,
+  sentence,
   testHousehold,
   testUser,
 } from '../../../test/utils';
@@ -186,7 +187,7 @@ describe('transactions list', () => {
     const pizzaDay = screen.getByRole('region', { name: /10 Oct/ });
     expect(within(pizzaDay).getByText('Pizza night')).toBeVisible();
     expect(within(pizzaDay).getByText('Eating out · You paid · 60 / 40 %')).toBeVisible();
-    expect(within(pizzaDay).getByText(/you 7200/)).toBeVisible();
+    expect(within(pizzaDay).getByText(sentence(/you 7200/))).toBeVisible();
 
     const haircutDay = screen.getByRole('region', { name: /9 Oct/ });
     expect(within(haircutDay).getByLabelText('Private')).toBeInTheDocument();

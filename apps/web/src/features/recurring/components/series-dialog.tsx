@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CategoryPicker } from '@/features/categories/components/category-picker';
-import { currencySymbol, formatMoney } from '@/features/transactions/money';
+import { currencySymbol } from '@/features/transactions/money';
 import { useAmountInput } from '@/features/transactions/use-amount-input';
 import { ApiError } from '@/lib/http';
 import { errorMessage } from '@/lib/query-client';
@@ -37,6 +37,7 @@ import {
 import { useAddSeries, useRemoveSeries, useUpdateSeries } from '../hooks';
 import { shortDate, signFor } from '../view';
 import { MatchPreview } from './match-preview';
+import { Amount } from '@/features/transactions/components/amount';
 
 const CADENCES: RecurringCadence[] = ['weekly', 'monthly', 'quarterly', 'yearly'];
 
@@ -325,7 +326,7 @@ export function SeriesDialog({
                   </span>
                   <span className={cn('shrink-0 tabular-nums', income && 'text-positive')}>
                     {signFor(kind)}
-                    {formatMoney(payment.amount, currency)}
+                    <Amount minor={payment.amount} currency={currency} />
                   </span>
                 </li>
               ))}

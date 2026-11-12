@@ -98,6 +98,8 @@ function toEdges(map: HouseholdMapData): Edge[] {
         sourceHandle: `${edge.route ?? 'side'}-out`,
         targetHandle: `${edge.route ?? 'side'}-in`,
         label: formatMoney(edge.amount ?? 0, map.currency),
+        // An SVG label, so no `data-amount` span: index.css blurs this class's text instead.
+        className: 'amount-svg',
         labelBgPadding: [6, 3] as [number, number],
         labelBgBorderRadius: 6,
         labelStyle: { fontWeight: 500, fontVariantNumeric: 'tabular-nums' },

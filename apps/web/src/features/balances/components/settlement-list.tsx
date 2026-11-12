@@ -13,11 +13,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatDayHeading } from '@/features/transactions/dates';
-import { formatMoney } from '@/features/transactions/money';
 import { COLLAPSE } from '@/lib/motion';
 import { describePayment } from '../debts';
 import { useDeleteSettlement, useRestoreSettlement } from '../hooks';
 import { balanceQueries } from '../queries';
+import { Amount } from '@/features/transactions/components/amount';
 
 /** Recorded payments, newest first, with delete (and undo) for the people allowed to. */
 export function SettlementList({
@@ -82,7 +82,7 @@ export function SettlementList({
                     </p>
                   </div>
                   <span className="font-medium tabular-nums">
-                    {formatMoney(settlement.amount, settlement.currency)}
+                    <Amount minor={settlement.amount} currency={settlement.currency} />
                   </span>
                   {mayDelete(settlement) ? (
                     <SettlementActions

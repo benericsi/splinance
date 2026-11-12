@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth-store';
+import { hideAmountsStore, useHideAmounts } from '@/lib/hide-amounts';
 import { type ThemePreference, themeStore, useTheme } from '@/lib/theme';
 import { useSavePreferences } from '../hooks';
 import { LanguageSwitch } from './language-switch';
@@ -51,10 +52,14 @@ function Row({
 
 const THEMES: readonly ThemePreference[] = ['light', 'dark', 'system'];
 
-/** How the app looks: the language (follows the account) and the theme (this device). */
+/**
+ * How the app looks: the language (follows the account), the theme and hidden amounts (this
+ * device).
+ */
 export function DisplaySection() {
   const { t } = useTranslation(['account', 'common']);
   const { preference } = useTheme();
+  const hidden = useHideAmounts();
 
   return (
     <Section title={t('preferences.display')}>
@@ -75,6 +80,24 @@ export function DisplaySection() {
               themeStore.setPreference(next);
             }}
             options={THEMES.map((value) => ({ value, label: t(`common:theme.${value}`) }))}
+          />
+        }
+      />
+      <Row
+        title={t('preferences.amounts.title')}
+        description={t('preferences.amounts.description')}
+        badge={t('preferences.thisDevice')}
+        control={
+          <PillToggle
+            label={t('preferences.amounts.title')}
+            value={hidden ? 'hidden' : 'shown'}
+            onChange={(next) => {
+              hideAmountsStore.setHidden(next === 'hidden');
+            }}
+            options={[
+              { value: 'shown', label: t('preferences.amounts.shown') },
+              { value: 'hidden', label: t('preferences.amounts.hidden') },
+            ]}
           />
         }
       />

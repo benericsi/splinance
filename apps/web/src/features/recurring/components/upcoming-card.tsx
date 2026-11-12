@@ -5,9 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { today } from '@/features/transactions/dates';
-import { formatMoney } from '@/features/transactions/money';
 import { cn } from '@/lib/utils';
 import { dueLabel, signFor, viewSeries } from '../view';
+import { Amount } from '@/features/transactions/components/amount';
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -73,7 +73,7 @@ export function UpcomingCard({
                   )}
                 >
                   {signFor(view.series.kind)}
-                  {formatMoney(view.series.latestAmount, data.currency)}
+                  <Amount minor={view.series.latestAmount} currency={data.currency} />
                 </span>
               </li>
             ))}

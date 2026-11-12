@@ -2,10 +2,10 @@ import { BRAND_COLORS, type Category, type Currency, type ReportCategory } from 
 import { m, useReducedMotion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { CategoryTile } from '@/features/categories/components/category-tile';
-import { formatMoney } from '@/features/transactions/money';
 import { REVEAL_ROW_STAGGER, TRANSITION, TRANSITION_GROW } from '@/lib/motion';
 import { useReveal } from '@/lib/reveal';
 import type { ReportView } from './trend-chart';
+import { Amount } from '@/features/transactions/components/amount';
 
 /**
  * A month's or a year's spending per category, largest first: the category's tile and name, a bar in
@@ -58,7 +58,9 @@ export function CategoryBreakdown({
         <span className="text-muted-foreground">
           {view === 'mine' ? t('breakdown.yourTotal') : t('breakdown.householdTotal')}
         </span>
-        <span className="font-medium tabular-nums">{formatMoney(total, currency)}</span>
+        <span className="font-medium tabular-nums">
+          <Amount minor={total} currency={currency} />
+        </span>
       </div>
       <ul aria-label={t('breakdown.label', { period: periodLabel })} className="space-y-2.5">
         {items.map((item, index) => {
@@ -100,7 +102,7 @@ export function CategoryBreakdown({
                 />
               </span>
               <span className="text-right text-sm tabular-nums">
-                {formatMoney(item.amount, currency)}
+                <Amount minor={item.amount} currency={currency} />
                 <span className="text-muted-foreground"> · {share}%</span>
               </span>
             </li>

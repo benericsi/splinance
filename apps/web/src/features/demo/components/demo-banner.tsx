@@ -21,7 +21,7 @@ export function DemoBanner() {
   return (
     <aside
       aria-label={t('banner.label')}
-      className="bg-muted/50 mb-6 flex items-center justify-between gap-3 rounded-lg border py-1.5 pr-1.5 pl-3 text-sm md:mr-28 min-[91rem]:mr-0 min-[91rem]:group-has-[[data-bleed]]/main:mr-28!"
+      className="bg-muted/50 mb-6 flex items-center justify-between gap-3 rounded-lg border py-1.5 pr-1.5 pl-3 text-sm md:mr-40 min-[97rem]:mr-0 min-[97rem]:group-has-[[data-bleed]]/main:mr-40!"
     >
       <p className="flex min-w-0 items-center gap-2">
         <FlaskConical className="text-muted-foreground size-4 shrink-0" aria-hidden />

@@ -14,6 +14,7 @@ import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
 import { type LeftSegment, leftSegments, leftThisMonth } from '../left';
 import { hideLeftNudge, isLeftNudgeHidden } from '../left-nudge';
+import { Amount, MaskMoney } from '@/features/transactions/components/amount';
 
 /** Fills only: the legend next to the bar says the same in words. */
 const SEGMENT_FILL: Record<LeftSegment['key'], string> = {
@@ -139,7 +140,11 @@ export function LeftThisMonthCard({
           >
             <MoneyFlow minor={Math.abs(month.left)} currency={currency} />
           </p>
-          {note && <p className="text-muted-foreground mt-1">{note}</p>}
+          {note && (
+            <p className="text-muted-foreground mt-1">
+              <MaskMoney>{note}</MaskMoney>
+            </p>
+          )}
 
           {/* Each slice grows by its amount; a small one keeps 4 px so it never vanishes. */}
           <div className="mt-4 flex h-2.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
@@ -162,7 +167,7 @@ export function LeftThisMonthCard({
                   aria-hidden
                 />
                 <span className="text-muted-foreground">{t(`left.legend.${segment.key}`)}</span>
-                <span className="tabular-nums">{money(segment.amount)}</span>
+                <Amount minor={segment.amount} currency={currency} className="tabular-nums" />
               </li>
             ))}
           </ul>
@@ -188,22 +193,30 @@ export function LeftThisMonthCard({
                 <dl className="space-y-1.5 pt-3 text-sm">
                   <Row label={t('left.rows.received')}>
                     <span className={cn(month.received > 0 && 'text-positive')}>
-                      {formatMoney(month.received, currency, { signed: month.received > 0 })}
+                      <Amount
+                        minor={month.received}
+                        currency={currency}
+                        signed={month.received > 0}
+                      />
                     </span>
                   </Row>
                   {month.expectedIncome > 0 && (
                     <Row label={t('left.rows.expectedIncome')}>
                       <span className="text-positive">
-                        {formatMoney(month.expectedIncome, currency, { signed: true })}
+                        <Amount minor={month.expectedIncome} currency={currency} signed />
                       </span>
                     </Row>
                   )}
-                  <Row label={t('left.rows.spent')}>{money(-month.spent)}</Row>
+                  <Row label={t('left.rows.spent')}>
+                    <Amount minor={-month.spent} currency={currency} />
+                  </Row>
                   {month.toCome > 0 && (
                     <Row label={t('left.rows.toCome', { count: month.toComeCount })}>
-                      {month.toComeVaries
-                        ? t('event.about', { amount: money(-month.toCome) })
-                        : money(-month.toCome)}
+                      <MaskMoney>
+                        {month.toComeVaries
+                          ? t('event.about', { amount: money(-month.toCome) })
+                          : money(-month.toCome)}
+                      </MaskMoney>
                     </Row>
                   )}
                 </dl>

@@ -4,11 +4,11 @@ import { AnimatePresence, m } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { CategoryTile } from '@/features/categories/components/category-tile';
-import { formatMoney } from '@/features/transactions/money';
 import { useRevealRows } from '@/lib/reveal';
 import { useConfirmSuggestion, useDismissSuggestion } from '../hooks';
 import { cn } from '@/lib/utils';
 import { cadenceLabel, shortDate, signFor } from '../view';
+import { Amount } from '@/features/transactions/components/amount';
 
 /**
  * What detection noticed and nobody decided on yet: Confirm makes it a series, Not
@@ -78,7 +78,7 @@ export function SuggestionList({
                   )}
                 >
                   {signFor(suggestion.kind)}
-                  {formatMoney(suggestion.amount, currency)}
+                  <Amount minor={suggestion.amount} currency={currency} />
                 </span>
               </div>
               <div className="ml-auto flex shrink-0 gap-2">
