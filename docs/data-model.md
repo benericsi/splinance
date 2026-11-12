@@ -328,6 +328,44 @@ A payment between two members made outside the app (cash, a bank transfer): the 
 - The member FKs accept former members (their rows stay), so a debt with someone who left can still be settled.
 - Partial index `settlements_household_settled_idx` on `(household_id, settled_on DESC, id DESC) WHERE deleted_at IS NULL` serves the list.
 
+### `savings_goals`
+
+Something a household or one person saves for. The app moves no money: a goal is a ledger of what was put aside elsewhere, and its balance is the sum of its live `savings_entries`, never stored.
+
+| Column                 | Type                          | Notes                                                                              |
+| ---------------------- | ----------------------------- | ---------------------------------------------------------------------------------- |
+| id                     | uuid PK                       | uuidv7                                                                             |
+| household_id           | uuid                          | `UNIQUE (household_id, id)` is the target of the entries' composite FK             |
+| name                   | text                          | 1 to 60 characters (`savings_goals_name_length`)                                   |
+| target_amount          | bigint, nullable              | Minor units, 1 to 10^12 (`savings_goals_target_range`); null for an open-ended pot |
+| target_date            | date, nullable                |                                                                                    |
+| currency               | enum `currency`               | The household's base currency                                                      |
+| visibility             | enum `transaction_visibility` | `shared` or `private`, set once: a private goal is readable only by `created_by`   |
+| created_by             | uuid                          | Composite FK `(household_id, created_by)` -> members                               |
+| archived_at            | timestamptz, nullable         | Closed: kept with its history, takes no entries                                    |
+| created_at, updated_at | timestamptz                   |                                                                                    |
+
+### `savings_entries`
+
+Money a member put into a goal (positive) or took out of it (negative). Not a transaction: it never counts as spending and creates no debt between members.
+
+| Column                 | Type                  | Notes                                                                           |
+| ---------------------- | --------------------- | ------------------------------------------------------------------------------- |
+| id                     | uuid PK               | uuidv7                                                                          |
+| household_id           | uuid                  | Part of both composite FKs                                                      |
+| goal_id                | uuid                  | Composite FK `(household_id, goal_id)` -> savings_goals                         |
+| user_id                | uuid                  | Who put it in or took it out. Composite FK `(household_id, user_id)` -> members |
+| amount                 | bigint                | Signed minor units, not 0, within +-10^12 (`savings_entries_amount_range`)      |
+| entry_on               | date                  | The day the money moved                                                         |
+| note                   | text, nullable        | Up to 200 characters                                                            |
+| deleted_at             | timestamptz, nullable | Soft delete, by its author                                                      |
+| created_at, updated_at | timestamptz           |                                                                                 |
+
+- Never edited: a wrong entry is deleted and recorded again.
+- A goal's balance never goes below zero. A CHECK cannot see other rows, so the service locks the goal row before a withdrawal or the removal of a deposit.
+- Partial indexes (`WHERE deleted_at IS NULL`): `savings_entries_goal_entry_idx` on `(goal_id, entry_on DESC, id DESC)` for a goal's history and balance, `savings_entries_user_entry_idx` on `(household_id, user_id, entry_on)` for what one person set aside in a month.
+- Not in the `analytics` views (names and notes are free text, and private goals would need stubs).
+
 ### Balances (derived, not a table)
 
 Who owes whom is computed on every read from live rows, per pair of people:
@@ -414,4 +452,5 @@ The role: `splinance_analytics_reader` (`NOLOGIN`) is created by the migration i
 Business rules already agreed:
 
 - Private transactions are paid by their author and never split; anything involving another person is shared.
+- Saving is a transfer, not an expense: savings entries stay out of spending, budgets, reports and balances, and do not block leaving.
 - A member cannot leave or be removed while they owe or are owed money, and a household cannot be archived while anyone does (409 `UNSETTLED_BALANCE`). Members record settlements they are part of; an owner can record one for any pair (audited).

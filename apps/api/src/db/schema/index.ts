@@ -10,6 +10,8 @@ export * from './import-batches';
 export * from './households';
 export * from './notifications';
 export * from './recurring-series';
+export * from './savings-entries';
+export * from './savings-goals';
 export * from './sessions';
 export * from './settlements';
 export * from './transaction-splits';

@@ -20,6 +20,7 @@ import { createReportsRouter } from '../reports/reports.routes';
 import { createNotificationSettingsRouter } from '../notifications/notifications.routes';
 import { createRecurringRouter } from '../recurring/recurring.routes';
 import { createRulesRouter } from '../rules/rules.routes';
+import { createSavingsRouter } from '../savings/savings.routes';
 import { createSettlementsRouter } from '../settlements/settlements.routes';
 import { createTransactionsRouter } from '../transactions/transactions.routes';
 import {
@@ -124,6 +125,7 @@ export function createHouseholdsRouter() {
   router.use('/:id/reports', createReportsRouter());
   router.use('/:id/recurring', createRecurringRouter());
   router.use('/:id/calendar', createCalendarRouter());
+  router.use('/:id/savings', createSavingsRouter());
   router.use('/:id/notification-settings', createNotificationSettingsRouter());
 
   return router;
