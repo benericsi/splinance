@@ -12,6 +12,9 @@ import {
 
 export const SAVINGS_GOAL_NAME_MAX = 60;
 
+/** How many goals one person can keep pinned in a household. */
+export const SAVINGS_PIN_MAX = 3;
+
 const goalNameSchema = z
   .string()
   .trim()
@@ -76,6 +79,8 @@ export const savingsGoalSchema = z.object({
   balance: z.number().int().nonnegative(),
   /** Per member, largest first; members with nothing in the goal are left out. */
   contributions: z.array(savingsContributionSchema),
+  /** The viewer keeps it on top of their savings page; everyone has their own pins. */
+  pinned: z.boolean(),
   createdAt: z.iso.datetime({ offset: true }),
 });
 

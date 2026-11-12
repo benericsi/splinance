@@ -22,6 +22,7 @@ import {
   importBatches,
   recurringSeries,
   savingsEntries,
+  savingsGoalPins,
   savingsGoals,
   sessions,
   transactions,
@@ -173,6 +174,14 @@ async function annasWorld() {
       { goalId: goalId('New sofa'), userId: ben.id, amount: 10_000 },
       { goalId: goalId('Bike'), userId: ben.id, amount: 5_000 },
     ].map((entry) => ({ ...entry, householdId: home, entryOn: '2026-10-12' })),
+  );
+  // Both keep the sofa pinned, she her own trip too.
+  await db.insert(savingsGoalPins).values(
+    [
+      { goalId: goalId('Surprise trip'), userId: anna.id },
+      { goalId: goalId('New sofa'), userId: anna.id },
+      { goalId: goalId('New sofa'), userId: ben.id },
+    ].map((pin) => ({ ...pin, householdId: home })),
   );
 
   const flat = await createHousehold(app, anna, 'Annas flat');
@@ -346,6 +355,8 @@ describe('delete', () => {
       (await db.select().from(savingsGoals).orderBy(savingsGoals.name)).map((g) => g.name),
     ).toEqual(['Bike', 'New sofa']);
     expect(await db.select().from(savingsEntries)).toHaveLength(3);
+    // Her pins are gone, Ben's stays.
+    expect((await db.select().from(savingsGoalPins)).map((pin) => pin.userId)).toEqual([ben.id]);
     const saved = await request(app)
       .get(`/api/households/${home}/savings`)
       .set('Authorization', ben.auth)

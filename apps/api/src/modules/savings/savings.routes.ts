@@ -22,6 +22,8 @@ import {
   getSavings,
   goalNotFound,
   listEntries,
+  pinGoal,
+  unpinGoal,
   updateGoal,
 } from './savings.service';
 
@@ -64,6 +66,16 @@ export function createSavingsRouter() {
 
   router.post('/:goalId/archive', writes, async (req, res) => {
     await archiveGoal(goalScope(req));
+    res.status(204).end();
+  });
+
+  router.put('/:goalId/pin', writes, async (req, res) => {
+    await pinGoal(goalScope(req));
+    res.status(204).end();
+  });
+
+  router.delete('/:goalId/pin', writes, async (req, res) => {
+    await unpinGoal(goalScope(req));
     res.status(204).end();
   });
 

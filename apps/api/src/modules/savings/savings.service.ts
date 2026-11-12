@@ -1,19 +1,22 @@
-import type {
-  Savings,
-  SavingsEntry,
-  SavingsEntryInput,
-  SavingsEntryListFilters,
-  SavingsEntryListResponse,
-  SavingsGoal,
-  SavingsGoalInput,
-  SavingsQuery,
-  UpdateSavingsGoalInput,
+import {
+  type Savings,
+  type SavingsEntry,
+  type SavingsEntryInput,
+  type SavingsEntryListFilters,
+  type SavingsEntryListResponse,
+  type SavingsGoal,
+  type SavingsGoalInput,
+  SAVINGS_PIN_MAX,
+  type SavingsQuery,
+  type UpdateSavingsGoalInput,
 } from '@splinance/shared';
 import { and, desc, eq, gte, inArray, isNull, lt, or, type SQL, sql } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
 import {
+  householdMembers,
   savingsEntries,
   type SavingsEntryRow,
+  savingsGoalPins,
   type SavingsGoalRow,
   savingsGoals,
   users,
@@ -36,6 +39,9 @@ const goalArchived = () => new HttpError(409, 'This goal is closed', 'SAVINGS_GO
 
 const insufficientSavings = () =>
   new HttpError(409, 'The goal does not hold that much', 'INSUFFICIENT_SAVINGS');
+
+const pinLimit = () =>
+  new HttpError(409, `You can pin up to ${String(SAVINGS_PIN_MAX)} goals`, 'SAVINGS_PIN_LIMIT');
 
 const notYourGoal = () =>
   new HttpError(403, 'Only the person who made this goal or an owner can change it', 'FORBIDDEN');
@@ -78,9 +84,22 @@ async function namesOf(executor: Db, userIds: Iterable<string>): Promise<Map<str
   return new Map(people.map((person) => [person.id, person.displayName]));
 }
 
-/** API representations for the given rows, in the same order, with balances and names. */
-async function toGoals(executor: Db, rows: SavingsGoalRow[]): Promise<SavingsGoal[]> {
+/**
+ * API representations for the given rows, in the same order, with balances, names and the
+ * viewer's own pins.
+ */
+async function toGoals(
+  executor: Db,
+  rows: SavingsGoalRow[],
+  viewerId: string,
+): Promise<SavingsGoal[]> {
   if (rows.length === 0) return [];
+  const goalIds = rows.map((row) => row.id);
+  const pins = await executor
+    .select({ goalId: savingsGoalPins.goalId })
+    .from(savingsGoalPins)
+    .where(and(inArray(savingsGoalPins.goalId, goalIds), eq(savingsGoalPins.userId, viewerId)));
+  const pinned = new Set(pins.map((pin) => pin.goalId));
   const sums = await executor
     .select({ goalId: savingsEntries.goalId, userId: savingsEntries.userId, amount: entrySum })
     .from(savingsEntries)
@@ -117,13 +136,14 @@ async function toGoals(executor: Db, rows: SavingsGoalRow[]): Promise<SavingsGoa
         .filter((sum) => sum.amount !== 0)
         .sort((a, b) => b.amount - a.amount || (a.userId < b.userId ? -1 : 1))
         .map((sum) => ({ ...person(sum.userId), amount: sum.amount })),
+      pinned: pinned.has(row.id),
       createdAt: row.createdAt.toISOString(),
     };
   });
 }
 
-async function toGoal(executor: Db, row: SavingsGoalRow): Promise<SavingsGoal> {
-  const [goal] = await toGoals(executor, [row]);
+async function toGoal(executor: Db, row: SavingsGoalRow, viewerId: string): Promise<SavingsGoal> {
+  const [goal] = await toGoals(executor, [row], viewerId);
   if (!goal) throw new Error('toGoal returned nothing');
   return goal;
 }
@@ -183,7 +203,11 @@ export async function getSavings(scope: HouseholdScope, query: SavingsQuery): Pr
     setAside = sum?.amount ?? 0;
   }
 
-  return { currency: household.baseCurrency, goals: await toGoals(db, rows), setAside };
+  return {
+    currency: household.baseCurrency,
+    goals: await toGoals(db, rows, scope.userId),
+    setAside,
+  };
 }
 
 /** The goal if the viewer can see it. `lock` serializes writes that depend on its balance. */
@@ -209,7 +233,7 @@ async function findGoal(
 
 export async function getGoal(scope: GoalScope): Promise<SavingsGoal> {
   await requireMembership(db, scope);
-  return toGoal(db, await findGoal(db, scope));
+  return toGoal(db, await findGoal(db, scope), scope.userId);
 }
 
 /**
@@ -245,7 +269,7 @@ export async function createGoal(
       })
       .returning();
     if (!row) throw new Error('Savings goal insert returned no row');
-    return toGoal(tx, row);
+    return toGoal(tx, row, scope.userId);
   });
 }
 
@@ -273,16 +297,20 @@ export async function updateGoal(
       .where(eq(savingsGoals.id, goal.id))
       .returning();
     if (!row) throw goalNotFound();
-    return toGoal(tx, row);
+    return toGoal(tx, row, scope.userId);
   });
 }
 
-/** Closes the goal: it stays with its history and takes no new entries. Idempotent. */
+/**
+ * Closes the goal: it stays with its history and takes no new entries. Everyone's pins on
+ * it go, so a closed goal holds no place on anyone's page. Idempotent.
+ */
 export async function archiveGoal(scope: GoalScope, now = new Date()): Promise<void> {
   await inWriteTransaction(scope, async (tx, membership) => {
     const goal = await findGoalToManage(tx, scope, membership);
     if (goal.archivedAt) return;
     await tx.update(savingsGoals).set({ archivedAt: now }).where(eq(savingsGoals.id, goal.id));
+    await tx.delete(savingsGoalPins).where(eq(savingsGoalPins.goalId, goal.id));
   });
 }
 
@@ -358,7 +386,7 @@ export async function addEntry(
 
     const [entry] = await toEntries(tx, [row]);
     if (!entry) throw new Error('toEntries returned nothing');
-    return { entry, goal: await toGoal(tx, goal) };
+    return { entry, goal: await toGoal(tx, goal, scope.userId) };
   });
 }
 
@@ -385,5 +413,52 @@ export async function deleteEntry(scope: EntryScope): Promise<void> {
       .update(savingsEntries)
       .set({ deletedAt: new Date() })
       .where(eq(savingsEntries.id, entry.id));
+  });
+}
+
+/**
+ * Keeps the goal on top of the caller's page. The limit is per person and household; the
+ * caller's membership row is locked so two pins at once cannot both count below it.
+ * Pinning a pinned goal changes nothing.
+ */
+export async function pinGoal(scope: GoalScope): Promise<void> {
+  await inWriteTransaction(scope, async (tx) => {
+    const goal = await findGoal(tx, scope);
+    if (goal.archivedAt) throw goalArchived();
+    await tx
+      .select({ userId: householdMembers.userId })
+      .from(householdMembers)
+      .where(
+        and(
+          eq(householdMembers.householdId, scope.householdId),
+          eq(householdMembers.userId, scope.userId),
+        ),
+      )
+      .for('no key update');
+
+    const pins = await tx
+      .select({ goalId: savingsGoalPins.goalId })
+      .from(savingsGoalPins)
+      .where(
+        and(
+          eq(savingsGoalPins.householdId, scope.householdId),
+          eq(savingsGoalPins.userId, scope.userId),
+        ),
+      );
+    if (pins.some((pin) => pin.goalId === goal.id)) return;
+    if (pins.length >= SAVINGS_PIN_MAX) throw pinLimit();
+    await tx
+      .insert(savingsGoalPins)
+      .values({ householdId: scope.householdId, goalId: goal.id, userId: scope.userId });
+  });
+}
+
+/** Unpinning a goal that is not pinned changes nothing. */
+export async function unpinGoal(scope: GoalScope): Promise<void> {
+  await inWriteTransaction(scope, async (tx) => {
+    const goal = await findGoal(tx, scope);
+    await tx
+      .delete(savingsGoalPins)
+      .where(and(eq(savingsGoalPins.goalId, goal.id), eq(savingsGoalPins.userId, scope.userId)));
   });
 }

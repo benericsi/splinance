@@ -47,6 +47,7 @@ const codes: Record<ApiErrorCode, string> = {
   SAVINGS_ENTRY_NOT_FOUND: 'Savings entry not found',
   SAVINGS_GOAL_ARCHIVED: 'This goal is closed',
   INSUFFICIENT_SAVINGS: 'The goal does not hold that much',
+  SAVINGS_PIN_LIMIT: 'You can pin up to 3 goals. Unpin one first',
   RULE_NOT_FOUND: 'Rule not found',
   RULE_PATTERN_TAKEN: 'There is a rule for this text already',
   RULE_ORDER_MISMATCH: 'The rules changed in the meantime. Reload and try again.',
