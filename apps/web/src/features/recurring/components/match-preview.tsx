@@ -38,8 +38,10 @@ export function MatchPreview({
   amount,
   amountVaries,
   scope,
+  kind = 'expense',
   startsOn,
-}: Omit<RecurringPreviewInput, 'amount'> & {
+}: Omit<RecurringPreviewInput, 'amount' | 'kind'> & {
+  kind?: RecurringPreviewInput['kind'];
   id: string;
   householdId: string;
   currency: Currency;
@@ -50,14 +52,14 @@ export function MatchPreview({
   const minor = readAmount(amount, currency).minor;
   const typed: RecurringPreviewInput | null =
     recurringPatternSchema.safeParse(pattern).success && minor !== undefined
-      ? { pattern: pattern.trim(), amount: minor, amountVaries, scope, startsOn }
+      ? { pattern: pattern.trim(), amount: minor, amountVaries, scope, kind, startsOn }
       : null;
   // Settled as text: a new object every render would restart the timer forever.
   const input = JSON.parse(useSettled(JSON.stringify(typed))) as RecurringPreviewInput | null;
   const preview = useQuery({
     ...recurringQueries.preview(
       householdId,
-      input ?? { pattern: '', amount: 1, amountVaries, scope, startsOn },
+      input ?? { pattern: '', amount: 1, amountVaries, scope, kind, startsOn },
     ),
     enabled: input !== null,
     placeholderData: keepPreviousData,

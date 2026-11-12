@@ -83,7 +83,11 @@ async function subjects(userId: string, rows: NotificationRow[]) {
     seriesIds.length === 0
       ? []
       : db
-          .select({ id: recurringSeries.id, name: recurringSeries.name })
+          .select({
+            id: recurringSeries.id,
+            name: recurringSeries.name,
+            kind: recurringSeries.kind,
+          })
           .from(recurringSeries)
           .where(
             and(
@@ -146,7 +150,8 @@ async function subjects(userId: string, rows: NotificationRow[]) {
       },
     ]),
   );
-  return { names, parties };
+  const kinds = new Map(series.map((row) => [row.id, row.kind]));
+  return { names, kinds, parties };
 }
 
 export async function listNotifications(userId: string): Promise<NotificationListResponse> {
@@ -171,7 +176,7 @@ export async function listNotifications(userId: string): Promise<NotificationLis
     .orderBy(desc(notifications.createdAt), desc(notifications.id))
     .limit(NOTIFICATION_LIST_LIMIT);
 
-  const { names, parties } = await subjects(
+  const { names, kinds, parties } = await subjects(
     userId,
     rows.map((row) => row.notification),
   );
@@ -189,6 +194,7 @@ export async function listNotifications(userId: string): Promise<NotificationLis
             n.actorId && actorName !== null ? { userId: n.actorId, displayName: actorName } : null,
           subjectId: n.subjectId,
           subjectName: names.get(n.subjectId) ?? null,
+          subjectKind: kinds.get(n.subjectId) ?? null,
           parties: parties.get(n.subjectId) ?? null,
           dueOn: n.dueOn,
           amount: n.amount,

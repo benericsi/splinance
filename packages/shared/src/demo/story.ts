@@ -108,6 +108,7 @@ export interface DemoRule {
 export interface DemoRecurringConfirmed {
   person: DemoPerson;
   scope: RecurringScope;
+  kind: TransactionKind;
   key: string;
 }
 
@@ -779,12 +780,14 @@ export function buildDemoStory({
       { category: 'Entertainment', from: addMonths(current, -5), amount: 10_000 },
     ],
     recurring: {
-      // The visitor confirmed the big ones; Spotify, the phone plan and the passes are left
-      // as suggestions for them to try.
+      // The visitor confirmed the big ones and their salary (private, like the income it
+      // matches); Spotify, the phone plan and the passes are left as suggestions for them
+      // to try.
       confirmed: [
-        { person: 'you', scope: 'shared', key: 'kovacs ingatlan kft.' },
-        { person: 'you', scope: 'shared', key: 'netflix' },
-        { person: 'you', scope: 'shared', key: 'telekom' },
+        { person: 'you', scope: 'shared', kind: 'expense', key: 'kovacs ingatlan kft.' },
+        { person: 'you', scope: 'shared', kind: 'expense', key: 'netflix' },
+        { person: 'you', scope: 'shared', kind: 'expense', key: 'telekom' },
+        { person: 'you', scope: 'private', kind: 'income', key: 'acme kft' },
       ],
       added: [
         // Added by hand when it started: the imports since then are its payments.

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { currencySchema } from './households';
 import { recurringScopeSchema } from './recurring/schemas';
 import { addMonths } from './reports';
-import { monthSchema, personSchema } from './transactions';
+import { monthSchema, personSchema, transactionKindSchema } from './transactions';
 
 /** How far ahead of the current month expected payments are worked out. */
 export const CALENDAR_MONTHS_AHEAD = 12;
@@ -53,6 +53,8 @@ const recurringEventFields = {
   seriesId: z.uuid(),
   name: z.string(),
   scope: recurringScopeSchema,
+  /** Money going out, or (an income series) coming in. */
+  kind: transactionKindSchema,
   categoryId: z.uuid().nullable(),
   amount: z.number().int().positive(),
 };

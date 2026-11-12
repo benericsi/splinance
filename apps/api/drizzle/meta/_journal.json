@@ -141,6 +141,13 @@
       "when": 1793909684015,
       "tag": "0019_demos_locale",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794474379091,
+      "tag": "0020_recurring_income",
+      "breakpoints": true
     }
   ]
 }

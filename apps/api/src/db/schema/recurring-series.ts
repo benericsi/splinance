@@ -24,7 +24,7 @@ import {
 import { householdMembers } from './household-members';
 
 /**
- * Recurring payments people track: added by hand or confirmed from a suggestion (`active`),
+ * Recurring payments and income people track (`kind`): added by hand or confirmed from a suggestion (`active`),
  * and suggestions they turned down (`dismissed`, only the pattern matters). Which
  * transactions are a series' payments is never stored: it follows from the pattern on every
  * read, like balances follow from transactions. Settings, not money records: no audit log;
@@ -37,7 +37,7 @@ export const recurringSeries = pgTable(
     householdId: uuid().notNull(),
     /** Null: a shared series (the household's). Set: private to that member. */
     userId: uuid(),
-    /** Always 'expense' for now (CHECK); kept for income series and the category FK. */
+    /** Money going out or coming in. Fixed at creation; part of the category FK. */
     kind: categoryKind().notNull().default('expense'),
     status: recurringStatus().notNull(),
     source: recurringSource().notNull(),
@@ -90,7 +90,6 @@ export const recurringSeries = pgTable(
         t.patternKey,
       )
       .where(sql`${t.archivedAt} is null`),
-    check('recurring_series_expense_only', sql`${t.kind} = 'expense'`),
     check('recurring_series_pattern_length', sql`char_length(${t.pattern}) between 2 and 60`),
     check('recurring_series_name_length', sql`char_length(${t.name}) between 1 and 60`),
     check(

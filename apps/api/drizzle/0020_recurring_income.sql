@@ -1,0 +1,1 @@
+ALTER TABLE "recurring_series" DROP CONSTRAINT "recurring_series_expense_only";

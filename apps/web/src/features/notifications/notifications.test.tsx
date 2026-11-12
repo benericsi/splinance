@@ -21,6 +21,7 @@ function notification(overrides: Partial<Notification>): Notification {
     actor: null,
     subjectId: '01a12509-0f61-75bc-b406-1301087809c1',
     subjectName: null,
+    subjectKind: null,
     parties: null,
     dueOn: null,
     amount: null,

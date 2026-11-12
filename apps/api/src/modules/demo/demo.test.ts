@@ -175,20 +175,22 @@ describe('POST /api/demo', { timeout: 30_000 }, () => {
     const list = budgetListResponseSchema.parse(budgetRes.body).budgets.budgets;
     expect(list.some((b) => b.spent / b.amount >= 0.8)).toBe(true);
 
-    // Recurring payments: three confirmed suggestions, two added by hand that the imports
-    // matched (one of them stopped months ago), the rest left as suggestions.
+    // Recurring payments: three confirmed suggestions and the visitor's salary (income),
+    // two added by hand that the imports matched (one of them stopped months ago), the rest
+    // left as suggestions.
     const recurringRes = await request(app)
       .get(`/api/households/${demo.householdId}/recurring`)
       .set('Authorization', auth)
       .expect(200);
     const { series } = recurringListResponseSchema.parse(recurringRes.body).recurring;
-    expect(series.map((s) => [s.name, s.source]).sort()).toEqual(
+    expect(series.map((s) => [s.name, s.source, s.kind]).sort()).toEqual(
       [
-        ['Gym membership', 'manual'],
-        ['Internet', 'detected'],
-        ['Netflix', 'detected'],
-        ['Rent', 'detected'],
-        ['Spotify Duo', 'manual'],
+        ['Gym membership', 'manual', 'expense'],
+        ['Internet', 'detected', 'expense'],
+        ['Netflix', 'detected', 'expense'],
+        ['Rent', 'detected', 'expense'],
+        ['Salary', 'detected', 'income'],
+        ['Spotify Duo', 'manual', 'expense'],
       ].sort(),
     );
     expect(series.find((s) => s.name === 'Spotify Duo')?.paymentCount).toBe(6);

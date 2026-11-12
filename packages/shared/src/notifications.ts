@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { currencySchema } from './households';
-import { personSchema } from './transactions';
+import { personSchema, transactionKindSchema } from './transactions';
 
 /**
  * Two families. State ones say how things stand (a renewal is coming, a budget is nearly
@@ -59,6 +59,11 @@ export const notificationSchema = z.object({
   subjectId: z.uuid(),
   /** The series' or category's name, or the transaction's description. */
   subjectName: z.string().nullable(),
+  /**
+   * For a recurring series: whether it is a payment or income, so "missed" and "changed"
+   * read right ("did not arrive", "came in higher"). Null for every other subject.
+   */
+  subjectKind: transactionKindSchema.nullable(),
   /** A settlement's two people (`settlement_recorded` only). */
   parties: z.object({ from: personSchema, to: personSchema }).nullable(),
   /** The renewal's payment date, or the budget's month (its first day). */

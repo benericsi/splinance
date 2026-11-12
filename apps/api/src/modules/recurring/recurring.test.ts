@@ -122,11 +122,17 @@ async function add(user: TestUser, overrides: Record<string, unknown> = {}) {
   return recurringSeriesResponseSchema.parse(res.body).series;
 }
 
-async function decide(user: TestUser, action: 'confirm' | 'dismiss', scope: string, key: string) {
+async function decide(
+  user: TestUser,
+  action: 'confirm' | 'dismiss',
+  scope: string,
+  key: string,
+  kind?: 'expense' | 'income',
+) {
   return request(app)
     .post(base(`/suggestions/${action}`))
     .set('Authorization', await bearer(user))
-    .send({ scope, key });
+    .send({ scope, key, kind });
 }
 
 /** `decide`, expecting `status`. */
@@ -136,8 +142,9 @@ async function decided(
   scope: string,
   key: string,
   status: number,
+  kind?: 'expense' | 'income',
 ) {
-  const res = await decide(user, action, scope, key);
+  const res = await decide(user, action, scope, key, kind);
   expect(res.status, JSON.stringify(res.body)).toBe(status);
   return res;
 }
@@ -294,6 +301,138 @@ describe('suggestions', () => {
     const after = await list(anna);
     expect(after.dismissed).toEqual([]);
     expect(after.series[0]?.paymentCount).toBe(monthsBack(4).length);
+  });
+});
+
+describe('income', () => {
+  /** Overrides for a salary: private income, filed under Salary. */
+  const SALARY = () => ({ ...PRIVATE, kind: 'income', amount: 690_000, categoryId: salary.id });
+
+  it('suggests a salary, and confirms or dismisses it only as income', async () => {
+    const dates = monthsBack(4, '10');
+    await importRows(anna, 'ACME KFT', dates, SALARY());
+
+    const { suggestions } = await list(anna);
+    expect(suggestions).toMatchObject([
+      {
+        key: 'acme kft',
+        scope: 'private',
+        kind: 'income',
+        cadence: 'monthly',
+        amount: 690_000,
+        occurrences: dates.length,
+        categoryId: salary.id,
+      },
+    ]);
+    // Private income is its receiver's alone.
+    expect((await list(ben)).suggestions).toEqual([]);
+
+    // A client from before income series says nothing about the kind: an expense, not this.
+    await decided(anna, 'confirm', 'private', 'acme kft', 404);
+    await decided(anna, 'dismiss', 'private', 'acme kft', 404, 'expense');
+
+    await decided(anna, 'dismiss', 'private', 'acme kft', 204, 'income');
+    const hidden = await list(anna);
+    expect(hidden.suggestions).toEqual([]);
+    expect(hidden.dismissed).toMatchObject([
+      { pattern: 'acme kft', scope: 'private', kind: 'income' },
+    ]);
+    await request(app)
+      .delete(base(`/${hidden.dismissed[0]?.id ?? ''}`))
+      .set('Authorization', await bearer(anna))
+      .expect(204);
+
+    const confirmed = await decided(anna, 'confirm', 'private', 'acme kft', 201, 'income');
+    expect(recurringSeriesResponseSchema.parse(confirmed.body).series).toMatchObject({
+      kind: 'income',
+      scope: 'private',
+      source: 'detected',
+      pattern: 'acme kft',
+      paymentCount: dates.length,
+      latestAmount: 690_000,
+      monthlyAmount: 690_000,
+      categoryId: salary.id,
+      share: null,
+    });
+    expect((await list(ben)).series).toEqual([]);
+  });
+
+  it('adds one by hand with an income category, and matches only money coming in', async () => {
+    const dates = monthsBack(3, '10');
+    await importRows(anna, 'ACME KFT', dates, SALARY());
+    // Money going to the same party is no salary, whatever its amount.
+    await importRows(anna, 'ACME KFT', dates, { ...PRIVATE, amount: 690_000 });
+
+    const wrongCategory = await request(app)
+      .post(base())
+      .set('Authorization', await bearer(anna))
+      .send(input({ kind: 'income', pattern: 'acme', categoryId: entertainment.id }));
+    expect(errorCode(wrongCategory)).toBe('INVALID_CATEGORY');
+
+    const values = {
+      kind: 'income',
+      name: 'Salary',
+      pattern: 'acme',
+      amount: 690_000,
+      anchorOn: dates[0],
+      categoryId: salary.id,
+      scope: 'private',
+    };
+    const added = await add(anna, values);
+    expect(added).toMatchObject({ kind: 'income', paymentCount: dates.length });
+
+    const preview = async (kind: string) => {
+      const res = await request(app)
+        .post(base('/preview'))
+        .set('Authorization', await bearer(anna))
+        .send({
+          kind,
+          pattern: 'acme',
+          amount: 690_000,
+          amountVaries: false,
+          scope: 'private',
+          startsOn: null,
+        })
+        .expect(200);
+      return recurringPreviewResponseSchema.parse(res.body).matches;
+    };
+    expect(await preview('income')).toBe(dates.length);
+    expect(await preview('expense')).toBe(dates.length);
+
+    // The same text may be tracked once as income and once as a payment, not twice as either.
+    const again = await request(app)
+      .post(base())
+      .set('Authorization', await bearer(anna))
+      .send(input(values));
+    expect(errorCode(again)).toBe('SERIES_PATTERN_TAKEN');
+    const paying = await add(anna, {
+      name: 'To ACME',
+      pattern: 'acme',
+      amount: 690_000,
+      anchorOn: dates[0],
+      scope: 'private',
+    });
+    expect(paying).toMatchObject({ kind: 'expense', paymentCount: dates.length });
+
+    // The kind is fixed, and an edit checks the category against it.
+    const edited = await request(app)
+      .patch(base(`/${added.id}`))
+      .set('Authorization', await bearer(anna))
+      .send({ kind: 'expense', categoryId: entertainment.id });
+    expect(errorCode(edited)).toBe('INVALID_CATEGORY');
+    expect((await list(anna)).series.find((s) => s.id === added.id)?.kind).toBe('income');
+  });
+
+  it('splits shared income by its shares', async () => {
+    const dates = monthsBack(3, '05');
+    await importRows(anna, 'Tenant Kft', dates, {
+      kind: 'income',
+      amount: 100_000,
+      categoryId: salary.id,
+    });
+    await decided(ben, 'confirm', 'shared', 'tenant kft', 201, 'income');
+    const [series] = (await list(ben)).series;
+    expect(series).toMatchObject({ kind: 'income', scope: 'shared', share: 50_000 });
   });
 });
 

@@ -12,6 +12,7 @@ import {
   recurringKey,
   recurringKeySchema,
   recurringSeriesInputSchema,
+  recurringSuggestionDecisionSchema,
   seriesCovers,
   type SeriesMatcher,
   seriesPayments,
@@ -337,13 +338,39 @@ describe('detectRecurring', () => {
     );
   });
 
-  it('looks only at expenses and sorts the most expensive per month first', () => {
+  it('finds income too and sorts the largest per month first', () => {
     const found = detect([
-      ...rows(monthly('2026-08-05', 3), { kind: 'income', counterparty: 'ACME KFT', amount: 1 }),
+      ...rows(monthly('2026-08-05', 3), {
+        kind: 'income',
+        counterparty: 'ACME KFT',
+        amount: 690_000,
+      }),
       ...rows(monthly('2026-08-07', 3)),
       ...rows(monthly('2026-08-01', 3), { counterparty: 'Kovács Ingatlan Kft.', amount: 320_000 }),
     ]);
-    expect(found.map((s) => s.key)).toEqual(['kovacs ingatlan kft.', 'netflix']);
+    expect(found.map((s) => [s.kind, s.key])).toEqual([
+      ['income', 'acme kft'],
+      ['expense', 'kovacs ingatlan kft.'],
+      ['expense', 'netflix'],
+    ]);
+  });
+
+  it('never mixes money going out with money coming in from the same party', () => {
+    // Two payments and a refund in rhythm: three rows, but no three of one kind.
+    const mixed = [
+      row({ occurredOn: '2026-08-07' }),
+      row({ occurredOn: '2026-09-07', kind: 'income' }),
+      row({ occurredOn: '2026-10-07' }),
+    ];
+    expect(detect(mixed)).toEqual([]);
+    const both = detect([
+      ...rows(monthly('2026-08-07', 3)),
+      ...rows(monthly('2026-08-09', 3), { kind: 'income' }),
+    ]);
+    expect(both.map((s) => [s.kind, s.key]).sort()).toEqual([
+      ['expense', 'netflix'],
+      ['income', 'netflix'],
+    ]);
   });
 });
 
@@ -370,6 +397,20 @@ describe('schemas', () => {
     expect(recurringSeriesInputSchema.safeParse({ ...input, pattern: ' ** ' }).success).toBe(false);
     expect(updateRecurringSeriesInputSchema.safeParse({ remind: false }).success).toBe(true);
     expect(updateRecurringSeriesInputSchema.safeParse({ scope: 'private' }).data).toEqual({});
+  });
+
+  it('takes a series for an expense unless it says income, and never changes the kind', () => {
+    expect(recurringSeriesInputSchema.parse(input).kind).toBe('expense');
+    expect(recurringSeriesInputSchema.parse({ ...input, kind: 'income' }).kind).toBe('income');
+    expect(recurringSeriesInputSchema.safeParse({ ...input, kind: 'transfer' }).success).toBe(
+      false,
+    );
+    expect(updateRecurringSeriesInputSchema.safeParse({ kind: 'income' }).data).toEqual({});
+    expect(recurringSuggestionDecisionSchema.parse({ scope: 'shared', key: 'acme kft' })).toEqual({
+      scope: 'shared',
+      kind: 'expense',
+      key: 'acme kft',
+    });
   });
 
   it('accepts only keys in match-key form', () => {

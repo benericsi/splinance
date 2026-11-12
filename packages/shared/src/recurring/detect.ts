@@ -2,10 +2,11 @@ import { daysBetween, GRACE_DAYS, monthlyAmount, nextDueOn } from './dates';
 import { recurringKey } from './keys';
 import { AMOUNT_TOLERANCE, type RecurringRow, withinTolerance } from './match';
 import { RECURRING_CADENCES, type RecurringCadence, type RecurringScope } from './schemas';
+import type { TransactionKind } from '../transactions';
 
 /**
- * Finding recurring payments nobody has told us about: transactions at the same merchant
- * in a steady rhythm with similar amounts. Pure; the caller passes the transactions the
+ * Finding recurring payments and income nobody has told us about: transactions of one kind
+ * at the same merchant (or from the same payer) in a steady rhythm with similar amounts. Pure; the caller passes the transactions the
  * viewer can see that no series owns (see `assignPayments`) and filters out dismissed keys.
  */
 
@@ -38,6 +39,7 @@ const VARIES_ABOVE = 0.05;
 export interface DetectedSeries {
   key: string;
   scope: RecurringScope;
+  kind: TransactionKind;
   /** The private author; null for shared. */
   ownerId: string | null;
   cadence: RecurringCadence;
@@ -95,9 +97,10 @@ function median(values: readonly number[]): number {
 }
 
 /**
- * Recurring expenses among `rows`, most expensive per month first. Groups never mix a
- * shared transaction with a private one, or two people's private ones, so a suggestion only
- * ever reaches people who can see all of it. A rhythm that stopped (its next payment is
+ * Recurring expenses and income among `rows`, largest per month first. Groups never mix an
+ * expense with an income (a refund from a shop is no payment to it), a shared transaction
+ * with a private one, or two people's private ones, so a suggestion only ever reaches
+ * people who can see all of it. A rhythm that stopped (its next payment is
  * past the grace window on `today`) is no suggestion: probably cancelled.
  */
 export function detectRecurring(
@@ -106,11 +109,10 @@ export function detectRecurring(
 ): DetectedSeries[] {
   const groups = new Map<string, RecurringRow[]>();
   for (const row of rows) {
-    if (row.kind !== 'expense') continue;
     const key = recurringKey(row);
     if (key.length < 2) continue;
     const scope = row.visibility === 'shared' ? 'shared' : `private:${row.createdBy}`;
-    const groupKey = `${scope}\u0000${key}`;
+    const groupKey = `${scope}:${row.kind}\u0000${key}`;
     const group = groups.get(groupKey);
     if (group) group.push(row);
     else groups.set(groupKey, [row]);
@@ -141,6 +143,7 @@ export function detectRecurring(
     found.push({
       key,
       scope: newest.visibility === 'shared' ? 'shared' : 'private',
+      kind: newest.kind,
       ownerId: newest.visibility === 'shared' ? null : newest.createdBy,
       cadence,
       amount: newest.amount,

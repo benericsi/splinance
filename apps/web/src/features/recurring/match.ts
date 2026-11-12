@@ -32,7 +32,7 @@ export function seriesForRow(
       seriesCovers(
         {
           id: item.id,
-          kind: 'expense',
+          kind: item.kind,
           ownerId: item.scope === 'private' ? viewerId : null,
           pattern: item.pattern,
           amount: item.latestAmount,
