@@ -1,4 +1,4 @@
-import type { Locale } from '@splinance/shared';
+import type { Locale, UpdatePreferencesInput, User } from '@splinance/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { householdQueries } from '@/features/households/queries';
 import { authStore } from '@/lib/auth-store';
@@ -36,6 +36,42 @@ export function useSaveLocale() {
       const { user } = authStore.getState();
       if (__DEMO_SITE__ || !user || user.locale === locale) return;
       authStore.setUser(await accountApi.updateProfile({ locale }));
+    },
+  });
+}
+
+/** The newest preferences save: an older answer must not undo a newer pick on screen. */
+let latestSave = 0;
+
+/**
+ * Saves preferences, shown at once: the user in the store changes before the request (the
+ * pages read their defaults from it) and goes back if the save fails, with the usual toast.
+ * Only the newest save's answer is applied. Also on the demo, where preferences stay open.
+ */
+export function useSavePreferences() {
+  return useMutation({
+    mutationFn: accountApi.updatePreferences,
+    onMutate: (input: UpdatePreferencesInput): { previous: User | null; save: number } => {
+      const previous = authStore.getState().user;
+      if (previous) {
+        const { preferences } = previous;
+        authStore.setUser({
+          ...previous,
+          preferences: {
+            overviewView: input.overviewView ?? preferences.overviewView,
+            transactionVisibility: input.transactionVisibility ?? preferences.transactionVisibility,
+            spendingView: input.spendingView ?? preferences.spendingView,
+          },
+        });
+      }
+      latestSave += 1;
+      return { previous, save: latestSave };
+    },
+    onSuccess: (user, _input, context) => {
+      if (context.save === latestSave) authStore.setUser(user);
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previous && context.save === latestSave) authStore.setUser(context.previous);
     },
   });
 }

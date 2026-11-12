@@ -12,8 +12,8 @@ import { SkeletonCard, SkeletonLine } from '@/components/skeletons';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AccountLayout } from '@/features/account/components/account-layout';
+import { AccountTabs } from '@/features/account/components/account-tabs';
 import { DangerZoneCard } from '@/features/account/components/danger-zone-card';
-import { LanguageCard } from '@/features/account/components/language-card';
 import { OtherDevicesCard } from '@/features/account/components/other-devices-card';
 import { ProfileCard } from '@/features/account/components/profile-card';
 import { SignInMethodsCard } from '@/features/account/components/sign-in-methods-card';
@@ -57,12 +57,9 @@ function AccountPage() {
             <SignInMethodsCard account={account} />
           </Reveal>
           <Reveal index={2}>
-            <LanguageCard />
-          </Reveal>
-          <Reveal index={3}>
             <OtherDevicesCard />
           </Reveal>
-          <Reveal index={4}>
+          <Reveal index={3}>
             <DangerZoneCard />
           </Reveal>
         </div>
@@ -96,7 +93,12 @@ function useProviderResult() {
 
 function AccountHeader() {
   const { t } = useTranslation('account');
-  return <PageHeader title={t('title')} description={t('description')} />;
+  return (
+    <>
+      <PageHeader title={t('title')} description={t('description')} />
+      <AccountTabs current="account" />
+    </>
+  );
 }
 
 function AccountSkeleton() {

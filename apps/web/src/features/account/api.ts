@@ -6,6 +6,7 @@ import {
   profileResponseSchema,
   providerRedirectResponseSchema,
   revokeSessionsResponseSchema,
+  type UpdatePreferencesInput,
   type UpdateProfileInput,
 } from '@splinance/shared';
 import { http, noContent } from '@/lib/http';
@@ -18,6 +19,8 @@ export const accountApi = {
     http.get('/account', accountResponseSchema, { signal }),
   updateProfile: async (input: UpdateProfileInput) =>
     (await http.patch('/account', profileResponseSchema, input)).user,
+  updatePreferences: async (input: UpdatePreferencesInput) =>
+    (await http.patch('/account/preferences', profileResponseSchema, input)).user,
   changePassword: (input: ChangePasswordInput) => http.post('/account/password', noContent, input),
   /** Returns how many other sessions were signed out. */
   revokeOtherSessions: async () =>

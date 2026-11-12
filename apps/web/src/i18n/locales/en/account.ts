@@ -1,16 +1,48 @@
 export const account = {
   title: 'Account settings',
-  description: 'Your profile and how you sign in.',
+  description: 'Your profile, how you sign in, and how the app works for you.',
+  tabs: {
+    label: 'Account settings',
+    account: 'Account and security',
+    preferences: 'Preferences',
+  },
+  preferences: {
+    title: 'Preferences',
+    display: 'Display',
+    defaults: 'Defaults',
+    thisDevice: 'This device',
+    language: {
+      title: 'Language',
+      description: 'Every device you sign in on follows it.',
+    },
+    theme: {
+      description: "System follows your device's setting.",
+    },
+    overview: {
+      title: 'Overview opens as',
+      description: 'On wide screens. Phones always show cards.',
+      cards: 'Cards',
+      map: 'Map',
+    },
+    visibility: {
+      title: 'New transactions start as',
+      description: 'You can still change it on each one.',
+      shared: 'Shared',
+      private: 'Just me',
+    },
+    spending: {
+      title: 'Reports and calendar show',
+      description: "The whole household's spending, or your share of it.",
+      household: 'Household',
+      mine: 'Your share',
+    },
+  },
   profile: {
     editName: 'Edit name',
     displayName: 'Display name',
     displayNamePlaceholder: 'Anna',
     emailNote: "Your email is used to sign in. It can't be changed yet.",
     nameChanged: 'Name changed',
-  },
-  language: {
-    title: 'Language',
-    description: 'Used on every device you sign in on.',
   },
   methods: {
     title: 'Sign-in methods',

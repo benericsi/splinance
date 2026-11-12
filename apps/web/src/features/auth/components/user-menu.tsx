@@ -1,6 +1,6 @@
 import type { User } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
-import { LogOut, UserRound } from 'lucide-react';
+import { LogOut, SlidersHorizontal, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -44,15 +44,18 @@ export function UserMenu({ user }: { user: User }) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        {/* The demo has no account page, but its preferences are open. */}
         {!__DEMO_SITE__ && (
-          <>
-            <DropdownMenuItem render={<Link to="/account" />}>
-              <UserRound aria-hidden />
-              {t('accountSettings')}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-          </>
+          <DropdownMenuItem render={<Link to="/account" />}>
+            <UserRound aria-hidden />
+            {t('accountSettings')}
+          </DropdownMenuItem>
         )}
+        <DropdownMenuItem render={<Link to="/account/preferences" />}>
+          <SlidersHorizontal aria-hidden />
+          {t('preferences')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <div className="flex items-center justify-between gap-4 px-2 py-1">
           <span className="text-sm">{t('common:theme.label')}</span>
           <ThemeToggle />
