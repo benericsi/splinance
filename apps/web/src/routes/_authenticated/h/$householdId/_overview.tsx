@@ -1,3 +1,4 @@
+import { type OverviewView, overviewViewSchema } from '@splinance/shared';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +15,7 @@ import { BalanceOverview } from '@/features/balances/components/balance-overview
 import { SettlementList } from '@/features/balances/components/settlement-list';
 import { balanceQueries } from '@/features/balances/queries';
 import { BudgetAlertsCard } from '@/features/budgets/components/budget-alerts-card';
+import { currentPreferences, unlessDefault, usePreferences } from '@/features/account/preferences';
 import { budgetQueries } from '@/features/budgets/queries';
 import { LeftThisMonthCard } from '@/features/calendar/components/left-this-month-card';
 import { calendarQueries } from '@/features/calendar/queries';
@@ -29,11 +31,17 @@ import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth-store';
 import { useMediaQuery } from '@/lib/use-media-query';
 
-/** `view=map`: the same overview drawn as a map (wide screens only); absent means cards. */
-const searchSchema = z.object({ view: z.enum(['map']).optional().catch(undefined) });
+/**
+ * `view`: cards or the same overview drawn as a map (wide screens only); absent means the
+ * person's default (`overviewView`).
+ */
+const searchSchema = z.object({ view: overviewViewSchema.optional().catch(undefined) });
 
 /** The map needs room: below this the overview is always cards and the switch is hidden. */
 const MAP_QUERY = '(min-width: 768px)';
+
+/** Whether the map shows: asked for (or the default) and room for it. */
+const mapShows = (view: OverviewView, wide: boolean) => view === 'map' && wide;
 
 /**
  * The household overview: balances first, then recent settlements and the members, or all
@@ -42,7 +50,12 @@ const MAP_QUERY = '(min-width: 768px)';
  */
 export const Route = createFileRoute('/_authenticated/h/$householdId/_overview')({
   validateSearch: searchSchema,
-  loaderDeps: ({ search }) => ({ map: search.view === 'map' }),
+  loaderDeps: ({ search }) => ({
+    map: mapShows(
+      search.view ?? currentPreferences().overviewView,
+      window.matchMedia(MAP_QUERY).matches,
+    ),
+  }),
   loader: async ({ context: { queryClient }, params: { householdId }, deps: { map } }) => {
     await Promise.all([
       ...(map ? [queryClient.query(importQueries.list(householdId))] : []),
@@ -75,11 +88,13 @@ function OverviewPage() {
   const { user } = useAuth();
   const { t } = useTranslation('balances');
   const { t: tMap } = useTranslation('map');
-  const { view } = Route.useSearch();
+  const search = Route.useSearch();
+  const { overviewView } = usePreferences();
+  const view = search.view ?? overviewView;
   const navigate = Route.useNavigate();
   const wide = useMediaQuery(MAP_QUERY);
   const viewerId = user?.id ?? '';
-  const showMap = view === 'map' && wide;
+  const showMap = mapShows(view, wide);
 
   return (
     <RevealPage>
@@ -91,10 +106,10 @@ function OverviewPage() {
             {showMap && <MapAddMenu household={household} />}
             <SegmentedControl
               label={tMap('view.label')}
-              value={view ?? 'cards'}
+              value={view}
               onChange={(next) => {
                 void navigate({
-                  search: (previous) => ({ ...previous, view: next === 'map' ? 'map' : undefined }),
+                  search: (previous) => ({ ...previous, view: unlessDefault(next, overviewView) }),
                   replace: true,
                 });
               }}
@@ -172,7 +187,7 @@ function OverviewPage() {
 
 /**
  * Reads the month itself, so the map (which never shows it) does not wait for it: a narrow
- * screen on `?view=map` gets the cards and loads it here.
+ * screen asked for the map gets the cards and loads it here.
  */
 function LeftThisMonth({
   householdId,
@@ -192,9 +207,10 @@ function OverviewSkeleton() {
   const { user } = useAuth();
   // Re-renders on a language switch.
   useTranslation('balances');
-  const { view } = Route.useSearch();
+  const search = Route.useSearch();
+  const { overviewView } = usePreferences();
   const wide = useMediaQuery(MAP_QUERY);
-  if (view === 'map' && wide) {
+  if (mapShows(search.view ?? overviewView, wide)) {
     return (
       <PageSkeleton>
         <PageHeader title={greeting(new Date().getHours(), user?.displayName ?? '')} />

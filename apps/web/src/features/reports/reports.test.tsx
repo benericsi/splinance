@@ -5,7 +5,7 @@ import { http as mock, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
-import { authResponse, householdDetail, testHousehold } from '../../../test/utils';
+import { authResponse, householdDetail, testHousehold, testUser } from '../../../test/utils';
 
 const category = (id: string, name: string, color: Category['color']): Category => ({
   id,
@@ -152,6 +152,40 @@ describe('reports page', () => {
     expect(within(table).getByRole('row', { name: /October 2026/ })).toHaveTextContent(
       money('11 500 Ft'),
     );
+  });
+
+  it('opens on the viewer’s share when that is their default', async () => {
+    fakeApi();
+    server.use(
+      mock.post('/api/auth/refresh', () =>
+        HttpResponse.json(
+          authResponse('access-1', {
+            ...testUser,
+            preferences: { ...testUser.preferences, spendingView: 'mine' },
+          }),
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    const router = renderRoute(page);
+
+    await waitFor(async () => {
+      expect(await categoryRows()).toEqual([
+        expect.stringMatching(/^Groceries8000\sFt · 70%$/),
+        expect.stringMatching(/^Eating out3000\sFt · 26%$/),
+        expect.stringMatching(/^No category500\sFt · 4%$/),
+      ]);
+    });
+    const view = screen.getByRole('group', { name: 'Whose spending' });
+    expect(within(view).getByRole('button', { name: 'Your share' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await user.click(within(view).getByRole('button', { name: 'Household' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toMatchObject({ view: 'household' });
+    });
   });
 
   it('steps to the previous month within the same six months', async () => {

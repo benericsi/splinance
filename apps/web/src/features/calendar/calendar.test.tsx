@@ -279,6 +279,29 @@ describe('calendar page', () => {
     expect(stat('Your income')).toBeVisible();
   });
 
+  it('opens on the viewer’s share when that is their default', async () => {
+    fakeApi();
+    server.use(
+      mock.post('/api/auth/refresh', () =>
+        HttpResponse.json(
+          authResponse('access-1', {
+            ...testUser,
+            preferences: { ...testUser.preferences, spendingView: 'mine' },
+          }),
+        ),
+      ),
+    );
+    renderRoute(page);
+    await days();
+
+    expect(stat('You spent')).toHaveTextContent(money('10 245 Ft'));
+    expect(
+      within(screen.getByRole('group', { name: 'Whose spending' })).getByRole('button', {
+        name: 'Your share',
+      }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('opens a day with its events and transactions', async () => {
     const asked = fakeApi();
     const user = userEvent.setup();

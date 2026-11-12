@@ -69,10 +69,14 @@ function viewerFirst(rows: ShareRow[], viewerId: string): ShareRow[] {
   return [...rows].sort((a, b) => rank(a) - rank(b));
 }
 
-/** A new transaction: an expense paid by the viewer, split equally between all members. */
+/**
+ * A new transaction: an expense paid by the viewer, split equally between all members;
+ * shared or just for the viewer as their default says (`transactionVisibility`).
+ */
 export function newTransactionValues(
   members: Pick<HouseholdMember, 'userId' | 'displayName'>[],
   viewerId: string,
+  visibility: TransactionVisibility = 'shared',
 ): TransactionFormValues {
   return {
     kind: 'expense',
@@ -80,7 +84,7 @@ export function newTransactionValues(
     description: '',
     occurredOn: today(),
     categoryId: '',
-    visibility: 'shared',
+    visibility,
     paidBy: viewerId,
     splitMethod: 'equal',
     shares: viewerFirst(

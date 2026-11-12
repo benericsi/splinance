@@ -8,6 +8,7 @@ import { RouteDialog } from '@/components/route-dialog';
 import { eventAmountText, eventName, eventStyle } from '@/features/calendar/events';
 import { calendarQueries } from '@/features/calendar/queries';
 import { type CalendarView, daySpent } from '@/features/calendar/view';
+import { usePreferences } from '@/features/account/preferences';
 import { categoryQueries } from '@/features/categories/queries';
 import { TransactionRow } from '@/features/transactions/components/transaction-list';
 import { formatDayHeading, today } from '@/features/transactions/dates';
@@ -44,7 +45,8 @@ function DayRoute() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const { user } = useAuth();
-  const view: CalendarView = search.view ?? 'household';
+  const { spendingView } = usePreferences();
+  const view: CalendarView = search.view ?? spendingView;
   const { data: calendar } = useSuspenseQuery(
     calendarQueries.month(householdId, date.slice(0, 7), search.category),
   );

@@ -18,13 +18,15 @@ import { CalendarSummary } from '@/features/calendar/components/calendar-summary
 import { calendarQueries } from '@/features/calendar/queries';
 import type { CalendarView } from '@/features/calendar/view';
 import { CategoryPicker } from '@/features/categories/components/category-picker';
+import { unlessDefault, usePreferences } from '@/features/account/preferences';
 import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
 import { currentMonth } from '@/features/transactions/dates';
 
 /**
  * `month`: absent means the current one, like Transactions and Budgets. `view`: the whole
- * household's spending (default) or the viewer's share, like Reports. `category`: only
+ * household's spending or the viewer's share, like Reports; absent means the person's
+ * default (`spendingView`). `category`: only
  * that category's spending and series (the month before is read too, to compare with).
  */
 const searchSchema = z.object({
@@ -63,7 +65,8 @@ function CalendarPage() {
   const { month, category: categoryId } = Route.useLoaderDeps();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
-  const view: CalendarView = search.view ?? 'household';
+  const { spendingView } = usePreferences();
+  const view: CalendarView = search.view ?? spendingView;
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: calendar } = useSuspenseQuery(
     calendarQueries.month(householdId, month, categoryId),
@@ -107,7 +110,7 @@ function CalendarPage() {
             value={view}
             onChange={(next) => {
               void navigate({
-                search: (prev) => ({ ...prev, view: next === 'household' ? undefined : next }),
+                search: (prev) => ({ ...prev, view: unlessDefault(next, spendingView) }),
                 resetScroll: false,
                 replace: true,
               });
