@@ -19,6 +19,7 @@ import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
 import { Route as AuthenticatedAccountDeleteRouteImport } from './routes/_authenticated/account.delete'
 import { Route as AuthenticatedAccountPasswordRouteImport } from './routes/_authenticated/account.password'
+import { Route as AuthenticatedAccountPreferencesRouteImport } from './routes/_authenticated/account_.preferences'
 import { Route as AuthenticatedHHouseholdIdRouteImport } from './routes/_authenticated/h/$householdId'
 import { Route as AuthenticatedWelcomeIndexRouteImport } from './routes/_authenticated/welcome.index'
 import { Route as AuthenticatedWelcomeDoneRouteImport } from './routes/_authenticated/welcome.done'
@@ -96,6 +97,12 @@ const AuthenticatedAccountPasswordRoute =
     id: '/password',
     path: '/password',
     getParentRoute: () => AuthenticatedAccountRoute,
+  } as any)
+const AuthenticatedAccountPreferencesRoute =
+  AuthenticatedAccountPreferencesRouteImport.update({
+    id: '/account_/preferences',
+    path: '/account/preferences',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedHHouseholdIdRoute =
   AuthenticatedHHouseholdIdRouteImport.update({
@@ -268,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AuthenticatedAccountRouteWithChildren
   '/account/delete': typeof AuthenticatedAccountDeleteRoute
   '/account/password': typeof AuthenticatedAccountPasswordRoute
+  '/account/preferences': typeof AuthenticatedAccountPreferencesRoute
   '/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
   '/welcome/done': typeof AuthenticatedWelcomeDoneRoute
   '/welcome/household': typeof AuthenticatedWelcomeHouseholdRoute
@@ -304,6 +312,7 @@ export interface FileRoutesByTo {
   '/account': typeof AuthenticatedAccountRouteWithChildren
   '/account/delete': typeof AuthenticatedAccountDeleteRoute
   '/account/password': typeof AuthenticatedAccountPasswordRoute
+  '/account/preferences': typeof AuthenticatedAccountPreferencesRoute
   '/h/$householdId': typeof AuthenticatedHHouseholdIdOverviewIndexRoute
   '/welcome/done': typeof AuthenticatedWelcomeDoneRoute
   '/welcome/household': typeof AuthenticatedWelcomeHouseholdRoute
@@ -342,6 +351,7 @@ export interface FileRoutesById {
   '/_authenticated/account': typeof AuthenticatedAccountRouteWithChildren
   '/_authenticated/account/delete': typeof AuthenticatedAccountDeleteRoute
   '/_authenticated/account/password': typeof AuthenticatedAccountPasswordRoute
+  '/_authenticated/account_/preferences': typeof AuthenticatedAccountPreferencesRoute
   '/_authenticated/h/$householdId': typeof AuthenticatedHHouseholdIdRouteWithChildren
   '/_authenticated/welcome/done': typeof AuthenticatedWelcomeDoneRoute
   '/_authenticated/welcome/household': typeof AuthenticatedWelcomeHouseholdRoute
@@ -381,6 +391,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/account/delete'
     | '/account/password'
+    | '/account/preferences'
     | '/h/$householdId'
     | '/welcome/done'
     | '/welcome/household'
@@ -417,6 +428,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/account/delete'
     | '/account/password'
+    | '/account/preferences'
     | '/h/$householdId'
     | '/welcome/done'
     | '/welcome/household'
@@ -454,6 +466,7 @@ export interface FileRouteTypes {
     | '/_authenticated/account'
     | '/_authenticated/account/delete'
     | '/_authenticated/account/password'
+    | '/_authenticated/account_/preferences'
     | '/_authenticated/h/$householdId'
     | '/_authenticated/welcome/done'
     | '/_authenticated/welcome/household'
@@ -562,6 +575,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/account/password'
       preLoaderRoute: typeof AuthenticatedAccountPasswordRouteImport
       parentRoute: typeof AuthenticatedAccountRoute
+    }
+    '/_authenticated/account_/preferences': {
+      id: '/_authenticated/account_/preferences'
+      path: '/account/preferences'
+      fullPath: '/account/preferences'
+      preLoaderRoute: typeof AuthenticatedAccountPreferencesRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/h/$householdId': {
       id: '/_authenticated/h/$householdId'
@@ -929,6 +949,7 @@ const AuthenticatedHHouseholdIdRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAccountRoute: typeof AuthenticatedAccountRouteWithChildren
+  AuthenticatedAccountPreferencesRoute: typeof AuthenticatedAccountPreferencesRoute
   AuthenticatedHHouseholdIdRoute: typeof AuthenticatedHHouseholdIdRouteWithChildren
   AuthenticatedWelcomeDoneRoute: typeof AuthenticatedWelcomeDoneRoute
   AuthenticatedWelcomeHouseholdRoute: typeof AuthenticatedWelcomeHouseholdRoute
@@ -939,6 +960,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAccountRoute: AuthenticatedAccountRouteWithChildren,
+  AuthenticatedAccountPreferencesRoute: AuthenticatedAccountPreferencesRoute,
   AuthenticatedHHouseholdIdRoute: AuthenticatedHHouseholdIdRouteWithChildren,
   AuthenticatedWelcomeDoneRoute: AuthenticatedWelcomeDoneRoute,
   AuthenticatedWelcomeHouseholdRoute: AuthenticatedWelcomeHouseholdRoute,

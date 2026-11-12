@@ -71,13 +71,17 @@ describe('UserMenu keyboard access', () => {
     expect(screen.getByRole('button', { name: 'Account menu' })).toHaveFocus();
   });
 
-  it('links to the account settings', async () => {
+  it('links to the account settings and the preferences', async () => {
     await renderMenu();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Account menu' }));
     expect(await screen.findByRole('menuitem', { name: 'Account settings' })).toHaveAttribute(
       'href',
       '/account',
+    );
+    expect(screen.getByRole('menuitem', { name: 'Preferences' })).toHaveAttribute(
+      'href',
+      '/account/preferences',
     );
   });
 
@@ -88,6 +92,9 @@ describe('UserMenu keyboard access', () => {
     await user.tab();
     await user.keyboard('{Enter}');
     await screen.findByRole('menu');
+    // Opening focuses Account settings; Preferences, then Log out.
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('menuitem', { name: 'Preferences' })).toHaveFocus();
     await user.keyboard('{ArrowDown}');
     expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveFocus();
 

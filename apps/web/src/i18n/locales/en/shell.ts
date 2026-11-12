@@ -2,6 +2,7 @@ export const shell = {
   accountMenu: 'Account menu',
   demoAccount: 'Demo account',
   accountSettings: 'Account settings',
+  preferences: 'Preferences',
   logOut: 'Log out',
   endDemo: 'End demo',
   endDemoTitle: 'End the demo?',

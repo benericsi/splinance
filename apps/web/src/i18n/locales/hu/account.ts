@@ -3,17 +3,49 @@ import type { Messages } from '../../types';
 
 export const account: Messages<typeof en.account> = {
   title: 'Fiókbeállítások',
-  description: 'A profilod és a bejelentkezési módjaid.',
+  description: 'A profilod, a bejelentkezési módjaid és az, ahogyan az app neked működik.',
+  tabs: {
+    label: 'Fiókbeállítások',
+    account: 'Fiók és biztonság',
+    preferences: 'Beállítások',
+  },
+  preferences: {
+    title: 'Beállítások',
+    display: 'Megjelenés',
+    defaults: 'Alapértelmezések',
+    thisDevice: 'Ez az eszköz',
+    language: {
+      title: 'Nyelv',
+      description: 'Minden eszközön ezt látod, ahol bejelentkezel.',
+    },
+    theme: {
+      description: 'A Rendszer az eszközöd beállítását követi.',
+    },
+    overview: {
+      title: 'Az áttekintés így nyílik meg',
+      description: 'Széles képernyőn. Telefonon mindig kártyák.',
+      cards: 'Kártyák',
+      map: 'Térkép',
+    },
+    visibility: {
+      title: 'Új tranzakció alapból',
+      description: 'Minden tranzakciónál átállíthatod.',
+      shared: 'Közös',
+      private: 'Csak én',
+    },
+    spending: {
+      title: 'Kimutatások és naptár',
+      description: 'A háztartás teljes költése, vagy a te részed belőle.',
+      household: 'Háztartás',
+      mine: 'A te részed',
+    },
+  },
   profile: {
     editName: 'Név módosítása',
     displayName: 'Megjelenített név',
     displayNamePlaceholder: 'Anna',
     emailNote: 'Az e-mail-címeddel jelentkezel be. Egyelőre nem módosítható.',
     nameChanged: 'Név módosítva',
-  },
-  language: {
-    title: 'Nyelv',
-    description: 'Minden eszközön ezt látod, ahol bejelentkezel.',
   },
   methods: {
     title: 'Bejelentkezési módok',
