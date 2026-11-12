@@ -30,6 +30,8 @@ export function describeNotification(n: Notification, viewerId: string, today: s
   const money = (minor: number | null) => formatMoney(minor ?? 0, n.currency);
   const name = n.subjectName ?? i18n.t('notifications:aPayment');
   const actor = n.actor?.displayName ?? i18n.t('notifications:someone');
+  // A recurring income reads the other way round: it arrives (or does not), it is not paid.
+  const income = n.subjectKind === 'income';
 
   switch (n.type) {
     case 'renewal_due':
@@ -41,10 +43,12 @@ export function describeNotification(n: Notification, viewerId: string, today: s
     case 'renewal_missed':
       return {
         lead: name,
-        rest: i18n.t('notifications:renewal.missed'),
+        rest: i18n.t(income ? 'notifications:income.missed' : 'notifications:renewal.missed'),
         detail: n.dueOn
-          ? i18n.t('notifications:renewal.expected', { date: shortDay(n.dueOn) })
-          : i18n.t('notifications:renewal.cancelled'),
+          ? i18n.t(income ? 'notifications:income.expected' : 'notifications:renewal.expected', {
+              date: shortDay(n.dueOn),
+            })
+          : i18n.t(income ? 'notifications:income.stopped' : 'notifications:renewal.cancelled'),
       };
     case 'price_changed': {
       const previous = n.previousAmount ?? 0;
@@ -54,8 +58,10 @@ export function describeNotification(n: Notification, viewerId: string, today: s
         lead: name,
         rest:
           amount > previous
-            ? i18n.t('notifications:price.up', { percent })
-            : i18n.t('notifications:price.down', { percent }),
+            ? i18n.t(income ? 'notifications:income.up' : 'notifications:price.up', { percent })
+            : i18n.t(income ? 'notifications:income.down' : 'notifications:price.down', {
+                percent,
+              }),
         detail: i18n.t('notifications:price.change', { from: money(previous), to: money(amount) }),
       };
     }

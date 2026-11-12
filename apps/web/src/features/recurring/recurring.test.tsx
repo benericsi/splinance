@@ -475,6 +475,120 @@ describe('overview', () => {
   });
 });
 
+describe('recurring income', () => {
+  /** The viewer's salary: private, arrives in 5 days. */
+  const salaryLast = monthBefore(daysFromToday(5));
+  const salary = series({
+    id: '01a12509-0f61-75bc-b406-1301087805a4',
+    kind: 'income',
+    name: 'Salary',
+    pattern: 'acme kft',
+    scope: 'private',
+    amount: 690_000,
+    anchorOn: salaryLast,
+    lastPaidOn: salaryLast,
+    paymentCount: 3,
+    latestAmount: 690_000,
+    previousAmount: 690_000,
+    monthlyAmount: 690_000,
+    categoryId: null,
+  });
+
+  it('lists income above the payments and totals the two apart', async () => {
+    fakeApi({ series: [netflix, salary], suggestions: [] });
+    renderRoute(page);
+
+    const income = await screen.findByRole('region', { name: 'Income' });
+    expect(
+      within(income)
+        .getAllByRole('listitem')
+        .map((row) => row.textContent),
+    ).toEqual([expect.stringMatching(/^SalaryMonthly · expected in 5 days\+690\s000\sFt$/)]);
+    const payments = screen.getByRole('region', { name: 'Payments' });
+    expect(within(payments).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(payments).getByRole('link', { name: /^Netflix/ })).toBeVisible();
+    // Income comes first on the page.
+    expect(
+      income.compareDocumentPosition(payments) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // Two figures, never one netted.
+    const out = screen.getByText('Going out').parentElement;
+    expect(out).toHaveTextContent(money('4990 Ft'));
+    expect(out).toHaveTextContent('1 payment');
+    const coming = screen.getByText('Coming in').parentElement;
+    expect(coming).toHaveTextContent(money('690 000 Ft'));
+    expect(coming).toHaveTextContent('1 source');
+  });
+
+  it('keeps the one list and the plain total without income', async () => {
+    fakeApi({ suggestions: [] });
+    renderRoute(page);
+    expect(await screen.findByText('About')).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Payments' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Coming in')).not.toBeInTheDocument();
+  });
+
+  it('adds one by hand, in income words, as income', async () => {
+    const { state, record } = fakeApi({ series: [], suggestions: [] });
+    server.use(
+      mock.post(`${base}/recurring/preview`, async ({ request }) => {
+        await record(request);
+        return HttpResponse.json({
+          matches: 3,
+          recent: [
+            {
+              transactionId: '01a12509-0f61-75bc-b406-1301087806c1',
+              occurredOn: '2026-10-10',
+              amount: 690_000,
+              imported: true,
+            },
+          ],
+        });
+      }),
+      mock.post(`${base}/recurring`, async ({ request }) => {
+        await record(request);
+        return HttpResponse.json({ series: salary }, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderRoute(`${page}/new`);
+
+    const payment = await screen.findByRole('dialog', { name: 'Add recurring payment' });
+    await user.click(within(payment).getByRole('button', { name: 'Income' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add recurring income' });
+    expect(within(dialog).getByLabelText(/^Next or last time it arrived/)).toBeVisible();
+    await user.type(within(dialog).getByLabelText(/^Name/), 'Salary');
+    await user.type(within(dialog).getByLabelText(/^Amount/), '690000');
+    expect(await within(dialog).findByText('Matches 3 times it arrived')).toBeVisible();
+    expect(state.requests.find((r) => r.path === '/recurring/preview')?.body).toMatchObject({
+      kind: 'income',
+      pattern: 'salary',
+    });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Add' }));
+    expect(await screen.findByText('Recurring income added')).toBeVisible();
+    expect(
+      state.requests.find((r) => r.method === 'POST' && r.path === '/recurring')?.body,
+    ).toMatchObject({ kind: 'income', name: 'Salary', amount: 690_000, scope: 'shared' });
+  });
+
+  it('labels an imported salary, and never money going the other way', () => {
+    expect(seriesForRow([salary], incomeRow, testUser.id)?.name).toBe('Salary');
+    // Money going to the same party is not the salary.
+    expect(seriesForRow([salary], { ...incomeRow, kind: 'expense' }, testUser.id)).toBeUndefined();
+  });
+
+  const incomeRow = {
+    kind: 'income' as const,
+    visibility: 'private' as const,
+    amount: 690_000,
+    occurredOn: '2026-11-10',
+    counterparty: 'ACME KFT',
+    description: 'Salary',
+  };
+});
+
 describe('seriesForRow (the import review label)', () => {
   const row = {
     kind: 'expense' as const,

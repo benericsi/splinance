@@ -46,6 +46,14 @@ function RecurringPage() {
         a.nextOn.localeCompare(b.nextOn),
     );
   const empty = views.length === 0 && data.suggestions.length === 0;
+  // Income above the payments, each under its heading; a household that tracks no income
+  // sees the one list it always had.
+  const income = views.filter((view) => view.series.kind === 'income');
+  const payments = views.filter((view) => view.series.kind === 'expense');
+  const sections = [
+    { id: 'income', title: t('sections.income'), views: income },
+    { id: 'payments', title: t('sections.payments'), views: payments },
+  ].filter((section) => section.views.length > 0);
 
   const addLink = (label: string) => (
     <Link
@@ -79,12 +87,35 @@ function RecurringPage() {
           {views.length > 0 && (
             <Reveal index={0} className="space-y-4">
               <RecurringSummary views={views} currency={data.currency} />
-              <SeriesList
-                householdId={householdId}
-                views={views}
-                categories={categories}
-                currency={data.currency}
-              />
+              {income.length === 0 ? (
+                <SeriesList
+                  householdId={householdId}
+                  views={views}
+                  categories={categories}
+                  currency={data.currency}
+                />
+              ) : (
+                sections.map((section) => (
+                  <section
+                    key={section.id}
+                    aria-labelledby={`${section.id}-heading`}
+                    className="space-y-2"
+                  >
+                    <h2
+                      id={`${section.id}-heading`}
+                      className="text-muted-foreground text-sm font-medium"
+                    >
+                      {section.title}
+                    </h2>
+                    <SeriesList
+                      householdId={householdId}
+                      views={section.views}
+                      categories={categories}
+                      currency={data.currency}
+                    />
+                  </section>
+                ))
+              )}
             </Reveal>
           )}
 

@@ -7,7 +7,8 @@ import { CategoryTile } from '@/features/categories/components/category-tile';
 import { formatMoney } from '@/features/transactions/money';
 import { useRevealRows } from '@/lib/reveal';
 import { useConfirmSuggestion, useDismissSuggestion } from '../hooks';
-import { cadenceLabel, shortDate } from '../view';
+import { cn } from '@/lib/utils';
+import { cadenceLabel, shortDate, signFor } from '../view';
 
 /**
  * What detection noticed and nobody decided on yet: Confirm makes it a series, Not
@@ -45,7 +46,7 @@ export function SuggestionList({
             : undefined;
           return (
             <m.li
-              key={`${suggestion.scope}:${suggestion.key}`}
+              key={`${suggestion.scope}:${suggestion.kind}:${suggestion.key}`}
               {...reveal.rowProps(index)}
               // Wraps on narrow screens: the buttons move under the text.
               className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3"
@@ -70,7 +71,13 @@ export function SuggestionList({
                     })}
                   </p>
                 </div>
-                <span className="shrink-0 font-medium tabular-nums">
+                <span
+                  className={cn(
+                    'shrink-0 font-medium tabular-nums',
+                    suggestion.kind === 'income' && 'text-positive',
+                  )}
+                >
+                  {signFor(suggestion.kind)}
                   {formatMoney(suggestion.amount, currency)}
                 </span>
               </div>

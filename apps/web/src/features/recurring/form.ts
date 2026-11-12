@@ -11,12 +11,16 @@ import {
   type RecurringSeries,
   type RecurringSeriesInput,
   type Transaction,
+  type TransactionKind,
+  transactionKindSchema,
 } from '@splinance/shared';
 import { z } from 'zod';
 import { today } from '@/features/transactions/dates';
 import { amountProblemMessage, formatAmountInput, readAmount } from '@/features/transactions/money';
 
 export interface SeriesFormValues {
+  /** A payment or income; chosen when adding, fixed afterwards. */
+  kind: TransactionKind;
   name: string;
   pattern: string;
   /** As typed. */
@@ -33,6 +37,7 @@ export interface SeriesFormValues {
 export function seriesFormSchema(currency: Currency) {
   return z
     .object({
+      kind: transactionKindSchema,
       name: recurringNameSchema,
       pattern: recurringPatternSchema,
       amount: z.string(),
@@ -56,6 +61,7 @@ export function seriesFormSchema(currency: Currency) {
 }
 
 export const newSeriesValues = (): SeriesFormValues => ({
+  kind: 'expense',
   name: '',
   pattern: '',
   amount: '',
@@ -68,14 +74,16 @@ export const newSeriesValues = (): SeriesFormValues => ({
 });
 
 /**
- * "Make recurring" on a transaction: its description, amount, date and category, the bank's
- * name for the merchant as the text to match, and its visibility as the scope.
+ * "Make recurring" on a transaction: its kind, description, amount, date and category, the
+ * bank's name for the merchant (or payer) as the text to match, and its visibility as the
+ * scope.
  */
 export const seriesValuesFrom = (
   transaction: Transaction,
   currency: Currency,
 ): SeriesFormValues => ({
   ...newSeriesValues(),
+  kind: transaction.kind,
   name: transaction.description.slice(0, 60),
   pattern: recurringKey(transaction),
   amount: formatAmountInput(transaction.amount, currency),
@@ -88,6 +96,7 @@ export const editSeriesValues = (
   series: RecurringSeries,
   currency: Currency,
 ): SeriesFormValues => ({
+  kind: series.kind,
   name: series.name,
   pattern: series.pattern,
   amount: formatAmountInput(series.amount, currency),
@@ -104,10 +113,9 @@ export function parseSeriesInput(
   values: SeriesFormValues,
   currency: Currency,
   startsOn: string | null = null,
-  kind: RecurringSeriesInput['kind'] = 'expense',
 ): RecurringSeriesInput {
   return {
-    kind,
+    kind: values.kind,
     name: values.name.trim(),
     pattern: values.pattern.trim(),
     cadence: values.cadence,

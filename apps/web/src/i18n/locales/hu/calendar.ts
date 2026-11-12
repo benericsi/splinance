@@ -46,6 +46,8 @@ export const calendar: Messages<typeof en.calendar> = {
   event: {
     paid: 'Rendszeres fizetés',
     expected: 'Várható',
+    received: 'Rendszeres bevétel',
+    expectedIncome: 'Várható bevétel',
     settlement: 'Elszámolás',
     about: 'kb. {{amount}}',
     paidYou: '{{name}} fizetett neked',
@@ -56,6 +58,7 @@ export const calendar: Messages<typeof en.calendar> = {
     label: 'A jelölések magyarázata',
     paid: 'Rendszeres, kifizetve',
     expected: 'Várható',
+    income: 'Rendszeres bevétel',
     settlement: 'Elszámolás',
     spending: 'Sötétebb nap: több költés',
   },

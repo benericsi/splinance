@@ -67,6 +67,21 @@ describe('describeNotification', () => {
     expect(
       sentence(notification({ type: 'renewal_missed', subjectName: 'Gym', dueOn: '2026-08-03' })),
     ).toBe('Gym was not paid | Expected 3 Aug. Cancelled?');
+    // Recurring income arrives or does not; it is never "paid".
+    const salary = { subjectName: 'Salary', subjectKind: 'income' as const };
+    expect(sentence(notification({ ...salary, type: 'renewal_missed', dueOn: '2026-08-10' }))).toBe(
+      'Salary did not arrive | Expected 10 Aug. Stopped?',
+    );
+    expect(
+      sentence(
+        notification({
+          ...salary,
+          type: 'price_changed',
+          amount: 720_000,
+          previousAmount: 690_000,
+        }),
+      ),
+    ).toBe('Salary came in 4% higher | 690 000 Ft to 720 000 Ft');
     expect(
       sentence(
         notification({

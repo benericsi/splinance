@@ -5,6 +5,7 @@ import {
   type RecurringSeries,
   type SeriesTiming,
   seriesTiming,
+  type TransactionKind,
 } from '@splinance/shared';
 import { formatDateWith, fromIsoDate } from '@/features/transactions/dates';
 import { i18n } from '@/i18n';
@@ -61,15 +62,25 @@ export function shortDate(value: string, now = new Date()): string {
   });
 }
 
-/** When the next payment is, in words: "due today", "due tomorrow", "due in 3 days", "due 12 Nov", "2 days late". */
-export function dueLabel(view: Pick<SeriesView, 'nextOn' | 'daysUntil'>): string {
+/**
+ * When the next payment is, in words: "due today", "due tomorrow", "due in 3 days",
+ * "due 12 Nov", "2 days late". Income is expected, not due: "expected today".
+ */
+export function dueLabel(
+  view: Pick<SeriesView, 'nextOn' | 'daysUntil'>,
+  kind: TransactionKind = 'expense',
+): string {
   const { daysUntil, nextOn } = view;
+  const words = kind === 'income' ? 'expected' : 'due';
   if (daysUntil < 0) return i18n.t('recurring:due.late', { count: -daysUntil });
-  if (daysUntil === 0) return i18n.t('recurring:due.today');
-  if (daysUntil === 1) return i18n.t('recurring:due.tomorrow');
-  if (daysUntil <= 6) return i18n.t('recurring:due.inDays', { count: daysUntil });
-  return i18n.t('recurring:due.on', { date: shortDate(nextOn) });
+  if (daysUntil === 0) return i18n.t(`recurring:${words}.today`);
+  if (daysUntil === 1) return i18n.t(`recurring:${words}.tomorrow`);
+  if (daysUntil <= 6) return i18n.t(`recurring:${words}.inDays`, { count: daysUntil });
+  return i18n.t(`recurring:${words}.on`, { date: shortDate(nextOn) });
 }
+
+/** "+690 000 Ft" for income, the plain amount for a payment. */
+export const signFor = (kind: TransactionKind) => (kind === 'income' ? '+' : '');
 
 /** "+11%", "-5%" */
 export const formatChange = (change: number) =>

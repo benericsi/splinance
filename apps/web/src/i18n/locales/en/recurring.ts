@@ -6,10 +6,15 @@ export const recurring = {
   empty: {
     title: 'Track subscriptions and bills',
     description:
-      'Add the ones you pay regularly, or import your bank exports: payments that come back every week, month or year show up here as suggestions.',
+      'Add what you pay or receive regularly, or import your bank exports: payments and income that come back every week, month or year show up here as suggestions.',
   },
   suggestionsTitle: 'Suggestions',
-  suggestionsDescription: 'These look recurring. Confirm the ones you pay regularly.',
+  suggestionsDescription: 'These look recurring. Confirm the ones that come back regularly.',
+  /** The two lists, when the household tracks income too. */
+  sections: {
+    income: 'Income',
+    payments: 'Payments',
+  },
   cadence: {
     weekly: 'Weekly',
     monthly: 'Monthly',
@@ -31,16 +36,30 @@ export const recurring = {
     inDays: 'due in {{count}} days',
     on: 'due {{date}}',
   },
+  /** The same for income: money is expected, not due. */
+  expected: {
+    today: 'expected today',
+    tomorrow: 'expected tomorrow',
+    inDays: 'expected in {{count}} days',
+    on: 'expected {{date}}',
+  },
   onlyYou: 'Only you',
   yourPart: 'you {{amount}}',
   change: 'Change from the payment before',
   noPaymentSince: 'No payment since {{date}}. Cancelled?',
   noPaymentYet: 'No payment found yet',
+  changeIncome: 'Change from the time before',
+  noIncomeSince: 'Nothing received since {{date}}. Stopped?',
+  noIncomeYet: 'Nothing received yet',
   summary: {
     about: 'About',
     perMonth: ' a month',
     payments_one: '{{count}} payment',
     payments_other: '{{count}} payments',
+    out: 'Going out',
+    in: 'Coming in',
+    sources_one: '{{count}} source',
+    sources_other: '{{count}} sources',
     count: 'Count',
     household: 'Household',
     yours: 'Your share',
@@ -72,11 +91,20 @@ export const recurring = {
     looking: 'Looking for past payments…',
     none: 'No past payments match yet. Imports containing "{{key}}" will.',
   },
+  incomePreview: {
+    matches_one: 'Matches {{count}} time it arrived',
+    matches_other: 'Matches {{count}} times it arrived',
+    looking: 'Looking for past income…',
+    none: 'Nothing received matches yet. Imports containing "{{key}}" will.',
+  },
   dialog: {
     addTitle: 'Add recurring payment',
     saved: 'Recurring payment saved',
     added: 'Recurring payment added',
     stopped: 'Stopped tracking {{name}}',
+    kind: 'What it is',
+    kindExpense: 'Payment',
+    kindIncome: 'Income',
     name: 'Name',
     namePlaceholder: 'Spotify',
     amount: 'Amount',
@@ -101,5 +129,20 @@ export const recurring = {
       'It leaves the list and gets no more reminders. Its payments stay as they are.',
     stopping: 'Stopping…',
     add: 'Add',
+  },
+  /** What the dialog says differently for income. */
+  incomeDialog: {
+    addTitle: 'Add recurring income',
+    saved: 'Recurring income saved',
+    added: 'Recurring income added',
+    namePlaceholder: 'Salary',
+    anchor: 'Next or last time it arrived',
+    patternPlaceholder: 'acme',
+    taken: 'A recurring income matches this text already',
+    varies: 'The amount changes from time to time (bonus, hours worked)',
+    remind: 'Tell me when it does not arrive or the amount changes',
+    payments: 'Received ({{count}})',
+    stopDescription:
+      'It leaves the list and you hear no more about it. What you received stays as it is.',
   },
 };

@@ -300,7 +300,7 @@ export function TransactionDialog({
           )}
         </form.Field>
 
-        {base?.kind === 'expense' && (
+        {base && (
           <Link
             to="/h/$householdId/recurring/new"
             params={{ householdId: household.id }}

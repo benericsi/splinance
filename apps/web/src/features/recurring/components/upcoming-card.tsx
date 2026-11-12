@@ -7,13 +7,13 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/componen
 import { today } from '@/features/transactions/dates';
 import { formatMoney } from '@/features/transactions/money';
 import { cn } from '@/lib/utils';
-import { dueLabel, viewSeries } from '../view';
+import { dueLabel, signFor, viewSeries } from '../view';
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
- * Overview: recurring payments due within a week (or a little late), soonest first, and a
- * nudge when there are suggestions to look at. Hidden when there is neither.
+ * Overview: recurring payments due and income expected within a week (or a little late),
+ * soonest first, and a nudge when there are suggestions to look at. Hidden when there is neither.
  */
 export function UpcomingCard({
   householdId,
@@ -63,10 +63,16 @@ export function UpcomingCard({
                       view.daysUntil < 0 ? 'text-negative' : 'text-muted-foreground',
                     )}
                   >
-                    {capitalize(dueLabel(view))}
+                    {capitalize(dueLabel(view, view.series.kind))}
                   </span>
                 </span>
-                <span className="shrink-0 tabular-nums">
+                <span
+                  className={cn(
+                    'shrink-0 tabular-nums',
+                    view.series.kind === 'income' && 'text-positive',
+                  )}
+                >
+                  {signFor(view.series.kind)}
                   {formatMoney(view.series.latestAmount, data.currency)}
                 </span>
               </li>
