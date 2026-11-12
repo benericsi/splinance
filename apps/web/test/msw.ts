@@ -1,3 +1,4 @@
+import { daysOfMonth } from '@splinance/shared';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 
@@ -28,6 +29,26 @@ export const server = setupServer(
       },
     }),
   ),
+  // The overview's "Left this month": an empty month (no income, so only its nudge shows).
+  http.get('/api/households/:id/calendar', ({ request }) => {
+    const month = new URL(request.url).searchParams.get('month') ?? '';
+    return HttpResponse.json({
+      calendar: {
+        month,
+        today: `${month}-01`,
+        currency: 'HUF',
+        days: daysOfMonth(month).map((date) => ({
+          date,
+          expenses: 0,
+          income: 0,
+          yourExpenses: 0,
+          yourIncome: 0,
+          count: 0,
+        })),
+        events: [],
+      },
+    });
+  }),
   http.get('/api/households/:id/recurring', () =>
     HttpResponse.json({
       recurring: { currency: 'HUF', series: [], suggestions: [], dismissed: [] },

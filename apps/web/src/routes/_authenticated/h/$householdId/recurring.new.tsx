@@ -9,8 +9,11 @@ import { seriesValuesFrom } from '@/features/recurring/form';
 import { transactionQueries } from '@/features/transactions/queries';
 import { useCloseModal } from '@/lib/route-modal';
 
-/** `from`: a transaction to start from ("Make recurring"). */
-const searchSchema = z.object({ from: z.uuid().optional().catch(undefined) });
+/** `from`: a transaction to start from ("Make recurring"); `kind=income`: open on Income. */
+const searchSchema = z.object({
+  from: z.uuid().optional().catch(undefined),
+  kind: z.enum(['income']).optional().catch(undefined),
+});
 
 /** Child route: the add dialog renders over the recurring page. */
 export const Route = createFileRoute('/_authenticated/h/$householdId/recurring/new')({
@@ -26,7 +29,7 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/recurring/n
 
 function AddSeriesRoute() {
   const { householdId } = Route.useParams();
-  const { from } = Route.useSearch();
+  const { from, kind } = Route.useSearch();
   const navigate = Route.useNavigate();
   const { data: household } = useSuspenseQuery(householdQueries.detail(householdId));
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
@@ -48,6 +51,7 @@ function AddSeriesRoute() {
       currency={currency}
       categories={categories.filter((c) => c.archivedAt === null)}
       initialValues={transaction ? seriesValuesFrom(transaction, currency) : undefined}
+      startKind={kind}
       onClose={close}
     />
   );
