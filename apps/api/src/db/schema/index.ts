@@ -11,6 +11,7 @@ export * from './households';
 export * from './notifications';
 export * from './recurring-series';
 export * from './savings-entries';
+export * from './savings-goal-pins';
 export * from './savings-goals';
 export * from './sessions';
 export * from './settlements';

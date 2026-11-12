@@ -14,7 +14,7 @@ import { type App, createHousehold, errorCode, join, leave } from '../../../test
 import { bearer, createTestUser, pgErrorOf, type TestUser } from '../../../test/users';
 import { createApp } from '../../app';
 import { db } from '../../db/client';
-import { savingsEntries, savingsGoals } from '../../db/schema';
+import { savingsEntries, savingsGoalPins, savingsGoals } from '../../db/schema';
 
 let app: App;
 let anna: TestUser;
@@ -52,7 +52,7 @@ const entryInput = (amount: number, overrides: Record<string, unknown> = {}) => 
 
 async function send(
   user: TestUser,
-  method: 'post' | 'patch' | 'delete' | 'get',
+  method: 'post' | 'patch' | 'put' | 'delete' | 'get',
   suffix: string,
   body?: object,
 ) {
@@ -105,6 +105,7 @@ describe('goals', () => {
       archivedAt: null,
       balance: 0,
       contributions: [],
+      pinned: false,
     });
 
     const pot = await createGoal(ben, { name: 'Pot', targetAmount: null, targetDate: null });
@@ -422,5 +423,73 @@ describe('constraints', () => {
         db.update(savingsGoals).set({ targetAmount: 0 }).where(eq(savingsGoals.id, goal.id)),
       ),
     ).toMatchObject({ constraint: 'savings_goals_target_range' });
+  });
+});
+
+describe('pins', () => {
+  const pin = (user: TestUser, goal: SavingsGoal) => send(user, 'put', `/${goal.id}/pin`);
+  const unpin = (user: TestUser, goal: SavingsGoal) => send(user, 'delete', `/${goal.id}/pin`);
+  const pinnedBy = async (user: TestUser) =>
+    (await savings(user)).goals.filter((goal) => goal.pinned).map((goal) => goal.name);
+
+  it('are per person: pinning a shared goal changes nothing for the others', async () => {
+    const trip = await createGoal(anna);
+    expect(trip.pinned).toBe(false);
+
+    expect((await pin(ben, trip)).status).toBe(204);
+    // Again changes nothing.
+    expect((await pin(ben, trip)).status).toBe(204);
+    expect(await pinnedBy(ben)).toEqual(['Summer in Italy']);
+    expect(await pinnedBy(anna)).toEqual([]);
+    const detail = await send(ben, 'get', `/${trip.id}`);
+    expect(savingsGoalResponseSchema.parse(detail.body).goal.pinned).toBe(true);
+
+    expect((await unpin(ben, trip)).status).toBe(204);
+    expect((await unpin(ben, trip)).status).toBe(204);
+    expect(await pinnedBy(ben)).toEqual([]);
+  });
+
+  it('stops at three per person, also when they arrive at once', async () => {
+    const goals = [];
+    for (const name of ['A', 'B', 'C', 'D', 'E']) goals.push(await createGoal(anna, { name }));
+    const [a, b, c, d, e] = goals as [
+      SavingsGoal,
+      SavingsGoal,
+      SavingsGoal,
+      SavingsGoal,
+      SavingsGoal,
+    ];
+
+    await pin(ben, a);
+    await pin(ben, b);
+    const results = await Promise.all([pin(ben, c), pin(ben, d), pin(ben, e)]);
+    expect(results.map((res) => res.status).sort()).toEqual([204, 409, 409]);
+    const refused = results.find((res) => res.status === 409);
+    expect(refused && errorCode(refused)).toBe('SAVINGS_PIN_LIMIT');
+    expect(await pinnedBy(ben)).toHaveLength(3);
+
+    // The limit is his alone, and unpinning frees a place.
+    expect((await pin(cara, e)).status).toBe(204);
+    await unpin(ben, a);
+    expect((await pin(ben, a)).status).toBe(204);
+  });
+
+  it('cannot reach a goal the caller cannot see', async () => {
+    const ring = await createGoal(ben, { name: 'Ring', visibility: 'private' });
+    expect((await pin(anna, ring)).status).toBe(404);
+    expect((await unpin(anna, ring)).status).toBe(404);
+    expect((await pin(ben, ring)).status).toBe(204);
+  });
+
+  it('go when the goal is closed, and a closed goal takes none', async () => {
+    const trip = await createGoal(anna);
+    await pin(ben, trip);
+    await pin(cara, trip);
+
+    await send(anna, 'post', `/${trip.id}/archive`);
+    expect(await db.select().from(savingsGoalPins)).toEqual([]);
+    const late = await pin(ben, trip);
+    expect(late.status).toBe(409);
+    expect(errorCode(late)).toBe('SAVINGS_GOAL_ARCHIVED');
   });
 });

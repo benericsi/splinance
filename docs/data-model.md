@@ -366,6 +366,20 @@ Money a member put into a goal (positive) or took out of it (negative). Not a tr
 - Partial indexes (`WHERE deleted_at IS NULL`): `savings_entries_goal_entry_idx` on `(goal_id, entry_on DESC, id DESC)` for a goal's history and balance, `savings_entries_user_entry_idx` on `(household_id, user_id, entry_on)` for what one person set aside in a month.
 - Not in the `analytics` views (names and notes are free text, and private goals would need stubs).
 
+### `savings_goal_pins`
+
+The goals a person keeps on top of their savings page. Per person, not per goal. A row exists while the goal is pinned.
+
+| Column       | Type        | Notes                                                            |
+| ------------ | ----------- | ---------------------------------------------------------------- |
+| household_id | uuid        | Part of both composite FKs                                       |
+| goal_id      | uuid        | PK part; composite FK `(household_id, goal_id)` -> savings_goals |
+| user_id      | uuid        | PK part; composite FK `(household_id, user_id)` -> members       |
+| created_at   | timestamptz |                                                                  |
+
+- At most 3 per person and household, checked by the service under a lock on the member row (a CHECK cannot count rows).
+- Closing a goal deletes its pins. Index `savings_goal_pins_user_idx` on `(household_id, user_id)`.
+
 ### Balances (derived, not a table)
 
 Who owes whom is computed on every read from live rows, per pair of people:

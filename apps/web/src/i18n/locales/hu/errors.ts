@@ -49,6 +49,7 @@ export const errors: Messages<typeof en.errors> = {
     SAVINGS_ENTRY_NOT_FOUND: 'A megtakarítási tétel nem található',
     SAVINGS_GOAL_ARCHIVED: 'Ez a cél le van zárva',
     INSUFFICIENT_SAVINGS: 'Nincs ennyi a célban',
+    SAVINGS_PIN_LIMIT: 'Legfeljebb 3 célt tűzhetsz ki. Előbb vegyél le egyet',
     RULE_NOT_FOUND: 'A szabály nem található',
     RULE_PATTERN_TAKEN: 'Erre a szövegre már van szabály',
     RULE_ORDER_MISMATCH: 'A szabályok közben megváltoztak. Töltsd újra, és próbáld újra.',

@@ -14,6 +14,7 @@ import {
   notifications,
   recurringSeries,
   savingsEntries,
+  savingsGoalPins,
   savingsGoals,
   sessions,
   transactionSplits,
@@ -195,6 +196,8 @@ async function erase(
     .select({ id: savingsGoals.id })
     .from(savingsGoals)
     .where(and(eq(savingsGoals.createdBy, user.id), eq(savingsGoals.visibility, 'private')));
+  // Their pins first: only they could pin their private goals.
+  await tx.delete(savingsGoalPins).where(eq(savingsGoalPins.userId, user.id));
   await tx.delete(savingsEntries).where(inArray(savingsEntries.goalId, privateGoals));
   await tx
     .delete(savingsGoals)
