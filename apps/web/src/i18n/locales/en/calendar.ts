@@ -46,6 +46,8 @@ export const calendar = {
   event: {
     paid: 'Recurring payment',
     expected: 'Expected',
+    received: 'Recurring income',
+    expectedIncome: 'Expected income',
     settlement: 'Settle-up',
     about: 'about {{amount}}',
     paidYou: '{{name}} paid you',
@@ -56,6 +58,7 @@ export const calendar = {
     label: 'What the marks mean',
     paid: 'Recurring, paid',
     expected: 'Expected',
+    income: 'Recurring income',
     settlement: 'Settle-up',
     spending: 'Darker days: more spent',
   },

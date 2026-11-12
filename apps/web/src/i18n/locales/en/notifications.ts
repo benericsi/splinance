@@ -20,6 +20,14 @@ export const notifications = {
     expected: 'Expected {{date}}. Cancelled?',
     cancelled: 'Cancelled?',
   },
+  /** A recurring income instead of a payment. */
+  income: {
+    missed: ' did not arrive',
+    expected: 'Expected {{date}}. Stopped?',
+    stopped: 'Stopped?',
+    up: ' came in {{percent}}% higher',
+    down: ' came in {{percent}}% lower',
+  },
   price: {
     up: ' price went up {{percent}}%',
     down: ' price went down {{percent}}%',

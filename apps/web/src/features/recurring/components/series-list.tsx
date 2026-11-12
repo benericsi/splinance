@@ -8,11 +8,12 @@ import { formatMoney } from '@/features/transactions/money';
 import { useRevealRows } from '@/lib/reveal';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
-import { cadenceLabel, dueLabel, formatChange, type SeriesView, shortDate } from '../view';
+import { cadenceLabel, dueLabel, formatChange, type SeriesView, shortDate, signFor } from '../view';
 
 /**
- * The viewer's recurring payments, soonest first. A row opens the series (payments, edit,
- * stop tracking); one gone quiet asks whether it was cancelled.
+ * The viewer's recurring payments, or their recurring income, soonest first. A row opens the
+ * series (payments, edit, stop tracking); one gone quiet asks whether it was cancelled.
+ * Income reads the other way round: its amount is money in, and a rise is good news.
  */
 export function SeriesList({
   householdId,
@@ -36,6 +37,7 @@ export function SeriesList({
           const { series, timing, change } = view;
           const category = series.categoryId ? categoryById.get(series.categoryId) : undefined;
           const lapsed = timing === 'lapsed';
+          const income = series.kind === 'income';
           return (
             <m.li key={series.id} {...reveal.rowProps(index)}>
               <Link
@@ -59,9 +61,9 @@ export function SeriesList({
                       <span
                         className={cn(
                           'bg-muted shrink-0 rounded-full px-1.5 text-xs font-normal tabular-nums',
-                          change > 0 ? 'text-negative' : 'text-positive',
+                          change > 0 === income ? 'text-positive' : 'text-negative',
                         )}
-                        title={t('change')}
+                        title={t(income ? 'changeIncome' : 'change')}
                       >
                         {formatChange(change)}
                       </span>
@@ -70,17 +72,25 @@ export function SeriesList({
                   {lapsed ? (
                     <p className="text-negative text-xs">
                       {series.lastPaidOn
-                        ? t('noPaymentSince', { date: shortDate(series.lastPaidOn) })
-                        : t('noPaymentYet')}
+                        ? t(income ? 'noIncomeSince' : 'noPaymentSince', {
+                            date: shortDate(series.lastPaidOn),
+                          })
+                        : t(income ? 'noIncomeYet' : 'noPaymentYet')}
                     </p>
                   ) : (
                     <p className="text-muted-foreground truncate text-xs">
-                      {cadenceLabel(series.cadence)} · {dueLabel(view)}
+                      {cadenceLabel(series.cadence)} · {dueLabel(view, series.kind)}
                     </p>
                   )}
                 </div>
                 <div className="shrink-0 text-right tabular-nums">
-                  <p className={cn('font-medium', lapsed && 'text-muted-foreground')}>
+                  <p
+                    className={cn(
+                      'font-medium',
+                      lapsed ? 'text-muted-foreground' : income && 'text-positive',
+                    )}
+                  >
+                    {signFor(series.kind)}
                     {formatMoney(series.latestAmount, currency)}
                   </p>
                   {series.scope === 'shared' && series.share !== null && (

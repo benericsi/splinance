@@ -46,12 +46,8 @@ function AddSeriesRoute() {
       key={transaction?.id ?? 'new'}
       householdId={householdId}
       currency={currency}
-      categories={categories.filter((c) => c.kind === 'expense' && c.archivedAt === null)}
-      initialValues={
-        transaction && transaction.kind === 'expense'
-          ? seriesValuesFrom(transaction, currency)
-          : undefined
-      }
+      categories={categories.filter((c) => c.archivedAt === null)}
+      initialValues={transaction ? seriesValuesFrom(transaction, currency) : undefined}
       onClose={close}
     />
   );

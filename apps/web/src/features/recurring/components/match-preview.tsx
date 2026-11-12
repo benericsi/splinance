@@ -38,10 +38,9 @@ export function MatchPreview({
   amount,
   amountVaries,
   scope,
-  kind = 'expense',
+  kind,
   startsOn,
-}: Omit<RecurringPreviewInput, 'amount' | 'kind'> & {
-  kind?: RecurringPreviewInput['kind'];
+}: Omit<RecurringPreviewInput, 'amount'> & {
   id: string;
   householdId: string;
   currency: Currency;
@@ -67,6 +66,7 @@ export function MatchPreview({
 
   if (input === null) return null;
   const latest = preview.data?.recent[0];
+  const words = kind === 'income' ? 'incomePreview' : 'preview';
 
   return (
     <div
@@ -78,7 +78,7 @@ export function MatchPreview({
         <>
           <CircleCheck className="text-positive mt-0.5 size-4 shrink-0" aria-hidden />
           <div className="min-w-0">
-            <p className="font-medium">{t('preview.matches', { count: preview.data.matches })}</p>
+            <p className="font-medium">{t(`${words}.matches`, { count: preview.data.matches })}</p>
             {latest && (
               <p className="text-muted-foreground text-xs">
                 {t('preview.latest', {
@@ -94,8 +94,8 @@ export function MatchPreview({
           <Search className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden />
           <p className="text-muted-foreground min-w-0">
             {preview.isPending
-              ? t('preview.looking')
-              : t('preview.none', { key: matchKey(input.pattern) })}
+              ? t(`${words}.looking`)
+              : t(`${words}.none`, { key: matchKey(input.pattern) })}
           </p>
         </>
       )}

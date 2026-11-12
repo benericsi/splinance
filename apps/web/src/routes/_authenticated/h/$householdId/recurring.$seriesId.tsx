@@ -37,7 +37,7 @@ function SeriesRoute() {
       householdId={householdId}
       currency={household.baseCurrency}
       categories={categories.filter(
-        (c) => c.kind === 'expense' && (c.archivedAt === null || c.id === series.categoryId),
+        (c) => c.kind === series.kind && (c.archivedAt === null || c.id === series.categoryId),
       )}
       series={series}
       onClose={close}

@@ -54,6 +54,8 @@ export type MapNodeData =
       seriesId: string;
       name: string;
       private: boolean;
+      /** Recurring income (a salary) instead of a payment. */
+      income: boolean;
       nextOn: string;
       daysUntil: number;
     }
@@ -230,6 +232,7 @@ export function buildMap({
       seriesId: view.series.id,
       name: view.series.name,
       private: isPrivate,
+      income: view.series.kind === 'income',
       nextOn: view.nextOn,
       daysUntil: view.daysUntil,
     }));

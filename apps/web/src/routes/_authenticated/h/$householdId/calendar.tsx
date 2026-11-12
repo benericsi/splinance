@@ -138,7 +138,11 @@ function CalendarPage() {
           view={view}
           category={category}
         />
-        <CalendarLegend />
+        <CalendarLegend
+          income={calendar.events.some(
+            (event) => event.type !== 'settlement' && event.kind === 'income',
+          )}
+        />
       </Reveal>
 
       {/* A day's dialog renders over the month. */}

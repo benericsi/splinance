@@ -116,8 +116,8 @@ export function MapNodeCard({ node, currency }: { node: MapNodeData; currency: C
       return (
         <Card
           title={node.name}
-          status={capitalize(dueLabel(node))}
-          tone={node.daysUntil < 0 ? 'negative' : 'neutral'}
+          status={capitalize(dueLabel(node, node.income ? 'income' : 'expense'))}
+          tone={node.daysUntil < 0 ? 'negative' : node.income ? 'positive' : 'neutral'}
           icon={node.private ? Lock : Repeat}
           {...(node.private && { iconLabel: t('recurring.private') })}
         />

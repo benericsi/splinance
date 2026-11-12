@@ -23,6 +23,13 @@ export const notifications: Messages<typeof en.notifications> = {
     expected: 'Várható volt: {{date}} Lemondtad?',
     cancelled: 'Lemondtad?',
   },
+  income: {
+    missed: ' nem érkezett meg',
+    expected: 'Várható volt: {{date}} Megszűnt?',
+    stopped: 'Megszűnt?',
+    up: ' {{percent}}%-kal több érkezett',
+    down: ' {{percent}}%-kal kevesebb érkezett',
+  },
   price: {
     up: ' ára {{percent}}%-kal nőtt',
     down: ' ára {{percent}}%-kal csökkent',

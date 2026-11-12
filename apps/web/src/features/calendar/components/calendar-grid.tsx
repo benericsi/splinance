@@ -13,7 +13,7 @@ import { useAuth } from '@/lib/auth-store';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
 import { type CalendarView, daySpent, eventsByDate, leadingBlanks, spendLevel } from '../view';
-import { EVENT_STYLES } from '../events';
+import { EVENT_STYLES, INCOME_STYLES } from '../events';
 import { EventChip } from './event-chip';
 
 /** A Monday: the week's days are named from here on. */
@@ -207,7 +207,7 @@ function DayCell({
             />
           )}
           {events.slice(0, 3).map((event, index) => (
-            <span key={index} className={cn('size-1.5 rounded-full', EVENT_DOTS[event.type])} />
+            <span key={index} className={cn('size-1.5 rounded-full', eventDot(event))} />
           ))}
         </span>
       )}
@@ -222,21 +222,37 @@ const EVENT_DOTS: Record<CalendarEvent['type'], string> = {
   settlement: 'bg-positive',
 };
 
-/** What the chips and the tint mean, under the grid. */
-export function CalendarLegend() {
+/** Recurring income takes the "money in" color, received or still expected. */
+function eventDot(event: CalendarEvent): string {
+  if (event.type === 'settlement' || event.kind === 'expense') return EVENT_DOTS[event.type];
+  return event.type === 'recurringPaid' ? 'bg-positive' : 'border-positive border';
+}
+
+/**
+ * What the chips and the tint mean, under the grid. Recurring income gets its line only in
+ * a month that has some.
+ */
+export function CalendarLegend({ income = false }: { income?: boolean }) {
   const { t } = useTranslation('calendar');
   const items = [
-    { type: 'recurringPaid', label: t('legend.paid') },
-    { type: 'recurringExpected', label: t('legend.expected') },
-    { type: 'settlement', label: t('legend.settlement') },
-  ] as const;
+    { type: 'recurringPaid', label: t('legend.paid'), style: EVENT_STYLES.recurringPaid },
+    {
+      type: 'recurringExpected',
+      label: t('legend.expected'),
+      style: EVENT_STYLES.recurringExpected,
+    },
+    ...(income
+      ? [{ type: 'income', label: t('legend.income'), style: INCOME_STYLES.recurringPaid }]
+      : []),
+    { type: 'settlement', label: t('legend.settlement'), style: EVENT_STYLES.settlement },
+  ];
   return (
     <ul
       aria-label={t('legend.label')}
       className="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs"
     >
-      {items.map(({ type, label }) => {
-        const { icon: Icon, className } = EVENT_STYLES[type];
+      {items.map(({ type, label, style }) => {
+        const { icon: Icon, className } = style;
         return (
           <li key={type} className="flex items-center gap-1.5">
             <span className={cn('flex size-5 items-center justify-center rounded-md', className)}>

@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { RouteDialog } from '@/components/route-dialog';
-import { EVENT_STYLES, eventAmountText, eventName } from '@/features/calendar/events';
+import { eventAmountText, eventName, eventStyle } from '@/features/calendar/events';
 import { calendarQueries } from '@/features/calendar/queries';
 import { type CalendarView, daySpent } from '@/features/calendar/view';
 import { categoryQueries } from '@/features/categories/queries';
@@ -146,7 +146,14 @@ function EventRow({
   viewerId: string | undefined;
 }) {
   const { t } = useTranslation('calendar');
-  const { icon: Icon, className } = EVENT_STYLES[event.type];
+  const { icon: Icon, className } = eventStyle(event);
+  const income = event.type !== 'settlement' && event.kind === 'income';
+  const label =
+    income && event.type === 'recurringPaid'
+      ? 'event.received'
+      : income
+        ? 'event.expectedIncome'
+        : KIND_LABEL[event.type];
   const row = 'flex items-center gap-3 py-2.5';
   const content = (
     <>
@@ -158,9 +165,9 @@ function EventRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{eventName(event, viewerId)}</span>
-        <span className="text-muted-foreground block text-xs">{t(KIND_LABEL[event.type])}</span>
+        <span className="text-muted-foreground block text-xs">{t(label)}</span>
       </span>
-      <span className="shrink-0 font-medium tabular-nums">
+      <span className={cn('shrink-0 font-medium tabular-nums', income && 'text-positive')}>
         {eventAmountText(event, view, currency)}
       </span>
     </>

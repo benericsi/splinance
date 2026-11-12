@@ -5,8 +5,9 @@ import {
   type RecurringScope,
   type RecurringSeries,
   suggestRecurringPattern,
+  type TransactionKind,
 } from '@splinance/shared';
-import { revalidateLogic, useForm } from '@tanstack/react-form';
+import { revalidateLogic, useForm, useSelector } from '@tanstack/react-form';
 import { Lock } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,6 +26,7 @@ import { currencySymbol, formatMoney } from '@/features/transactions/money';
 import { useAmountInput } from '@/features/transactions/use-amount-input';
 import { ApiError } from '@/lib/http';
 import { errorMessage } from '@/lib/query-client';
+import { cn } from '@/lib/utils';
 import {
   editSeriesValues,
   newSeriesValues,
@@ -33,15 +35,16 @@ import {
   seriesFormSchema,
 } from '../form';
 import { useAddSeries, useRemoveSeries, useUpdateSeries } from '../hooks';
-import { shortDate } from '../view';
+import { shortDate, signFor } from '../view';
 import { MatchPreview } from './match-preview';
 
 const CADENCES: RecurringCadence[] = ['weekly', 'monthly', 'quarterly', 'yearly'];
 
 /**
- * Add a recurring payment by hand (or from a transaction), or look at one and edit it. The
- * text to match fills in from the name until the person edits it, and a preview under it
- * shows which past payments it would own.
+ * Add a recurring payment or income by hand (or from a transaction), or look at one and
+ * edit it. What it is (payment or income) is chosen when adding and fixed afterwards; it
+ * decides the categories on offer and the words. The text to match fills in from the name
+ * until the person edits it, and a preview under it shows which past payments it would own.
  */
 export function SeriesDialog({
   householdId,
@@ -53,7 +56,7 @@ export function SeriesDialog({
 }: {
   householdId: string;
   currency: Currency;
-  /** Expense categories that may be picked (active, or the series' own). */
+  /** Categories of both kinds that may be picked (active, or the series' own). */
   categories: Category[];
   /** Omitted when adding. */
   series?: RecurringSeries | undefined;
@@ -78,14 +81,15 @@ export function SeriesDialog({
     validators: { onDynamic: seriesFormSchema(currency) },
     onSubmit: async ({ value }) => {
       const input = parseSeriesInput(value, currency, series?.startsOn ?? null);
+      const saidAs = value.kind === 'income' ? 'incomeDialog' : 'dialog';
       try {
         if (series) {
-          // The scope rides along and the API ignores it: who a series belongs to stays.
+          // The scope and kind ride along and the API ignores them: they never change.
           await update.mutateAsync({ householdId, seriesId: series.id, input });
-          toast.success(t('dialog.saved'));
+          toast.success(t(`${saidAs}.saved`));
         } else {
           await add.mutateAsync({ householdId, input });
-          toast.success(t('dialog.added'));
+          toast.success(t(`${saidAs}.added`));
         }
         onClose();
       } catch {
@@ -93,6 +97,11 @@ export function SeriesDialog({
       }
     },
   });
+
+  const kind = useSelector(form.store, (state) => state.values.kind);
+  const income = kind === 'income';
+  /** The income wording of a dialog string, where there is one. */
+  const words = income ? 'incomeDialog' : 'dialog';
 
   const taken =
     mutation.error instanceof ApiError && mutation.error.code === 'SERIES_PATTERN_TAKEN';
@@ -113,7 +122,7 @@ export function SeriesDialog({
   };
 
   return (
-    <RouteDialog title={series ? series.name : t('dialog.addTitle')} onClose={onClose}>
+    <RouteDialog title={series ? series.name : t(`${words}.addTitle`)} onClose={onClose}>
       <form
         noValidate
         className="min-w-0 space-y-5"
@@ -124,13 +133,34 @@ export function SeriesDialog({
       >
         <FormError message={formError} />
 
+        {!series && (
+          <form.Field name="kind">
+            {(field) => (
+              <SegmentedControl<TransactionKind>
+                label={t('dialog.kind')}
+                value={field.state.value}
+                onChange={(value) => {
+                  field.handleChange(value);
+                  // A category belongs to one kind.
+                  form.setFieldValue('categoryId', '');
+                  mutation.reset();
+                }}
+                options={[
+                  { value: 'expense', label: t('dialog.kindExpense') },
+                  { value: 'income', label: t('dialog.kindIncome') },
+                ]}
+              />
+            )}
+          </form.Field>
+        )}
+
         <form.Field name="name">
           {(field) => (
             <TextField
               field={field}
               required
               label={t('dialog.name')}
-              placeholder={t('dialog.namePlaceholder')}
+              placeholder={t(`${words}.namePlaceholder`)}
               maxLength={60}
               autoFocus={!series && !initialValues}
               onValueChange={(name) => {
@@ -153,7 +183,9 @@ export function SeriesDialog({
             )}
           </form.Field>
           <form.Field name="anchorOn">
-            {(field) => <TextField field={field} required type="date" label={t('dialog.anchor')} />}
+            {(field) => (
+              <TextField field={field} required type="date" label={t(`${words}.anchor`)} />
+            )}
           </form.Field>
         </div>
 
@@ -180,7 +212,7 @@ export function SeriesDialog({
               <Label htmlFor="series-category">{t('dialog.category')}</Label>
               <CategoryPicker
                 id="series-category"
-                categories={categories}
+                categories={categories.filter((category) => category.kind === kind)}
                 value={field.state.value}
                 onChange={field.handleChange}
                 onBlur={field.handleBlur}
@@ -227,9 +259,9 @@ export function SeriesDialog({
                   field={field}
                   required
                   label={t('dialog.pattern')}
-                  placeholder={t('dialog.patternPlaceholder')}
+                  placeholder={t(`${words}.patternPlaceholder`)}
                   maxLength={60}
-                  serverError={taken ? t('dialog.taken') : undefined}
+                  serverError={taken ? t(`${words}.taken`) : undefined}
                   onValueChange={() => {
                     setPatternEdited(true);
                     mutation.reset();
@@ -243,6 +275,7 @@ export function SeriesDialog({
                       amount={amount}
                       amountVaries={amountVaries}
                       scope={scope}
+                      kind={kind}
                       startsOn={series?.startsOn ?? null}
                     />
                   }
@@ -256,7 +289,7 @@ export function SeriesDialog({
           <form.Field name="amountVaries">
             {(field) => (
               <Checkbox
-                label={t('dialog.varies')}
+                label={t(`${words}.varies`)}
                 checked={field.state.value}
                 onChange={field.handleChange}
               />
@@ -265,7 +298,7 @@ export function SeriesDialog({
           <form.Field name="remind">
             {(field) => (
               <Checkbox
-                label={t('dialog.remind')}
+                label={t(`${words}.remind`)}
                 checked={field.state.value}
                 onChange={field.handleChange}
               />
@@ -276,7 +309,7 @@ export function SeriesDialog({
         {series && series.payments.length > 0 && (
           <section aria-labelledby="series-payments" className="space-y-2">
             <h3 id="series-payments" className="text-sm font-medium">
-              {t('dialog.payments', { count: series.paymentCount })}
+              {t(`${words}.payments`, { count: series.paymentCount })}
             </h3>
             <ul className="divide-y rounded-lg border text-sm">
               {series.payments.slice(0, 6).map((payment) => (
@@ -287,7 +320,8 @@ export function SeriesDialog({
                   <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
                     {payment.imported ? t('dialog.imported') : t('dialog.typedIn')}
                   </span>
-                  <span className="shrink-0 tabular-nums">
+                  <span className={cn('shrink-0 tabular-nums', income && 'text-positive')}>
+                    {signFor(kind)}
                     {formatMoney(payment.amount, currency)}
                   </span>
                 </li>
@@ -326,7 +360,7 @@ export function SeriesDialog({
           open={stopping}
           onOpenChange={setStopping}
           title={t('dialog.stopTitle', { name: series.name })}
-          description={t('dialog.stopDescription')}
+          description={t(`${words}.stopDescription`)}
           confirmLabel={t('dialog.stop')}
           pendingLabel={t('dialog.stopping')}
           destructive

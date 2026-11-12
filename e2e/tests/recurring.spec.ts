@@ -136,3 +136,63 @@ test('the bell tells about what the other person did and about renewals', async 
 
   await partnerContext.close();
 });
+
+test('a salary tracked as recurring income sits apart from the payments', async ({
+  page,
+  browser,
+}) => {
+  const { householdId, partner, partnerContext } = await householdWithPartner(page, browser);
+
+  // Anna adds her salary: the dialog turns to income words, and it is hers alone.
+  await openRecurring(page, householdId);
+  await page.getByRole('link', { name: 'Add', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Add recurring payment' })
+    .getByRole('button', { name: 'Income' })
+    .click();
+  const income = page.getByRole('dialog', { name: 'Add recurring income' });
+  await field(income, 'Name').fill('Salary');
+  await field(income, 'Amount').fill('690000');
+  await field(income, 'Next or last time it arrived').fill(day(5));
+  await income.getByRole('button', { name: 'Only me' }).click();
+  await expect(income.getByText(/Nothing received matches yet/)).toBeVisible();
+  await income.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(page.getByText('Recurring income added')).toBeVisible();
+
+  // And a shared payment next to it.
+  await page.getByRole('link', { name: 'Add', exact: true }).click();
+  const payment = page.getByRole('dialog', { name: 'Add recurring payment' });
+  await field(payment, 'Name').fill('Netflix');
+  await field(payment, 'Amount').fill('4990');
+  await field(payment, 'Next or last payment').fill(day(20));
+  await payment.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(page.getByText('Recurring payment added')).toBeVisible();
+
+  // Income first, expected rather than due, with a plus; the totals stand apart.
+  const salary = page
+    .getByRole('region', { name: 'Income' })
+    .getByRole('link', { name: /^Salary/ });
+  await expect(salary).toContainText('expected in 5 days');
+  await expect(salary).toContainText(money('690 000 Ft'));
+  await expect(
+    page.getByRole('region', { name: 'Payments' }).getByRole('link', { name: /^Netflix/ }),
+  ).toBeVisible();
+  await expect(page.getByText('Coming in')).toBeVisible();
+  await expect(page.getByText('Going out')).toBeVisible();
+
+  // Money about to arrive is no reminder: the bell stays quiet about it.
+  await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible();
+
+  // The calendar expects it on its day; what is "still to come" counts payments only.
+  await page.goto(`/h/${householdId}/calendar/${day(5)}`);
+  const dayDialog = page.getByRole('dialog');
+  await expect(dayDialog.getByRole('link', { name: /Salary/ })).toContainText('Expected income');
+
+  // Ben sees the shared payment and nothing of Anna's salary.
+  await openRecurring(partner, householdId);
+  await expect(partner.getByRole('link', { name: /^Netflix/ })).toBeVisible();
+  await expect(partner.getByRole('region', { name: 'Income' })).toHaveCount(0);
+  await expect(partner.getByText('Salary')).toHaveCount(0);
+
+  await partnerContext.close();
+});
