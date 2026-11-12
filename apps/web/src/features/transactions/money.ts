@@ -1,4 +1,5 @@
 import {
+  CURRENCIES,
   CURRENCY_EXPONENTS,
   type Currency,
   MAX_AMOUNT_MINOR,
@@ -71,6 +72,20 @@ export function currencySymbol(currency: Currency): string {
       .find((part) => part.type === 'currency')?.value ?? currency
   );
 }
+
+const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * What `formatMoney` writes, in any currency: an optional sign, digits grouped by no-break
+ * spaces, a decimal comma, a no-break space and the symbol ("-1 234,50 €", "+4490 Ft").
+ * Built from the formatter itself; a test runs it over `formatMoney` output.
+ */
+export const MONEY_PATTERN = new RegExp(
+  String.raw`[+\-\u2212]?\d[\d\u00a0\u202f]*(?:,\d+)?[\u00a0\u202f ](?:${CURRENCIES.map(
+    (currency) => escape(currencySymbol(currency)),
+  ).join('|')})`,
+  'g',
+);
 
 export type AmountProblem = 'empty' | 'invalid' | 'zero' | 'too-large';
 

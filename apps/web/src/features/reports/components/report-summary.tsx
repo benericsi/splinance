@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CategoryTile } from '@/features/categories/components/category-tile';
+import { MaskMoney } from '@/features/transactions/components/amount';
 import { MoneyFlow } from '@/features/transactions/components/money-flow';
 import { formatMoney } from '@/features/transactions/money';
 import { cn } from '@/lib/utils';
@@ -146,7 +147,9 @@ function KpiCard({
         {value}
       </p>
       {/* Two lines at most: "vs Jan–Oct 2025: 954 480 Ft" does not fit a phone's card. */}
-      <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">{detail}</p>
+      <p className="text-muted-foreground mt-0.5 line-clamp-2 text-xs">
+        <MaskMoney>{detail}</MaskMoney>
+      </p>
       <div className="mt-auto pt-2">{sparkline ?? <span className="block h-7" aria-hidden />}</div>
     </section>
   );

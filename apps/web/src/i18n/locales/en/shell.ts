@@ -3,6 +3,7 @@ export const shell = {
   demoAccount: 'Demo account',
   accountSettings: 'Account settings',
   preferences: 'Preferences',
+  hideAmounts: 'Hide amounts',
   logOut: 'Log out',
   endDemo: 'End demo',
   endDemoTitle: 'End the demo?',

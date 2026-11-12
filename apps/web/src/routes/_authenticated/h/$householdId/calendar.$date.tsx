@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { RouteDialog } from '@/components/route-dialog';
 import { eventAmountText, eventName, eventStyle } from '@/features/calendar/events';
+import { MaskMoney } from '@/features/transactions/components/amount';
 import { calendarQueries } from '@/features/calendar/queries';
 import { type CalendarView, daySpent } from '@/features/calendar/view';
 import { usePreferences } from '@/features/account/preferences';
@@ -74,7 +75,11 @@ function DayRoute() {
     <RouteDialog
       title={formatDayHeading(date)}
       description={
-        spent > 0 ? t('dialog.spent', { amount: formatMoney(spent, calendar.currency) }) : undefined
+        spent > 0 ? (
+          <MaskMoney>
+            {t('dialog.spent', { amount: formatMoney(spent, calendar.currency) })}
+          </MaskMoney>
+        ) : undefined
       }
       onClose={close}
     >
@@ -170,7 +175,7 @@ function EventRow({
         <span className="text-muted-foreground block text-xs">{t(label)}</span>
       </span>
       <span className={cn('shrink-0 font-medium tabular-nums', income && 'text-positive')}>
-        {eventAmountText(event, view, currency)}
+        <MaskMoney>{eventAmountText(event, view, currency)}</MaskMoney>
       </span>
     </>
   );

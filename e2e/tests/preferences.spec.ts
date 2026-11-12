@@ -61,3 +61,35 @@ test('preferences saved to the account set how the overview, new transactions an
     page.getByRole('group', { name: 'Whose spending' }).getByRole('button', { name: 'Your share' }),
   ).toHaveAttribute('aria-pressed', 'true');
 });
+
+test('hiding amounts blurs them on this device, also after a reload', async ({ page }) => {
+  await register(page, newUser('Anna'));
+  const { householdId } = await createHousehold(page, 'Home');
+  // The month totals are there even before the first transaction.
+  await openTransactions(page, householdId);
+
+  const eye = page.getByRole('button', { name: 'Hide amounts' });
+  await eye.click();
+  await expect(eye).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('html')).toHaveClass(/hide-amounts/);
+  // The blur is CSS on every marked amount; the numbers stay for screen readers.
+  const amount = page.locator('[data-amount]').first();
+  await expect(amount).toHaveCSS('filter', /blur/);
+
+  await page.reload();
+  await expect(page.locator('html')).toHaveClass(/hide-amounts/);
+  await expect(page.getByRole('button', { name: 'Hide amounts' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  // The same setting in Preferences.
+  await page.goto('/account/preferences');
+  const amounts = page.getByRole('group', { name: 'Amounts' });
+  await expect(amounts.getByRole('button', { name: 'Hide' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await amounts.getByRole('button', { name: 'Show' }).click();
+  await expect(page.locator('html')).not.toHaveClass(/hide-amounts/);
+});

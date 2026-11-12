@@ -5,7 +5,13 @@ import { http as mock, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
-import { authResponse, householdDetail, testHousehold, testUser } from '../../../test/utils';
+import {
+  authResponse,
+  householdDetail,
+  sentence,
+  testHousehold,
+  testUser,
+} from '../../../test/utils';
 import type { HouseholdMap } from './build-map';
 
 // React Flow needs a real layout engine to measure and place nodes; jsdom has none. The
@@ -111,9 +117,6 @@ function wideScreen() {
   };
 }
 
-/** Intl writes no-break spaces in amounts; match any whitespace. */
-const money = (text: string) => new RegExp(text.replace(/ /g, '\\s'));
-
 let restore: (() => void) | undefined;
 afterEach(() => {
   restore?.();
@@ -130,8 +133,8 @@ describe('the overview as a map', () => {
     expect(within(map).getByText('Otthon')).toBeVisible();
     expect(within(map).getByText('2 members')).toBeVisible();
     expect(within(map).getByText(`${testUser.displayName} (you)`)).toBeVisible();
-    expect(within(map).getByText(money("You're owed 12 000 Ft"))).toHaveClass('text-positive');
-    expect(within(map).getByText(money('Owes 12 000 Ft'))).toHaveClass('text-negative');
+    expect(within(map).getByText(sentence("You're owed 12 000 Ft"))).toHaveClass('text-positive');
+    expect(within(map).getByText(sentence('Owes 12 000 Ft'))).toHaveClass('text-negative');
     expect(within(map).getByText('Imported 3 days ago')).toHaveClass('text-muted-foreground');
     // Older than a month: time to import again.
     expect(within(map).getByText('K&H')).toBeVisible();

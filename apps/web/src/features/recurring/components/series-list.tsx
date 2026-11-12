@@ -9,6 +9,7 @@ import { useRevealRows } from '@/lib/reveal';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
 import { cadenceLabel, dueLabel, formatChange, type SeriesView, shortDate, signFor } from '../view';
+import { Amount, MaskMoney } from '@/features/transactions/components/amount';
 
 /**
  * The viewer's recurring payments, or their recurring income, soonest first. A row opens the
@@ -91,11 +92,13 @@ export function SeriesList({
                     )}
                   >
                     {signFor(series.kind)}
-                    {formatMoney(series.latestAmount, currency)}
+                    <Amount minor={series.latestAmount} currency={currency} />
                   </p>
                   {series.scope === 'shared' && series.share !== null && (
                     <p className="text-muted-foreground text-xs">
-                      {t('yourPart', { amount: formatMoney(series.share, currency) })}
+                      <MaskMoney>
+                        {t('yourPart', { amount: formatMoney(series.share, currency) })}
+                      </MaskMoney>
                     </p>
                   )}
                 </div>

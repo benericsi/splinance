@@ -157,3 +157,23 @@
     @apply font-sans;
   }
 }
+
+/* "Hide amounts" (src/lib/hide-amounts.ts): every amount blurs, sized to its own text so a
+   big total is as unreadable as a small one. The text stays in the DOM (layout, screen
+   readers); selection is off so a copy does not reveal it either. */
+.hide-amounts [data-amount] {
+  filter: blur(0.4em);
+  user-select: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-amount] {
+    transition: filter 0.15s ease-out;
+  }
+}
+/* Amounts drawn as SVG text cannot carry a span: the household map's debt labels sit in an
+   `amount-svg` edge, and a chart marked `amount-chart` blurs its y axis ticks (Recharts draws
+   tick labels in a layer of their own, outside the axis group). */
+.hide-amounts .amount-svg text,
+.hide-amounts .amount-chart .recharts-yAxis-tick-labels text {
+  filter: blur(4px);
+}

@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { http as mock, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
+import { hideAmountsStore } from '@/lib/hide-amounts';
 import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
 import {
@@ -109,6 +110,7 @@ const overview = `/h/${testHousehold.id}`;
 const money = (text: string) => new RegExp(text.replace(/ /g, '\\s'));
 
 afterEach(() => {
+  hideAmountsStore.setHidden(false);
   localStorage.clear();
 });
 
@@ -135,6 +137,27 @@ describe('balances on the overview', () => {
     expect(within(rest).getByText('Cili owes Bela')).toBeVisible();
     // Only debts the viewer is part of can be settled from here.
     expect(within(rest).getAllByRole('link', { name: 'Settle up' })).toHaveLength(1);
+  });
+
+  it('blurs every amount from the eye in the top bar until it is pressed again', async () => {
+    fakeApi({ debts: [{ from: person(bela), to: anna, amount: 12_000 }] });
+    renderRoute(overview);
+    const user = userEvent.setup();
+
+    expect(await screen.findByText('Bela owes you')).toBeVisible();
+    const amount = screen.getAllByText(money('12 000 Ft'))[0];
+    // The blur is CSS on the mark (index.css); the number stays for screen readers.
+    expect(amount?.closest('[data-amount]')).not.toBeNull();
+
+    const eye = screen.getByRole('button', { name: 'Hide amounts' });
+    expect(eye).toHaveAttribute('aria-pressed', 'false');
+    await user.click(eye);
+    expect(eye).toHaveAttribute('aria-pressed', 'true');
+    expect(document.documentElement).toHaveClass('hide-amounts');
+    expect(localStorage.getItem('splinance-hide-amounts')).toBe('true');
+
+    await user.click(eye);
+    expect(document.documentElement).not.toHaveClass('hide-amounts');
   });
 
   it('says when nobody owes anybody', async () => {

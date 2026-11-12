@@ -61,3 +61,18 @@ export function householdDetail(
 ): HouseholdDetail {
   return { ...household, members };
 }
+
+/**
+ * A `getByText` matcher for a sentence whose amounts sit in their own spans (`MaskMoney`,
+ * for hiding amounts): matches the innermost element whose whole text is `text`, with any
+ * run of whitespace (no-break spaces in amounts) read as one space.
+ */
+export function sentence(text: string | RegExp) {
+  const normalize = (value: string | null) => (value ?? '').replace(/\s+/g, ' ').trim();
+  const matches = (element: Element) => {
+    const content = normalize(element.textContent);
+    return typeof text === 'string' ? content === text : text.test(content);
+  };
+  return (_: string, element: Element | null) =>
+    element !== null && matches(element) && !Array.from(element.children).some(matches);
+}

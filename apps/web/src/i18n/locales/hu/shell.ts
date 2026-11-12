@@ -6,6 +6,7 @@ export const shell: Messages<typeof en.shell> = {
   demoAccount: 'Demófiók',
   accountSettings: 'Fiókbeállítások',
   preferences: 'Beállítások',
+  hideAmounts: 'Összegek elrejtése',
   logOut: 'Kijelentkezés',
   endDemo: 'Demó befejezése',
   endDemoTitle: 'Befejezed a demót?',

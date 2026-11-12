@@ -180,7 +180,10 @@ function DayCell({
         {spent > 0 && (
           // The number alone: the currency is in the totals above, and a narrow cell
           // has no room for it.
-          <span className="text-foreground/80 ml-auto truncate text-xs tabular-nums max-sm:hidden">
+          <span
+            data-amount=""
+            className="text-foreground/80 ml-auto truncate text-xs tabular-nums max-sm:hidden"
+          >
             {formatAmountInput(spent, currency)}
           </span>
         )}

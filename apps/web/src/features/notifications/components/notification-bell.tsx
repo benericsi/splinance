@@ -16,6 +16,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
 import { UserAvatar } from '@/components/user-avatar';
+import { MaskMoney } from '@/features/transactions/components/amount';
 import { today } from '@/features/transactions/dates';
 import { useAuth } from '@/lib/auth-store';
 import { PHONE_QUERY, useMediaQuery } from '@/lib/use-media-query';
@@ -201,11 +202,11 @@ function NotificationPanel({
                   <span className={cn('min-w-0 flex-1', !fresh && 'text-muted-foreground')}>
                     <span className="block text-sm">
                       <span className={cn('font-medium', fresh && 'text-foreground')}>{lead}</span>
-                      {rest}
+                      <MaskMoney>{rest}</MaskMoney>
                     </span>
                     <span className="text-muted-foreground block truncate text-xs">
                       {n.householdId !== household.id && `${n.householdName} · `}
-                      {detail}
+                      <MaskMoney>{detail}</MaskMoney>
                     </span>
                   </span>
                   <span className="text-muted-foreground shrink-0 text-xs tabular-nums">

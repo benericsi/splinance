@@ -4,13 +4,13 @@ import { AnimatePresence, m } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { CategoryTile } from '@/features/categories/components/category-tile';
 import { MoneyFlow } from '@/features/transactions/components/money-flow';
-import { formatMoney } from '@/features/transactions/money';
 import { compareNames } from '@/lib/locale';
 import { useRevealRows } from '@/lib/reveal';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
 import { budgetNote, budgetStatus } from '../status';
 import { BudgetBar } from './budget-bar';
+import { Amount, MaskMoney } from '@/features/transactions/components/amount';
 
 /**
  * A month's budgets: totals (budgeted, spent, left) and one row per budget with a bar,
@@ -71,10 +71,10 @@ export function BudgetList({
                       {category?.name ?? t('unknown')}
                     </span>
                     <span className="tabular-nums">
-                      {formatMoney(budget.spent, data.currency)}
+                      <Amount minor={budget.spent} currency={data.currency} />
                       <span className="text-muted-foreground">
                         {' '}
-                        / {formatMoney(budget.amount, data.currency)}
+                        / <Amount minor={budget.amount} currency={data.currency} />
                       </span>
                     </span>
                   </div>
@@ -86,7 +86,7 @@ export function BudgetList({
                         status === 'over' ? 'text-negative' : 'text-muted-foreground',
                       )}
                     >
-                      {budgetNote(budget, data.currency)}
+                      <MaskMoney>{budgetNote(budget, data.currency)}</MaskMoney>
                     </p>
                   </div>
                 </Link>

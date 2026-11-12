@@ -12,7 +12,13 @@ import { currentMonth } from '@/features/transactions/dates';
 import { localeStore } from '@/lib/locale';
 import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
-import { authResponse, householdDetail, testHousehold, testUser } from '../../../test/utils';
+import {
+  authResponse,
+  householdDetail,
+  sentence,
+  testHousehold,
+  testUser,
+} from '../../../test/utils';
 import { leftSegments, leftThisMonth, roughly } from './left';
 
 const SERIES = '01a12509-0f61-75bc-b406-1301087805';
@@ -269,7 +275,7 @@ describe('overview: left this month', () => {
     // Only the current month, without a category.
     expect(new Set(asked)).toEqual(new Set([`?month=${currentMonth()}`]));
     expect(within(left).getByText(money('^228 700 Ft$'), { selector: '.sr-only' })).toBeDefined();
-    expect(within(left).getByText(money('About 12 700 Ft a day for 18 days'))).toBeVisible();
+    expect(within(left).getByText(sentence('About 12 700 Ft a day for 18 days'))).toBeVisible();
     expect(
       within(left)
         .getAllByRole('listitem')
@@ -313,7 +319,7 @@ describe('overview: left this month', () => {
 
     const left = await card('Left this month');
     expect(
-      within(left).getByText(money('Includes Salary: 690 000 Ft expected 15 Nov')),
+      within(left).getByText(sentence('Includes Salary: 690 000 Ft expected 15 Nov')),
     ).toBeVisible();
     expect(within(left).queryByText(/a day for/)).toBeNull();
   });
@@ -329,7 +335,7 @@ describe('overview: left this month', () => {
 
     const over = await card('Over this month');
     expect(within(over).getByText(money('^80 000 Ft$'), { selector: '.sr-only' })).toBeDefined();
-    expect(within(over).getByText(money('100 000 Ft of payments still to come'))).toBeVisible();
+    expect(within(over).getByText(sentence('100 000 Ft of payments still to come'))).toBeVisible();
     expect(
       within(over)
         .getAllByRole('listitem')
@@ -400,7 +406,7 @@ describe('overview: left this month', () => {
     renderRoute(`/h/${testHousehold.id}`);
 
     const left = await card('Ebből a hónapból maradt');
-    expect(within(left).getByText(money('Naponta kb. 12 700 Ft, még 18 napig'))).toBeVisible();
+    expect(within(left).getByText(sentence('Naponta kb. 12 700 Ft, még 18 napig'))).toBeVisible();
     expect(within(left).getByRole('button', { name: 'Hogyan számoljuk?' })).toBeVisible();
   });
 });

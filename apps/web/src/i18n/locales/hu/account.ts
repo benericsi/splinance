@@ -21,6 +21,13 @@ export const account: Messages<typeof en.account> = {
     theme: {
       description: 'A Rendszer az eszközöd beállítását követi.',
     },
+    amounts: {
+      title: 'Összegek',
+      description:
+        'Minden összeget elhomályosít, például képernyőmegosztáshoz. A háztartás oldalain fent lévő szem ikon ugyanezt teszi.',
+      shown: 'Mutasd',
+      hidden: 'Rejtsd el',
+    },
     overview: {
       title: 'Az áttekintés így nyílik meg',
       description: 'Széles képernyőn. Telefonon mindig kártyák.',
