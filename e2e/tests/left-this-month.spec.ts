@@ -35,6 +35,9 @@ test('the overview says what is left of the month once a salary is tracked', asy
   await income.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByText('Recurring income added')).toBeVisible();
   await expect(page).toHaveURL(`/h/${householdId}`);
+  // With a salary tracked the card stops offering one and asks for the income itself.
+  await expect(page.getByRole('heading', { name: 'No income yet this month' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Add income' })).toHaveCount(0);
 
   // The salary itself, as it would come from the bank: now there is a month to measure.
   await openTransactions(page, householdId);

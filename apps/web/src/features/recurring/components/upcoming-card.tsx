@@ -41,7 +41,7 @@ export function UpcomingCard({
           <Link
             to="/h/$householdId/recurring"
             params={{ householdId }}
-            className={buttonVariants({ variant: 'link', className: 'text-link h-auto px-0' })}
+            className={buttonVariants({ variant: 'link', className: 'h-auto px-0' })}
           >
             {t('upcoming.all')}
           </Link>

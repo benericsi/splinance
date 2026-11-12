@@ -33,7 +33,7 @@ export function BudgetAlertsCard({
           <Link
             to="/h/$householdId/budgets"
             params={{ householdId }}
-            className={buttonVariants({ variant: 'link', className: 'text-link h-auto px-0' })}
+            className={buttonVariants({ variant: 'link', className: 'h-auto px-0' })}
           >
             {t('alerts.all')}
           </Link>

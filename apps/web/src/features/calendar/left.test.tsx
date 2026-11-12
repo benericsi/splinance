@@ -1,5 +1,10 @@
-import { type Calendar, type CalendarEvent, daysOfMonth } from '@splinance/shared';
-import { screen, within } from '@testing-library/react';
+import {
+  type Calendar,
+  type CalendarEvent,
+  daysOfMonth,
+  type RecurringSeries,
+} from '@splinance/shared';
+import { cleanup, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { http as mock, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -7,8 +12,8 @@ import { currentMonth } from '@/features/transactions/dates';
 import { localeStore } from '@/lib/locale';
 import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
-import { authResponse, householdDetail, testHousehold } from '../../../test/utils';
-import { leftSegments, leftThisMonth } from './left';
+import { authResponse, householdDetail, testHousehold, testUser } from '../../../test/utils';
+import { leftSegments, leftThisMonth, roughly } from './left';
 
 const SERIES = '01a12509-0f61-75bc-b406-1301087805';
 
@@ -107,7 +112,8 @@ describe('left this month', () => {
       toComeVaries: true,
       left: 228_700,
       daysLeft: 18,
-      perDay: 12_705,
+      // 12 705 a day, said as a round figure.
+      perDay: 12_700,
     });
   });
 
@@ -150,6 +156,14 @@ describe('left this month', () => {
     expect(leftThisMonth(november({ today: '2026-12-01', days: paid }))?.daysLeft).toBe(1);
   });
 
+  it('rounds an estimate down to its first three digits', () => {
+    expect(roughly(2_109_684)).toBe(2_100_000);
+    expect(roughly(12_705)).toBe(12_700);
+    expect(roughly(1000)).toBe(1000);
+    expect(roughly(877)).toBe(877);
+    expect(roughly(0)).toBe(0);
+  });
+
   it('splits the bar into the income, or into what the income covers when over', () => {
     const within = leftThisMonth(november({ days: paid, events: [rent, gas] }));
     if (!within) throw new Error('no month');
@@ -185,9 +199,39 @@ describe('left this month', () => {
 const money = (text: string) => new RegExp(text.replace(/ /g, '\\s'));
 const base = `/api/households/${testHousehold.id}`;
 
-function fakeApi(calendar?: Calendar) {
+/** The viewer's salary as a tracked series: nothing of it in the month's calendar. */
+const salarySeries: RecurringSeries = {
+  id: `${SERIES}a4`,
+  kind: 'income',
+  source: 'manual',
+  createdBy: testUser.id,
+  name: 'Salary',
+  pattern: 'acme kft',
+  cadence: 'monthly',
+  amount: 690_000,
+  amountVaries: false,
+  anchorOn: '2026-11-10',
+  startsOn: null,
+  categoryId: null,
+  scope: 'private',
+  remind: true,
+  payments: [],
+  paymentCount: 0,
+  lastPaidOn: null,
+  latestAmount: 690_000,
+  previousAmount: null,
+  share: null,
+  monthlyAmount: 690_000,
+};
+
+function fakeApi(calendar?: Calendar, { series = [] as RecurringSeries[] } = {}) {
   const asked: string[] = [];
   server.use(
+    mock.get(`${base}/recurring`, () =>
+      HttpResponse.json({
+        recurring: { currency: 'HUF', series, suggestions: [], dismissed: [] },
+      }),
+    ),
     mock.post('/api/auth/refresh', () => HttpResponse.json(authResponse())),
     mock.get('/api/households', () => HttpResponse.json({ households: [testHousehold] })),
     mock.get(base, () => HttpResponse.json({ household: householdDetail() })),
@@ -213,6 +257,7 @@ async function card(heading: string) {
 describe('overview: left this month', () => {
   afterEach(() => {
     void localeStore.setLocale('en', { persist: false });
+    localStorage.clear();
   });
 
   it('shows what is left, a day, and the sum behind it on request', async () => {
@@ -224,7 +269,7 @@ describe('overview: left this month', () => {
     // Only the current month, without a category.
     expect(new Set(asked)).toEqual(new Set([`?month=${currentMonth()}`]));
     expect(within(left).getByText(money('^228 700 Ft$'), { selector: '.sr-only' })).toBeDefined();
-    expect(within(left).getByText(money('About 12 705 Ft a day for 18 days'))).toBeVisible();
+    expect(within(left).getByText(money('About 12 700 Ft a day for 18 days'))).toBeVisible();
     expect(
       within(left)
         .getAllByRole('listitem')
@@ -307,13 +352,55 @@ describe('overview: left this month', () => {
     expect(screen.queryByText('Left this month')).toBeNull();
   });
 
+  it('asks for the income itself once a salary is tracked', async () => {
+    fakeApi(undefined, { series: [salarySeries] });
+    renderRoute(`/h/${testHousehold.id}`);
+
+    const waiting = await card('No income yet this month');
+    expect(within(waiting).getByText(/has not shown up yet/)).toBeVisible();
+    expect(within(waiting).getByRole('link', { name: 'Add transaction' })).toHaveAttribute(
+      'href',
+      `/h/${testHousehold.id}/transactions/new`,
+    );
+    expect(screen.queryByRole('link', { name: 'Add income' })).toBeNull();
+  });
+
+  it('hides the offer for good in this browser, for this household only', async () => {
+    const user = userEvent.setup();
+    fakeApi();
+    renderRoute(`/h/${testHousehold.id}`);
+
+    const nudge = await card('See what is left each month');
+    await user.click(within(nudge).getByRole('button', { name: 'Hide' }));
+    expect(screen.queryByText('See what is left each month')).toBeNull();
+    expect(localStorage.getItem(`splinance-left-nudge-hidden:${testUser.id}`)).toBe(
+      JSON.stringify([testHousehold.id]),
+    );
+
+    // Still hidden on the next visit.
+    cleanup();
+    renderRoute(`/h/${testHousehold.id}`);
+    await screen.findByRole('heading', { name: 'Members' });
+    expect(screen.queryByText('See what is left each month')).toBeNull();
+  });
+
+  it('shows the month whatever was hidden once there is income', async () => {
+    localStorage.setItem(
+      `splinance-left-nudge-hidden:${testUser.id}`,
+      JSON.stringify([testHousehold.id]),
+    );
+    fakeApi(november({ days: paid }));
+    renderRoute(`/h/${testHousehold.id}`);
+    expect(await card('Left this month')).toBeVisible();
+  });
+
   it('is in Hungarian when the language is', async () => {
     await localeStore.setLocale('hu', { persist: false });
     fakeApi(november({ days: paid, events: [rent, gas] }));
     renderRoute(`/h/${testHousehold.id}`);
 
     const left = await card('Ebből a hónapból maradt');
-    expect(within(left).getByText(money('Naponta kb. 12 705 Ft, még 18 napig'))).toBeVisible();
+    expect(within(left).getByText(money('Naponta kb. 12 700 Ft, még 18 napig'))).toBeVisible();
     expect(within(left).getByRole('button', { name: 'Hogyan számoljuk?' })).toBeVisible();
   });
 });

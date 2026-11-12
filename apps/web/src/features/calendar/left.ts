@@ -20,7 +20,7 @@ export interface LeftThisMonth {
   left: number;
   /** Days of the month still ahead, today included (at least 1). */
   daysLeft: number;
-  /** `left` spread over `daysLeft`; null when nothing is left. */
+  /** `left` spread over `daysLeft`, rounded down to a round figure; null when nothing is left. */
   perDay: number | null;
 }
 
@@ -57,8 +57,19 @@ export function leftThisMonth(calendar: Calendar): LeftThisMonth | null {
     toComeVaries: payments.some((event) => event.amountVaries),
     left,
     daysLeft,
-    perDay: left > 0 ? Math.floor(left / daysLeft) : null,
+    // The last day has the whole of it; before that it is an estimate, and reads like one.
+    perDay: left > 0 ? (daysLeft === 1 ? left : roughly(Math.floor(left / daysLeft))) : null,
   };
+}
+
+/**
+ * An amount as an "about" figure: its first three digits, the rest zero (2 109 684 becomes
+ * 2 100 000, 12 705 becomes 12 700). Always down: better to promise too little a day.
+ */
+export function roughly(amount: number): number {
+  if (amount < 1000) return amount;
+  const step = 10 ** (String(amount).length - 3);
+  return Math.floor(amount / step) * step;
 }
 
 /** Today through the end of the month; 1 when the browser's month and the server's differ. */

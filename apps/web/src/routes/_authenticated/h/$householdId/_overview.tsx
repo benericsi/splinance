@@ -123,7 +123,10 @@ function OverviewPage() {
             <BalanceOverview household={household} balances={balances} viewerId={viewerId} />
           </Reveal>
           <Reveal index={1}>
-            <LeftThisMonth householdId={householdId} />
+            <LeftThisMonth
+              householdId={householdId}
+              tracksIncome={recurring.series.some((series) => series.kind === 'income')}
+            />
           </Reveal>
           <Reveal index={2}>
             <BudgetAlertsCard householdId={householdId} data={budgets} categories={categories} />
@@ -171,9 +174,17 @@ function OverviewPage() {
  * Reads the month itself, so the map (which never shows it) does not wait for it: a narrow
  * screen on `?view=map` gets the cards and loads it here.
  */
-function LeftThisMonth({ householdId }: { householdId: string }) {
+function LeftThisMonth({
+  householdId,
+  tracksIncome,
+}: {
+  householdId: string;
+  tracksIncome: boolean;
+}) {
   const { data: calendar } = useQuery(calendarQueries.month(householdId, currentMonth()));
-  return calendar ? <LeftThisMonthCard householdId={householdId} calendar={calendar} /> : null;
+  return calendar ? (
+    <LeftThisMonthCard householdId={householdId} calendar={calendar} tracksIncome={tracksIncome} />
+  ) : null;
 }
 
 /** Balance card, settlements and members; the budget card only shows once it is known. */
