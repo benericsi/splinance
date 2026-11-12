@@ -52,6 +52,7 @@ export function SeriesDialog({
   categories,
   series,
   initialValues,
+  startKind,
   onClose,
 }: {
   householdId: string;
@@ -62,6 +63,8 @@ export function SeriesDialog({
   series?: RecurringSeries | undefined;
   /** Prefilled values when adding ("Make recurring"). */
   initialValues?: SeriesFormValues | undefined;
+  /** The kind an empty add dialog opens on (the overview's "Add income"). */
+  startKind?: TransactionKind | undefined;
   onClose: () => void;
 }) {
   const { t } = useTranslation(['recurring', 'common']);
@@ -76,7 +79,7 @@ export function SeriesDialog({
   const form = useForm({
     defaultValues: series
       ? editSeriesValues(series, currency)
-      : (initialValues ?? newSeriesValues()),
+      : (initialValues ?? { ...newSeriesValues(), ...(startKind && { kind: startKind }) }),
     validationLogic: revalidateLogic(),
     validators: { onDynamic: seriesFormSchema(currency) },
     onSubmit: async ({ value }) => {

@@ -30,6 +30,38 @@ export const calendar = {
     period: '1–{{day}} {{month}}',
     nothingThen: 'Nothing then',
   },
+  /** The overview's card: the viewer's income against what went out and what still will. */
+  left: {
+    title: 'Left this month',
+    overTitle: 'Over this month',
+    month: 'See the month',
+    perDay_one: 'Today is the last day of the month',
+    perDay_other: 'About {{amount}} a day for {{count}} days',
+    /** While income is still on its way: "Includes Salary: 690 000 Ft expected 10 Nov". */
+    awaiting: 'Includes {{name}}: {{amount}} expected {{date}}',
+    overNote: '{{amount}} of payments still to come',
+    legend: {
+      spent: 'Spent',
+      toCome: 'Still to come',
+      left: 'Left',
+      covered: 'Covered by income',
+      over: 'Over',
+    },
+    how: 'How is this calculated',
+    rows: {
+      received: 'Income received',
+      expectedIncome: 'Income still expected',
+      spent: 'Spent so far',
+      toCome_one: 'Recurring still to come · {{count}} payment',
+      toCome_other: 'Recurring still to come · {{count}} payments',
+    },
+    note: 'Your share only. Savings and your bank balance are not counted.',
+    nudge: {
+      title: 'See what is left each month',
+      text: 'Track your salary and this card shows what you can still spend.',
+      action: 'Add income',
+    },
+  },
   grid: {
     label: 'Days of {{month}}',
   },

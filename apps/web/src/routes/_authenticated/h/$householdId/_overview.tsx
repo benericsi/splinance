@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
@@ -15,6 +15,8 @@ import { SettlementList } from '@/features/balances/components/settlement-list';
 import { balanceQueries } from '@/features/balances/queries';
 import { BudgetAlertsCard } from '@/features/budgets/components/budget-alerts-card';
 import { budgetQueries } from '@/features/budgets/queries';
+import { LeftThisMonthCard } from '@/features/calendar/components/left-this-month-card';
+import { calendarQueries } from '@/features/calendar/queries';
 import { categoryQueries } from '@/features/categories/queries';
 import { MapAddMenu } from '@/features/household-map/components/map-add-menu';
 import { MapSkeleton, OverviewMap } from '@/features/household-map/components/overview-map';
@@ -47,6 +49,8 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/_overview')
       queryClient.query(balanceQueries.debts(householdId)),
       queryClient.infiniteQuery(balanceQueries.settlements(householdId)),
       queryClient.query(budgetQueries.month(householdId, currentMonth())),
+      // The cards only: the map shows nothing of the month's money.
+      ...(map ? [] : [queryClient.query(calendarQueries.month(householdId, currentMonth()))]),
       queryClient.query(categoryQueries.list(householdId)),
       queryClient.query(recurringQueries.list(householdId)),
     ]);
@@ -119,19 +123,22 @@ function OverviewPage() {
             <BalanceOverview household={household} balances={balances} viewerId={viewerId} />
           </Reveal>
           <Reveal index={1}>
-            <BudgetAlertsCard householdId={householdId} data={budgets} categories={categories} />
+            <LeftThisMonth householdId={householdId} />
           </Reveal>
           <Reveal index={2}>
+            <BudgetAlertsCard householdId={householdId} data={budgets} categories={categories} />
+          </Reveal>
+          <Reveal index={3}>
             <UpcomingCard
               householdId={householdId}
               data={recurring}
               memberCount={household.members.length}
             />
           </Reveal>
-          <Reveal index={3}>
+          <Reveal index={4}>
             <SettlementList household={household} viewerId={viewerId} />
           </Reveal>
-          <Reveal index={4}>
+          <Reveal index={5}>
             <Card>
               <CardHeader>
                 <CardTitle>{t('overview.members')}</CardTitle>
@@ -158,6 +165,15 @@ function OverviewPage() {
       <Outlet />
     </RevealPage>
   );
+}
+
+/**
+ * Reads the month itself, so the map (which never shows it) does not wait for it: a narrow
+ * screen on `?view=map` gets the cards and loads it here.
+ */
+function LeftThisMonth({ householdId }: { householdId: string }) {
+  const { data: calendar } = useQuery(calendarQueries.month(householdId, currentMonth()));
+  return calendar ? <LeftThisMonthCard householdId={householdId} calendar={calendar} /> : null;
 }
 
 /** Balance card, settlements and members; the budget card only shows once it is known. */
@@ -190,6 +206,14 @@ function OverviewSkeleton() {
               <Skeleton className="h-9 w-24 rounded-lg" />
               <Skeleton className="h-9 w-28 rounded-lg" />
             </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="space-y-3">
+            <SkeletonLine line="h-5" className="w-32" />
+            <SkeletonLine line="h-10" className="w-48" />
+            <Skeleton className="h-2.5 w-full rounded-full" />
+            <SkeletonLine line="h-5" className="w-64 max-w-full" />
           </CardContent>
         </Card>
         <SkeletonCard title="w-40">
