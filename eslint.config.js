@@ -15,6 +15,9 @@ export default tseslint.config(
       '**/routeTree.gen.ts',
       '**/playwright-report/**',
       '**/test-results/**',
+      // Git worktrees of other sessions: whole copies of the repo (gitignored). Linting
+      // them too ran the type-aware rules out of memory.
+      '.claude/**',
       // Python virtual environment of the data track; may contain vendored JS.
       'data/.venv/**',
     ],
