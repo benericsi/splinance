@@ -21,5 +21,6 @@ export * from './preferences';
 export * from './recurring';
 export * from './reports';
 export * from './rules';
+export * from './savings';
 export * from './splits';
 export * from './transactions';

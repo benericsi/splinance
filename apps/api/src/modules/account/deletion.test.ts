@@ -3,6 +3,7 @@ import {
   authResponseSchema,
   balancesResponseSchema,
   householdDetailResponseSchema,
+  savingsResponseSchema,
   transactionListResponseSchema,
 } from '@splinance/shared';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -20,6 +21,8 @@ import {
   households,
   importBatches,
   recurringSeries,
+  savingsEntries,
+  savingsGoals,
   sessions,
   transactions,
   userIdentities,
@@ -151,7 +154,45 @@ async function annasWorld() {
     });
   }
 
+  // A goal of her own, one shared with Ben that both put money into, and Ben's own.
+  const goals = await db
+    .insert(savingsGoals)
+    .values(
+      [
+        { name: 'Surprise trip', visibility: 'private' as const, createdBy: anna.id },
+        { name: 'New sofa', visibility: 'shared' as const, createdBy: anna.id },
+        { name: 'Bike', visibility: 'private' as const, createdBy: ben.id },
+      ].map((goal) => ({ ...goal, householdId: home, currency: 'HUF' as const })),
+    )
+    .returning();
+  const goalId = (name: string) => goals.find((goal) => goal.name === name)?.id ?? '';
+  await db.insert(savingsEntries).values(
+    [
+      { goalId: goalId('Surprise trip'), userId: anna.id, amount: 30_000 },
+      { goalId: goalId('New sofa'), userId: anna.id, amount: 20_000 },
+      { goalId: goalId('New sofa'), userId: ben.id, amount: 10_000 },
+      { goalId: goalId('Bike'), userId: ben.id, amount: 5_000 },
+    ].map((entry) => ({ ...entry, householdId: home, entryOn: '2026-10-12' })),
+  );
+
   const flat = await createHousehold(app, anna, 'Annas flat');
+  const [flatGoal] = await db
+    .insert(savingsGoals)
+    .values({
+      householdId: flat,
+      name: 'Deposit',
+      visibility: 'shared',
+      currency: 'HUF',
+      createdBy: anna.id,
+    })
+    .returning();
+  await db.insert(savingsEntries).values({
+    householdId: flat,
+    goalId: flatGoal?.id ?? '',
+    userId: anna.id,
+    amount: 1_000,
+    entryOn: '2026-10-12',
+  });
   await addTransaction(flat, anna, { visibility: 'private', description: 'Rent' });
 
   const oldPlace = await createHousehold(app, anna, 'Old place');
@@ -298,6 +339,28 @@ describe('delete', () => {
         (r) => r.name,
       ),
     ).toEqual(['Netflix']);
+
+    // Her private goal is gone with its entries; the shared one keeps what she put in,
+    // under "Former member", and Ben's own goal is untouched.
+    expect(
+      (await db.select().from(savingsGoals).orderBy(savingsGoals.name)).map((g) => g.name),
+    ).toEqual(['Bike', 'New sofa']);
+    expect(await db.select().from(savingsEntries)).toHaveLength(3);
+    const saved = await request(app)
+      .get(`/api/households/${home}/savings`)
+      .set('Authorization', ben.auth)
+      .expect(200);
+    const sofa = savingsResponseSchema
+      .parse(saved.body)
+      .savings.goals.find((goal) => goal.name === 'New sofa');
+    expect(sofa).toMatchObject({
+      balance: 30_000,
+      createdBy: { displayName: FORMER_MEMBER_NAME },
+      contributions: [
+        { displayName: FORMER_MEMBER_NAME, amount: 20_000 },
+        { displayName: 'Ben', amount: 10_000 },
+      ],
+    });
 
     // Her flat is gone whole, the old place is archived, her memberships ended.
     expect(await db.select().from(households).where(eq(households.id, flat))).toEqual([]);

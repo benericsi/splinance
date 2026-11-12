@@ -13,6 +13,8 @@ import {
   importBatches,
   notifications,
   recurringSeries,
+  savingsEntries,
+  savingsGoals,
   sessions,
   transactionSplits,
   transactions,
@@ -187,6 +189,16 @@ async function erase(
     .update(importBatches)
     .set({ fileName: null })
     .where(eq(importBatches.createdBy, user.id));
+  // Private goals were only ever theirs to read. What they put into shared goals stays:
+  // the others' goal balances depend on it, under "Former member".
+  const privateGoals = tx
+    .select({ id: savingsGoals.id })
+    .from(savingsGoals)
+    .where(and(eq(savingsGoals.createdBy, user.id), eq(savingsGoals.visibility, 'private')));
+  await tx.delete(savingsEntries).where(inArray(savingsEntries.goalId, privateGoals));
+  await tx
+    .delete(savingsGoals)
+    .where(and(eq(savingsGoals.createdBy, user.id), eq(savingsGoals.visibility, 'private')));
   await tx.delete(budgets).where(eq(budgets.userId, user.id));
   // Private recurring payments hold their names and the merchants they match.
   await tx.delete(recurringSeries).where(eq(recurringSeries.userId, user.id));

@@ -45,6 +45,10 @@ export const errors: Messages<typeof en.errors> = {
     VERSION_CONFLICT:
       'Valaki más közben módosította ezt a tranzakciót. Töltsd újra, és próbáld újra',
     SETTLEMENT_NOT_FOUND: 'Az elszámolás nem található',
+    SAVINGS_GOAL_NOT_FOUND: 'A megtakarítási cél nem található',
+    SAVINGS_ENTRY_NOT_FOUND: 'A megtakarítási tétel nem található',
+    SAVINGS_GOAL_ARCHIVED: 'Ez a cél le van zárva',
+    INSUFFICIENT_SAVINGS: 'Nincs ennyi a célban',
     RULE_NOT_FOUND: 'A szabály nem található',
     RULE_PATTERN_TAKEN: 'Erre a szövegre már van szabály',
     RULE_ORDER_MISMATCH: 'A szabályok közben megváltoztak. Töltsd újra, és próbáld újra.',
