@@ -349,6 +349,14 @@ describe('set aside', () => {
     await send(ben, 'delete', `/${trip.id}/entries/${entry.id}`);
 
     expect((await savings(ben, '2026-11')).setAside).toBe(70_000);
+    // Per day too, for the overview's bars: in date order, only days with entries.
+    expect((await savings(ben, '2026-11')).setAsideByDay).toEqual([
+      { date: '2026-11-01', amount: 30_000 },
+      { date: '2026-11-15', amount: -10_000 },
+      { date: '2026-11-30', amount: 50_000 },
+    ]);
+    expect((await savings(cara, '2026-11')).setAsideByDay).toEqual([]);
+    expect((await savings(ben)).setAsideByDay).toBeNull();
     expect((await savings(anna, '2026-11')).setAside).toBe(40_000);
     expect((await savings(cara, '2026-11')).setAside).toBe(0);
     expect((await savings(ben, '2026-12')).setAside).toBe(77_000);
@@ -360,6 +368,12 @@ describe('set aside', () => {
     await add(ben, trip, 30_000, { entryOn: '2026-10-05' });
     await add(ben, trip, -20_000, { entryOn: '2026-11-05' });
     expect((await savings(ben, '2026-11')).setAside).toBe(-20_000);
+    // A day that puts in and takes out the same is left out of the days.
+    await add(ben, trip, 5_000, { entryOn: '2026-11-07' });
+    await add(ben, trip, -5_000, { entryOn: '2026-11-07' });
+    expect((await savings(ben, '2026-11')).setAsideByDay).toEqual([
+      { date: '2026-11-05', amount: -20_000 },
+    ]);
   });
 
   it('rejects a malformed month', async () => {

@@ -122,7 +122,7 @@ function fakeApi(goals: SavingsGoal[] = [trip, fund, pot, old], setAside = 100_0
       }),
     ),
     mock.get(`${base}/savings`, () => {
-      const savings: Savings = { currency: 'HUF', goals: state.goals, setAside };
+      const savings: Savings = { currency: 'HUF', goals: state.goals, setAside, setAsideByDay: [] };
       return HttpResponse.json({ savings });
     }),
     mock.post(`${base}/savings`, async ({ request }) => {

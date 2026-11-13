@@ -70,6 +70,16 @@ export const calendar = {
       action: 'Add transaction',
     },
   },
+  /** The overview's day bars: the label of the day pointed at. */
+  bars: {
+    today: 'Today',
+    spent: 'Spent',
+    setAside: 'Set aside',
+    takenOut: 'Taken out of savings',
+    income: 'Income',
+    expected: 'Expected payments',
+    expectedIncome: 'Income expected',
+  },
   grid: {
     label: 'Days of {{month}}',
   },

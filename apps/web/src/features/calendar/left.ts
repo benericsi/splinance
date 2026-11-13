@@ -1,4 +1,4 @@
-import type { Calendar } from '@splinance/shared';
+import type { Calendar, DaySetAside } from '@splinance/shared';
 import { eventAmount, summarize } from './view';
 
 /** The viewer's month as money in against money out, for the overview's "Left this month". */
@@ -94,33 +94,74 @@ function daysLeftIn(month: string, today: string, daysInMonth: number): number {
 export interface DayBar {
   date: string;
   when: 'past' | 'today' | 'future';
+  /** The viewer's share spent that day; 0 ahead of today. */
+  spent: number;
+  /** What the viewer put into savings that day, net (negative: taken out); 0 ahead of today. */
+  setAside: number;
+  /** Income that arrived that day (the viewer's part); 0 ahead of today. */
+  income: number;
+  /** Recurring payments expected that day (the viewer's part); only ahead of today. */
+  expected: number;
+  /** Income tracked series expect that day (the viewer's part); only ahead of today. */
+  expectedIncome: number;
   /**
-   * The viewer's spending that day against the month's busiest day so far, 0 to 1, by
-   * square root (like the calendar's tint) so the rent does not flatten every other day.
-   * Always 0 ahead of today.
+   * Heights, 0 to 1, by square root against the month's biggest day (like the calendar's
+   * tint) so the rent does not flatten every other day: the top of what was spent, the top
+   * of spent plus set aside (money out, stacked), and the top of an expected day's stub.
    */
-  level: number;
+  spentTop: number;
+  stackTop: number;
+  expectedTop: number;
 }
 
 /**
- * The viewer's share spent per day of the month (`yourExpenses`), for the bars under the
- * hero's number: past days filled, today marked, days ahead as stubs. A month before the
- * browser's is all past, one after it all ahead.
+ * The viewer's month by day, for the bars under the hero's number: money out stacked
+ * (spent, then set aside) on past days and today, income as a marker, and on days ahead the
+ * recurring payments and income still expected. Only the viewer's part, like the number
+ * above them. A month before the browser's is all past, one after it all ahead. Money taken
+ * out of savings is no bar: it is in the day's label.
  */
-export function dayBars(calendar: Calendar): DayBar[] {
+export function dayBars(calendar: Calendar, setAsideByDay: readonly DaySetAside[] = []): DayBar[] {
   const { today } = calendar;
   const when = (date: string): DayBar['when'] =>
     date < today ? 'past' : date === today ? 'today' : 'future';
-  const max = Math.max(
-    0,
-    ...calendar.days.filter((day) => day.date <= today).map((day) => day.yourExpenses),
-  );
-  return calendar.days.map((day) => {
+  const saved = new Map(setAsideByDay.map((day) => [day.date, day.amount]));
+  const expectedOn = (date: string, kind: 'expense' | 'income') =>
+    calendar.events
+      .filter((event) => event.type === 'recurringExpected' && event.kind === kind)
+      .filter((event) => event.date === date)
+      .reduce((sum, event) => sum + eventAmount(event, 'mine'), 0);
+
+  const days = calendar.days.map((day) => {
     const state = when(day.date);
+    const ahead = state === 'future';
     return {
       date: day.date,
       when: state,
-      level: state === 'future' || max === 0 ? 0 : Math.sqrt(day.yourExpenses / max),
+      spent: ahead ? 0 : day.yourExpenses,
+      setAside: ahead ? 0 : (saved.get(day.date) ?? 0),
+      income: ahead ? 0 : day.yourIncome,
+      expected: ahead ? expectedOn(day.date, 'expense') : 0,
+      expectedIncome: ahead ? expectedOn(day.date, 'income') : 0,
     };
   });
+  const out = (day: (typeof days)[number]) => day.spent + Math.max(0, day.setAside);
+  const max = Math.max(0, ...days.map((day) => Math.max(out(day), day.expected)));
+  const scale = (amount: number) => (max === 0 ? 0 : Math.sqrt(amount / max));
+  return days.map((day) => ({
+    ...day,
+    spentTop: scale(day.spent),
+    stackTop: scale(out(day)),
+    expectedTop: scale(day.expected),
+  }));
+}
+
+/**
+ * Where a day's label sits against its bar: starting at it in the first third of the
+ * month, ending at it in the last, centred between, so it never sticks out of the hero.
+ */
+export function labelAlign(index: number, count: number): 'start' | 'center' | 'end' {
+  if (index < count / 3) return 'start';
+  if (index >= (count * 2) / 3) return 'end';
+  return 'center';
 }

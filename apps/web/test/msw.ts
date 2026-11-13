@@ -51,7 +51,7 @@ export const server = setupServer(
   }),
   // The overview's savings card and the "set aside" line: no goals unless a test adds some.
   http.get('/api/households/:id/savings', () =>
-    HttpResponse.json({ savings: { currency: 'HUF', goals: [], setAside: 0 } }),
+    HttpResponse.json({ savings: { currency: 'HUF', goals: [], setAside: 0, setAsideByDay: [] } }),
   ),
   http.get('/api/households/:id/recurring', () =>
     HttpResponse.json({

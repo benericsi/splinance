@@ -1,4 +1,4 @@
-import type { Calendar } from '@splinance/shared';
+import type { Calendar, DaySetAside } from '@splinance/shared';
 import { Link } from '@tanstack/react-router';
 import { ChevronRight, X } from 'lucide-react';
 import { useId, useState } from 'react';
@@ -28,12 +28,15 @@ export function LeftThisMonthCard({
   householdId,
   calendar,
   setAside = 0,
+  setAsideByDay = [],
   tracksIncome,
 }: {
   householdId: string;
   calendar: Calendar;
   /** The viewer's net savings entries this month (0 until they are known). */
   setAside?: number;
+  /** The same per day, for the day bars. */
+  setAsideByDay?: readonly DaySetAside[];
   /** The viewer follows a recurring income: the empty state stops offering to add one. */
   tracksIncome: boolean;
 }) {
@@ -168,7 +171,7 @@ export function LeftThisMonthCard({
                 ))}
             </ul>
           </div>
-          <DayBars calendar={calendar} over={over} />
+          <DayBars calendar={calendar} setAsideByDay={setAsideByDay} over={over} />
         </div>
 
         <div className="border-foreground/10 mt-4 border-t pt-3">

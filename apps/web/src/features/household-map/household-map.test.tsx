@@ -1,5 +1,5 @@
 import type { HouseholdMember, ImportBatch, Invite } from '@splinance/shared';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { http as mock, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -123,6 +123,17 @@ afterEach(() => {
   restore = undefined;
 });
 
+/**
+ * The cards after switching from the map. The page can render the cards before the new
+ * view's data has loaded and again once it has, so a node found on the first render may be
+ * replaced (or still coming in) by the time it is checked: query again until it settles.
+ */
+async function cardsShown() {
+  await waitFor(() => {
+    expect(screen.getByText('Bela owes you')).toBeVisible();
+  });
+}
+
 describe('the overview as a map', () => {
   it('shows the household, its people, your banks and a pending invite', async () => {
     restore = wideScreen();
@@ -163,7 +174,7 @@ describe('the overview as a map', () => {
     expect(router.state.location.search).toEqual({ view: 'map' });
 
     await user.click(within(group).getByRole('button', { name: 'Cards' }));
-    expect(await screen.findByText('Bela owes you')).toBeVisible();
+    await cardsShown();
     expect(router.state.location.search).toEqual({});
   });
 
@@ -187,7 +198,7 @@ describe('the overview as a map', () => {
     const group = screen.getByRole('group', { name: 'Overview layout' });
 
     await user.click(within(group).getByRole('button', { name: 'Cards' }));
-    expect(await screen.findByText('Bela owes you')).toBeVisible();
+    await cardsShown();
     expect(router.state.location.search).toEqual({ view: 'cards' });
 
     await user.click(within(group).getByRole('button', { name: 'Map' }));

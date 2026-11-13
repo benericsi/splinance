@@ -93,15 +93,25 @@ export type SavingsGoalResponse = z.infer<typeof savingsGoalResponseSchema>;
 export const savingsQuerySchema = z.object({ month: monthSchema.optional() });
 export type SavingsQuery = z.infer<typeof savingsQuerySchema>;
 
+/** The viewer's net savings entries on one day (negative: more taken out than put in). */
+export const daySetAsideSchema = z.object({
+  date: z.iso.date(),
+  amount: z.number().int(),
+});
+export type DaySetAside = z.infer<typeof daySetAsideSchema>;
+
 /**
  * The goals the viewer can see (shared ones and their own private ones), active first.
  * `setAside` is the viewer's own entries in the month asked for, added up over all of those
  * goals: negative when they took out more than they put in, null without a month.
+ * `setAsideByDay` is the same per day, only days with entries, in date order (the
+ * overview's day bars); null without a month.
  */
 export const savingsSchema = z.object({
   currency: currencySchema,
   goals: z.array(savingsGoalSchema),
   setAside: z.number().int().nullable(),
+  setAsideByDay: z.array(daySetAsideSchema).max(31).nullable(),
 });
 
 export type Savings = z.infer<typeof savingsSchema>;
