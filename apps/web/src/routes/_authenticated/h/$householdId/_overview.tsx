@@ -271,7 +271,7 @@ function OverviewSkeleton() {
         <Card>
           <CardContent>
             <SkeletonLine className="w-32" />
-            <div className="mt-1 grid gap-x-10 gap-y-4 md:grid-cols-2 md:items-end">
+            <div className="mt-1 grid gap-x-10 gap-y-4 md:grid-cols-[auto_minmax(0,1fr)]">
               <div>
                 <SkeletonLine line="h-10 md:h-12" className="w-48" />
                 <SkeletonLine className="mt-1 w-64 max-w-full" />
@@ -280,7 +280,7 @@ function OverviewSkeleton() {
                   <Skeleton className="h-7 w-24 rounded-full" />
                 </div>
               </div>
-              <Skeleton className="h-16 w-full rounded-md" />
+              <Skeleton className="h-32 w-full rounded-md md:h-full" />
             </div>
             <div className="mt-4 border-t pt-3">
               <SkeletonLine className="w-44" />

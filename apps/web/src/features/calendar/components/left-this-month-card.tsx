@@ -142,7 +142,7 @@ export function LeftThisMonthCard({
             {t('left.month')}
           </Link>
         </div>
-        <div className="mt-1 grid gap-x-10 gap-y-4 md:grid-cols-2 md:items-end">
+        <div className="mt-1 grid gap-x-10 gap-y-4 md:grid-cols-[auto_minmax(0,1fr)]">
           <div className="min-w-0">
             <p
               className={cn(
@@ -171,7 +171,13 @@ export function LeftThisMonthCard({
                 ))}
             </ul>
           </div>
-          <DayBars calendar={calendar} setAsideByDay={setAsideByDay} over={over} />
+          {/* The number takes what it needs; the month gets the rest of the width and its height. */}
+          <DayBars
+            calendar={calendar}
+            setAsideByDay={setAsideByDay}
+            over={over}
+            className="md:h-full"
+          />
         </div>
 
         <div className="border-foreground/10 mt-4 border-t pt-3">
