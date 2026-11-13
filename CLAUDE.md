@@ -9,6 +9,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Running balance ("who owes whom") with settle-up
 - Bank CSV import with duplicate detection
 - Categories, auto-categorization rules, monthly budgets
+- Savings goals (shared or private): what members put in or took out, 25% milestones, pace, per-person pins
 - Reports: six-month trend and spending by category (household or your share)
 - Calendar: the month by day with spend tint, recurring payments (paid and expected) and settlements
 - Household map: the overview as a canvas (people, debts, your banks, recurring payments, budgets, pending invites)
@@ -68,6 +69,7 @@ Splinance is a household expense web app for tracking personal spending and shar
 - Amounts that change in place (totals, balances) render with `MoneyFlow` (NumberFlow, digits roll; same formatting as `formatMoney`, `aria-hidden` digits plus an sr-only copy); static amounts use `Amount`, and sentences built with `formatMoney` go through `MaskMoney`, so "hide amounts" (`data-amount` blur) reaches them; SVG text gets an `amount-svg` container (charts: `amount-chart`). NumberFlow is mocked in web tests
 - Motion: `m.*` from `motion/react` (never `motion.*`: `LazyMotion strict`), tokens and `COLLAPSE` in `src/lib/motion.ts`, `Collapse` for open/close by height; `AnimatePresence initial={false}` so first renders are static; key lists by what swaps them (month, kind). Short (0.15-0.2 s), no page transitions, reduced motion respected
 - Loading: household pages have a `pendingComponent` skeleton (`PageSkeleton` + blocks from `components/skeletons.tsx`, mirroring the real boxes, real static h1); content that replaces a skeleton comes in with `RevealPage` / `Reveal` and `useRevealRows` (never on cached navigation). A new household page gets a skeleton too
+- Savings (`features/savings`, architecture 4 "Savings" and 9 "Savings"): saving is a transfer, never spending, so entries stay out of transactions, budgets, reports and balances; goal balances, milestones and pace are derived (`view.ts`, pure and tested), never stored; private goals go through `goalVisibleTo` in every read and write
 - Household map (`features/household-map`, architecture 9 "Household map"): rules live in the pure `buildMap` (tested there); only `components/household-map.tsx` imports `@xyflow/react`, and it stays lazy-loaded; the map shows nothing the cards could not (no new API reads beyond the viewer's imports and, for owners, invites); nodes are real links (`MapNodeLink`), and anything a drag or drop does (settle up, import) must also be reachable by a click and the keyboard
 - Fonts: Inter (body, 14px base, use `tabular-nums` for amounts) and Bricolage Grotesque (headings, `font-heading`), self-hosted via fontsource (never Google Fonts CDN, GDPR)
 - Web tests mock the API with MSW (`test/msw.ts`, unhandled requests fail the test; `/api/auth/providers` defaults to none)

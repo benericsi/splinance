@@ -7,6 +7,7 @@ import {
   House,
   type LucideIcon,
   PiggyBank,
+  Target,
   Repeat,
   Settings,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ interface NavItem {
     | '/h/$householdId'
     | '/h/$householdId/transactions'
     | '/h/$householdId/budgets'
+    | '/h/$householdId/savings'
     | '/h/$householdId/calendar'
     | '/h/$householdId/recurring'
     | '/h/$householdId/reports'
@@ -43,10 +45,11 @@ interface NavItem {
   alsoActiveOn?: '/h/$householdId/settle';
   /**
    * Not a phone tab: six fill the bar. The calendar is reached from Transactions there
-   * (`ActivityViewSwitch`), so that tab stays highlighted on it (`tabAlsoActiveOn`).
+   * (`ActivityViewSwitch`) and savings from Budgets (`SavingsViewSwitch`), so those tabs
+   * stay highlighted on them (`tabAlsoActiveOn`).
    */
   sidebarOnly?: boolean;
-  tabAlsoActiveOn?: '/h/$householdId/calendar';
+  tabAlsoActiveOn?: '/h/$householdId/calendar' | '/h/$householdId/savings';
 }
 
 // New sections (expenses, balances, budgets, ...) are added here as they ship.
@@ -68,7 +71,13 @@ const NAV_ITEMS: NavItem[] = [
     tabAlsoActiveOn: '/h/$householdId/calendar',
   },
   { to: '/h/$householdId/calendar', label: 'calendar', icon: CalendarDays, sidebarOnly: true },
-  { to: '/h/$householdId/budgets', label: 'budgets', icon: PiggyBank },
+  {
+    to: '/h/$householdId/budgets',
+    label: 'budgets',
+    icon: PiggyBank,
+    tabAlsoActiveOn: '/h/$householdId/savings',
+  },
+  { to: '/h/$householdId/savings', label: 'savings', icon: Target, sidebarOnly: true },
   {
     to: '/h/$householdId/recurring',
     label: 'recurring',

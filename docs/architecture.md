@@ -55,7 +55,7 @@ Key files by concern:
 | Categories (API)              | `apps/api/src/modules/categories/*`                                                                                      |
 | Transactions (API)            | `apps/api/src/modules/transactions/*`, trigger in `apps/api/drizzle/0006_transaction_split_sum_trigger.sql`              |
 | Balances and settlements      | `apps/api/src/modules/balances/*` (`ledger.ts` derives debts), `apps/api/src/modules/settlements/*`                      |
-| Savings goals (API)           | `packages/shared/src/savings.ts`, `apps/api/src/modules/savings/*`                                                       |
+| Savings goals                 | `packages/shared/src/savings.ts`, `apps/api/src/modules/savings/*`, `apps/web/src/features/savings/*`                    |
 | Bank imports                  | `packages/shared/src/imports/*` (parsers, contract), `apps/api/src/modules/imports/*`, `apps/web/src/features/imports/*` |
 | Category rules                | `packages/shared/src/rules.ts` (matching), `apps/api/src/modules/rules/*`, `apps/web/src/features/rules/*`               |
 | Budgets                       | `packages/shared/src/budgets.ts`, `apps/api/src/modules/budgets/*`, `apps/web/src/features/budgets/*`                    |
@@ -655,6 +655,9 @@ _authenticated.tsx         pathless layout: if not authenticated -> redirect /lo
       _authenticated/h/$householdId/transactions.$transactionId.tsx /h/:id/transactions/:tid  edit dialog
     _authenticated/h/$householdId/budgets.tsx        /h/:id/budgets?month=YYYY-MM  budgets of a month; <Outlet /> for the dialog
       _authenticated/h/$householdId/budgets.set.tsx  /h/:id/budgets/set?category=  set, change or remove a budget
+    _authenticated/h/$householdId/savings.tsx        /h/:id/savings                savings goals; <Outlet /> for the dialogs
+      _authenticated/h/$householdId/savings.new.tsx      /h/:id/savings/new        new goal
+      _authenticated/h/$householdId/savings.$goalId.tsx  /h/:id/savings/:goalId    a goal: add or take out, history, edit, close
     _authenticated/h/$householdId/reports.tsx        /h/:id/reports?to=&month=&view=  trend and spending by category
     _authenticated/h/$householdId/calendar.tsx       /h/:id/calendar?month=&view=&category=  the month by day
     _authenticated/h/$householdId/calendar.$date.tsx /h/:id/calendar/:date            one day, as a dialog over it
@@ -742,6 +745,18 @@ invitee: opens /invite#<token>
 - Totals (budgeted, spent, left or over) and one row per budget, sorted by category name, with a bar: neutral below 80%, mustard from 80% (`BUDGET_WARNING_RATIO`), red when over; the line under it says the same in words ("3000 Ft left · 90%", "Over by 4000 Ft"), so the bar is decorative. Only shared expenses count.
 - The dialog (`/budgets/set`, with `?category=` when opened from a row) sets the amount from the month on screen; picking a category that has a budget prefills it. "Remove budget" sends a null amount from that month.
 - The overview shows `BudgetAlertsCard`: only this month's budgets at 80% or more, most used first, hidden when there are none.
+
+### Savings
+
+- A section of its own in the sidebar. Phones have no seventh tab: `SavingsViewSwitch` (Budgets | Savings) sits on top of both pages, and the Budgets tab stays highlighted on savings (`tabAlsoActiveOn`), the way the calendar shares the Transactions tab.
+- The page: totals (saved, the viewer's part, set aside this month, which reads "Taken out this month" when negative), then the goals as `arrangeGoals` orders them. Pinned goals are large `GoalBox`es; the other open goals are `GoalTile`s; closed goals wait behind a toggle. With nothing pinned one goal is featured anyway (nearest target date, else closest to its target, only goals with a target not yet reached) and a line says it was picked; the first pin replaces that.
+- A `GoalBox` shows what a tile cannot: the bar with its milestones, who put in what, what is missing to the next step and the pace. All of it is derived in `features/savings/view.ts` (pure, tested there), nothing is stored:
+  - **Milestones** at 25, 50, 75 and 100% of the target (`goalProgress`). A milestone's amount is rounded up, so it never shows as passed a forint early; taking money out can lose one again. No target, no milestones.
+  - **Pace** (`goalPace`): the rest spread over the whole months left until the target date (at least one), rounded up: "25 715 Ft a month gets you there by 1 Jul 2027". Past the date it says so in the warning tone. The app does not say "on track": it has no plan to compare the past to.
+  - **Bar** (`barSegments`): the filled part is the balance against the target, split by what each member has in the goal; a member who took out more than they put in has no slice. Fills come from `memberFills`: the viewer is always `bg-positive`, the others get one brand fill each for the whole page, by user id, so colors do not move when amounts change. The bar is decoration (`aria-hidden`); the legend and the lines under it say the same, plus an sr-only "2 of 4 milestones reached".
+- Pins are the viewer's own (`PinButton`, a toggle button with `aria-pressed`); a refused fourth pin is said by the global mutation toast.
+- The goal dialog (`/savings/$goalId`, a drawer on phones) has the amount, the bar, the form to add or take out (one amount, a direction, a day, a note; it stays open and empties for the next entry) and the history, paged with "Load more". Taking out more than the goal holds is refused in the form before the API would (409). The viewer removes only their own entries, after a `ConfirmDialog`; the goal's maker and owners get Edit (name, target, date, never the visibility) and Close goal, whose confirmation says what the goal still holds. The route's loader answers not found for a goal the list does not have, which includes someone else's private goal.
+- Dates of goals always show the year (`formatGoalDate`): a target is often next year.
 
 ### Recurring payments
 

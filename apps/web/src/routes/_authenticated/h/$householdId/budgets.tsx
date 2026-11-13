@@ -15,6 +15,7 @@ import { BudgetList } from '@/features/budgets/components/budget-list';
 import { budgetQueries } from '@/features/budgets/queries';
 import { categoryQueries } from '@/features/categories/queries';
 import { householdQueries } from '@/features/households/queries';
+import { SavingsViewSwitch } from '@/features/savings/components/savings-view-switch';
 import { currentMonth, formatMonth } from '@/features/transactions/dates';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 
@@ -59,6 +60,7 @@ function BudgetsPage() {
     <RevealPage>
       <PageTitle title={t('pageTitle', { household: household.name })} />
       <PageHeader title={t('title')} actions={setLink(t('set'))} />
+      <SavingsViewSwitch householdId={householdId} active="budgets" />
       <Reveal index={0} className="mb-6">
         <MonthNav month={month} page="/h/$householdId/budgets" />
       </Reveal>

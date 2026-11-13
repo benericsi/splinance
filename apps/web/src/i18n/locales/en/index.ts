@@ -11,6 +11,7 @@ import { rules } from './rules';
 import { shell } from './shell';
 import { imports } from './imports';
 import { budgets } from './budgets';
+import { savings } from './savings';
 import { calendar } from './calendar';
 import { reports } from './reports';
 import { recurring } from './recurring';
@@ -37,6 +38,7 @@ export const en = {
   balances,
   imports,
   budgets,
+  savings,
   reports,
   calendar,
   recurring,

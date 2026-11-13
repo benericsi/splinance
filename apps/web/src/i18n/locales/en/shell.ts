@@ -27,6 +27,7 @@ export const shell = {
     transactions: 'Transactions',
     transactionsShort: 'Activity',
     budgets: 'Budgets',
+    savings: 'Savings',
     calendar: 'Calendar',
     recurring: 'Recurring',
     recurringShort: 'Recurring',
