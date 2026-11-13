@@ -42,6 +42,7 @@ export const calendar: Messages<typeof en.calendar> = {
     legend: {
       spent: 'Elköltve',
       toCome: 'Még várható',
+      setAside: 'Félretéve',
       left: 'Maradt',
       covered: 'Bevételből fedezve',
       over: 'Túlköltés',
@@ -51,10 +52,12 @@ export const calendar: Messages<typeof en.calendar> = {
       received: 'Beérkezett bevétel',
       expectedIncome: 'Még várt bevétel',
       spent: 'Eddig elköltve',
+      setAside: 'Megtakarításba félretéve',
+      takenOut: 'Megtakarításból kivéve',
       toCome_one: 'Még várható rendszeres fizetés · {{count}} db',
       toCome_other: 'Még várható rendszeres fizetés · {{count}} db',
     },
-    note: 'Csak a te részed. A megtakarítás és a bankszámla egyenlege nem számít bele.',
+    note: 'Csak a te részed. A bankszámla egyenlege nem számít bele; amit a megtakarítási céloknál rögzítesz, az igen.',
     nudge: {
       title: 'Lásd, mennyi marad a hónapból',
       text: 'Kövesd a fizetésedet, és ez a kártya megmutatja, mennyit költhetsz még.',

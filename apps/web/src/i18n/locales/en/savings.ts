@@ -36,6 +36,10 @@ export const savings = {
   suggested: 'Picked for you. Pin a goal to keep it on top.',
   others: 'Other goals',
   closed: 'Closed goals ({{count}})',
+  card: {
+    title: 'Savings',
+    all: 'All goals',
+  },
   switch: {
     label: 'Budgets or savings',
     budgets: 'Budgets',
