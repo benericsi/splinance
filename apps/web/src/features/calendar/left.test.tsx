@@ -3,6 +3,7 @@ import {
   type CalendarEvent,
   daysOfMonth,
   type RecurringSeries,
+  type SavingsGoal,
 } from '@splinance/shared';
 import { cleanup, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
@@ -408,5 +409,202 @@ describe('overview: left this month', () => {
     const left = await card('Ebből a hónapból maradt');
     expect(within(left).getByText(sentence('Naponta kb. 12 700 Ft, még 18 napig'))).toBeVisible();
     expect(within(left).getByRole('button', { name: 'Hogyan számoljuk?' })).toBeVisible();
+  });
+});
+
+describe('left this month, with savings', () => {
+  const month = (setAside: number, calendar = november({ days: paid, events: [rent, gas] })) => {
+    const result = leftThisMonth(calendar, setAside);
+    if (!result) throw new Error('no month');
+    return result;
+  };
+
+  it('takes what was set aside out of what is left, as its own slice', () => {
+    const saved = month(100_000);
+    expect(saved).toMatchObject({ setAside: 100_000, left: 128_700, perDay: 7150 });
+    expect(leftSegments(saved)).toEqual([
+      { key: 'spent', amount: 312_400 },
+      { key: 'toCome', amount: 148_900 },
+      { key: 'setAside', amount: 100_000 },
+      { key: 'left', amount: 128_700 },
+    ]);
+    // The bar is still the income.
+    expect(leftSegments(saved).reduce((sum, { amount }) => sum + amount, 0)).toBe(690_000);
+  });
+
+  it('gives money taken out of savings back to the month, without a slice', () => {
+    const takenOut = month(-50_000);
+    expect(takenOut).toMatchObject({ setAside: -50_000, left: 278_700 });
+    expect(leftSegments(takenOut).map((segment) => segment.key)).toEqual([
+      'spent',
+      'toCome',
+      'left',
+    ]);
+    // Spending it afterwards is neutral: the month ends where it would have without savings.
+    const spentIt = month(
+      -50_000,
+      november({
+        days: { ...paid, '2026-11-12': { expenses: 50_000, yourExpenses: 50_000 } },
+        events: [rent, gas],
+      }),
+    );
+    expect(spentIt.left).toBe(228_700);
+  });
+
+  it('can push the month over its income, and savings taken out help cover it', () => {
+    const tight = november({
+      days: { '2026-11-10': { income: 300_000, yourIncome: 300_000, yourExpenses: 250_000 } },
+    });
+    const over = month(80_000, tight);
+    expect(over.left).toBe(-30_000);
+    expect(leftSegments(over)).toEqual([
+      { key: 'covered', amount: 300_000 },
+      { key: 'over', amount: 30_000 },
+    ]);
+    const covered = month(-20_000, {
+      ...tight,
+      days: tight.days.map((day) =>
+        day.date === '2026-11-10' ? { ...day, yourExpenses: 350_000 } : day,
+      ),
+    });
+    expect(covered.left).toBe(-30_000);
+    expect(leftSegments(covered)).toEqual([
+      { key: 'covered', amount: 320_000 },
+      { key: 'over', amount: 30_000 },
+    ]);
+  });
+
+  it('still needs income to measure against', () => {
+    expect(leftThisMonth(november(), 100_000)).toBeNull();
+  });
+});
+
+describe('overview: savings', () => {
+  const person = { userId: testUser.id, displayName: testUser.displayName };
+  const goal = (id: string, name: string, fields: Partial<SavingsGoal>): SavingsGoal => ({
+    id: `${SERIES}${id}`,
+    name,
+    targetAmount: 600_000,
+    targetDate: null,
+    currency: 'HUF',
+    visibility: 'shared',
+    createdBy: person,
+    archivedAt: null,
+    balance: 0,
+    contributions: [],
+    pinned: false,
+    createdAt: '2026-10-09T16:06:43.129Z',
+    ...fields,
+  });
+  const trip = goal('b1', 'Summer in Italy', {
+    targetDate: '2027-07-01',
+    balance: 420_000,
+    contributions: [{ ...person, amount: 420_000 }],
+  });
+  const fund = goal('b2', 'Emergency fund', { targetAmount: 2_000_000, balance: 1_150_000 });
+  const pot = goal('b3', 'Rainy day pot', { targetAmount: null, balance: 90_000 });
+  const old = goal('b4', 'Old sofa', { archivedAt: '2026-09-01T10:00:00.000Z' });
+
+  function savingsApi(goals: SavingsGoal[], setAside: number) {
+    server.use(
+      mock.get(`${base}/savings`, () =>
+        HttpResponse.json({ savings: { currency: 'HUF', goals, setAside } }),
+      ),
+    );
+  }
+
+  it('takes what was set aside out of the card, with a slice and a row of its own', async () => {
+    const user = userEvent.setup();
+    fakeApi(november({ days: paid, events: [rent, gas] }));
+    savingsApi([trip], 100_000);
+    renderRoute(`/h/${testHousehold.id}`);
+
+    const left = await card('Left this month');
+    expect(
+      await within(left).findByText(money('^128 700 Ft$'), { selector: '.sr-only' }),
+    ).toBeDefined();
+    expect(
+      within(left)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([
+      expect.stringMatching(money('^Spent312 400 Ft$')),
+      expect.stringMatching(money('^Still to come148 900 Ft$')),
+      expect.stringMatching(money('^Set aside100 000 Ft$')),
+      expect.stringMatching(money('^Left128 700 Ft$')),
+    ]);
+
+    await user.click(within(left).getByRole('button', { name: 'How is this calculated' }));
+    const rows = within(left)
+      .getAllByRole('term')
+      .map((term) => `${term.textContent}: ${term.nextElementSibling?.textContent ?? ''}`);
+    expect(rows).toContainEqual(
+      expect.stringMatching(money('^Set aside in savings: [-−]100 000 Ft$')),
+    );
+  });
+
+  it('says so when savings came back instead', async () => {
+    const user = userEvent.setup();
+    fakeApi(november({ days: paid, events: [rent, gas] }));
+    savingsApi([trip], -50_000);
+    renderRoute(`/h/${testHousehold.id}`);
+
+    const left = await card('Left this month');
+    expect(
+      await within(left).findByText(money('^278 700 Ft$'), { selector: '.sr-only' }),
+    ).toBeDefined();
+    expect(within(left).queryByText('Set aside')).toBeNull();
+    await user.click(within(left).getByRole('button', { name: 'How is this calculated' }));
+    const rows = within(left)
+      .getAllByRole('term')
+      .map((term) => `${term.textContent}: ${term.nextElementSibling?.textContent ?? ''}`);
+    expect(rows).toContainEqual(
+      expect.stringMatching(money('^Taken out of savings: \\+50 000 Ft$')),
+    );
+  });
+
+  it('lists the goal picked for the viewer, or their pins, with a link to each', async () => {
+    fakeApi(november({ days: paid }));
+    savingsApi([trip, fund, pot, old], 0);
+    renderRoute(`/h/${testHousehold.id}`);
+
+    const savings = await card('Savings');
+    // Nothing pinned: the one with the nearest date.
+    const items = within(savings).getAllByRole('listitem');
+    expect(items.map((item) => item.textContent.replace(/\s/g, ' '))).toEqual([
+      expect.stringMatching(/^Summer in Italy420 000 Ft of 600 000 Ft30 000 Ft to 75%$/),
+    ]);
+    expect(within(savings).getByRole('link', { name: 'Summer in Italy' })).toHaveAttribute(
+      'href',
+      `/h/${testHousehold.id}/savings/${trip.id}`,
+    );
+    expect(within(savings).getByRole('link', { name: 'All goals' })).toHaveAttribute(
+      'href',
+      `/h/${testHousehold.id}/savings`,
+    );
+
+    cleanup();
+    savingsApi([trip, { ...fund, pinned: true }, { ...pot, pinned: true }, old], 0);
+    renderRoute(`/h/${testHousehold.id}`);
+    const pinned = await card('Savings');
+    expect(
+      within(pinned)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['All goals', 'Emergency fund', 'Rainy day pot']);
+  });
+
+  it('falls back to any open goal, and hides without one', async () => {
+    fakeApi(november({ days: paid }));
+    savingsApi([pot, old], 0);
+    renderRoute(`/h/${testHousehold.id}`);
+    const savings = await card('Savings');
+    expect(within(savings).getByRole('link', { name: 'Rainy day pot' })).toBeVisible();
+
+    cleanup();
+    savingsApi([old], 0);
+    renderRoute(`/h/${testHousehold.id}`);
+    await card('Left this month');
+    expect(screen.queryByRole('heading', { name: 'Savings' })).toBeNull();
   });
 });

@@ -20,24 +20,28 @@ import { Amount, MaskMoney } from '@/features/transactions/components/amount';
 const SEGMENT_FILL: Record<LeftSegment['key'], string> = {
   spent: 'bg-foreground',
   toCome: 'bg-foreground/45',
+  setAside: 'bg-brand-sky',
   left: 'bg-positive',
   covered: 'bg-foreground',
   over: 'bg-brand-red',
 };
 
 /**
- * Overview: what is left of the viewer's income this month after what they spent and the
- * recurring payments still expected, as one number, a bar and (on request) the sum behind
+ * Overview: what is left of the viewer's income this month after what they spent, the
+ * recurring payments still expected and what they set aside in savings, as one number, a bar and (on request) the sum behind
  * it. Without any income to measure against it offers to track a salary instead (or, with
  * one tracked, to add the income itself); that offer can be hidden, per person and browser.
  */
 export function LeftThisMonthCard({
   householdId,
   calendar,
+  setAside = 0,
   tracksIncome,
 }: {
   householdId: string;
   calendar: Calendar;
+  /** The viewer's net savings entries this month (0 until they are known). */
+  setAside?: number;
   /** The viewer follows a recurring income: the empty state stops offering to add one. */
   tracksIncome: boolean;
 }) {
@@ -47,7 +51,7 @@ export function LeftThisMonthCard({
   const [hidden, setHidden] = useState(() => isLeftNudgeHidden(userId, householdId));
   const headingId = useId();
   const detailsId = useId();
-  const month = leftThisMonth(calendar);
+  const month = leftThisMonth(calendar, setAside);
   const { currency } = calendar;
   const money = (minor: number) => formatMoney(minor, currency);
 
@@ -210,6 +214,17 @@ export function LeftThisMonthCard({
                   <Row label={t('left.rows.spent')}>
                     <Amount minor={-month.spent} currency={currency} />
                   </Row>
+                  {month.setAside !== 0 && (
+                    <Row
+                      label={t(month.setAside > 0 ? 'left.rows.setAside' : 'left.rows.takenOut')}
+                    >
+                      <Amount
+                        minor={-month.setAside}
+                        currency={currency}
+                        signed={month.setAside < 0}
+                      />
+                    </Row>
+                  )}
                   {month.toCome > 0 && (
                     <Row label={t('left.rows.toCome', { count: month.toComeCount })}>
                       <MaskMoney>

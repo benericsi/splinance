@@ -26,6 +26,8 @@ import { householdQueries } from '@/features/households/queries';
 import { importQueries } from '@/features/imports/queries';
 import { UpcomingCard } from '@/features/recurring/components/upcoming-card';
 import { recurringQueries } from '@/features/recurring/queries';
+import { SavingsCard } from '@/features/savings/components/savings-card';
+import { savingsQueries } from '@/features/savings/queries';
 import { currentMonth } from '@/features/transactions/dates';
 import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth-store';
@@ -62,8 +64,13 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/_overview')
       queryClient.query(balanceQueries.debts(householdId)),
       queryClient.infiniteQuery(balanceQueries.settlements(householdId)),
       queryClient.query(budgetQueries.month(householdId, currentMonth())),
-      // The cards only: the map shows nothing of the month's money.
-      ...(map ? [] : [queryClient.query(calendarQueries.month(householdId, currentMonth()))]),
+      // The cards only: the map shows nothing of the month's money or of savings.
+      ...(map
+        ? []
+        : [
+            queryClient.query(calendarQueries.month(householdId, currentMonth())),
+            queryClient.query(savingsQueries.month(householdId, currentMonth())),
+          ]),
       queryClient.query(categoryQueries.list(householdId)),
       queryClient.query(recurringQueries.list(householdId)),
     ]);
@@ -144,19 +151,22 @@ function OverviewPage() {
             />
           </Reveal>
           <Reveal index={2}>
-            <BudgetAlertsCard householdId={householdId} data={budgets} categories={categories} />
+            <SavingsGoals householdId={householdId} viewerId={viewerId} />
           </Reveal>
           <Reveal index={3}>
+            <BudgetAlertsCard householdId={householdId} data={budgets} categories={categories} />
+          </Reveal>
+          <Reveal index={4}>
             <UpcomingCard
               householdId={householdId}
               data={recurring}
               memberCount={household.members.length}
             />
           </Reveal>
-          <Reveal index={4}>
+          <Reveal index={5}>
             <SettlementList household={household} viewerId={viewerId} />
           </Reveal>
-          <Reveal index={5}>
+          <Reveal index={6}>
             <Card>
               <CardHeader>
                 <CardTitle>{t('overview.members')}</CardTitle>
@@ -187,7 +197,8 @@ function OverviewPage() {
 
 /**
  * Reads the month itself, so the map (which never shows it) does not wait for it: a narrow
- * screen asked for the map gets the cards and loads it here.
+ * screen asked for the map gets the cards and loads it here. What was set aside in savings
+ * comes from its own query; until it is known the card counts none.
  */
 function LeftThisMonth({
   householdId,
@@ -197,8 +208,22 @@ function LeftThisMonth({
   tracksIncome: boolean;
 }) {
   const { data: calendar } = useQuery(calendarQueries.month(householdId, currentMonth()));
+  const { data: savings } = useQuery(savingsQueries.month(householdId, currentMonth()));
   return calendar ? (
-    <LeftThisMonthCard householdId={householdId} calendar={calendar} tracksIncome={tracksIncome} />
+    <LeftThisMonthCard
+      householdId={householdId}
+      calendar={calendar}
+      setAside={savings?.setAside ?? 0}
+      tracksIncome={tracksIncome}
+    />
+  ) : null;
+}
+
+/** The savings card, reading its goals itself for the same reason. */
+function SavingsGoals({ householdId, viewerId }: { householdId: string; viewerId: string }) {
+  const { data: savings } = useQuery(savingsQueries.month(householdId, currentMonth()));
+  return savings ? (
+    <SavingsCard householdId={householdId} savings={savings} viewerId={viewerId} />
   ) : null;
 }
 

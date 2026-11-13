@@ -43,6 +43,7 @@ export const calendar = {
     legend: {
       spent: 'Spent',
       toCome: 'Still to come',
+      setAside: 'Set aside',
       left: 'Left',
       covered: 'Covered by income',
       over: 'Over',
@@ -52,10 +53,12 @@ export const calendar = {
       received: 'Income received',
       expectedIncome: 'Income still expected',
       spent: 'Spent so far',
+      setAside: 'Set aside in savings',
+      takenOut: 'Taken out of savings',
       toCome_one: 'Recurring still to come · {{count}} payment',
       toCome_other: 'Recurring still to come · {{count}} payments',
     },
-    note: 'Your share only. Savings and your bank balance are not counted.',
+    note: 'Your share only. Your bank balance is not counted; what you record in savings goals is.',
     nudge: {
       title: 'See what is left each month',
       text: 'Track your salary and this card shows what you can still spend.',

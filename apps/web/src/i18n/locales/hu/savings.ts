@@ -39,6 +39,10 @@ export const savings: Messages<typeof en.savings> = {
   suggested: 'Ezt mi választottuk. Tűzz ki egy célt, hogy az maradjon felül.',
   others: 'További célok',
   closed: 'Lezárt célok ({{count}})',
+  card: {
+    title: 'Megtakarítások',
+    all: 'Minden cél',
+  },
   switch: {
     label: 'Keretek vagy megtakarítások',
     budgets: 'Keretek',
