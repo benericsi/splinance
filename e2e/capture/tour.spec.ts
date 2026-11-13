@@ -130,6 +130,17 @@ async function recordTour(browser: Browser, scheme: (typeof SCHEMES)[number]) {
   await expect(page.getByRole('heading', { name: 'Budgets', level: 1 })).toBeVisible();
   await pause(page, 2000);
 
+  // Savings: the pinned goals with their milestones, then one goal with its history.
+  await glideAndClick(page, sections.getByRole('link', { name: 'Savings' }));
+  await expect(page.getByRole('heading', { name: 'Savings', level: 1 })).toBeVisible();
+  await pause(page, 3000);
+  await glideAndClick(page, page.getByRole('link', { name: 'Add money' }).first());
+  await expect(page.getByRole('dialog', { name: 'Summer in Italy' })).toBeVisible();
+  await pause(page, 3000);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await pause(page, 800);
+
   await glideAndClick(page, sections.getByRole('link', { name: 'Overview' }));
   await expect(page.getByRole('heading', { name: 'Balance' })).toBeVisible();
   await pause(page, 1500);
