@@ -81,8 +81,15 @@ export const recurring = {
   upcoming: {
     title: 'Coming up',
     all: 'All recurring',
-    found_one: '{{count}} possible recurring payment found. Review',
-    found_other: '{{count}} possible recurring payments found. Review',
+    /** Under the soonest one: the others due within the week. */
+    more: '+{{count}} more this week',
+  },
+  /** The overview's tile counting suggestions. */
+  review: {
+    title: 'To review',
+    text_one: 'possible recurring payment',
+    text_other: 'possible recurring payments',
+    link: 'Review the suggestions',
   },
   preview: {
     matches_one: 'Matches {{count}} past payment',

@@ -23,3 +23,15 @@ export function budgetNote(budget: Pick<Budget, 'amount' | 'spent'>, currency: C
 
 /** Budgets that need attention first: most used on top. */
 export const byUsage = (a: Budget, b: Budget) => budgetUsage(b) - budgetUsage(a);
+
+/** The overview's budget tile has room for this many gauges. */
+export const MAX_GAUGES = 2;
+
+/**
+ * The overview's budgets: this month's at 80% or more, most used first, the first
+ * `MAX_GAUGES` drawn and the rest counted ("+1 more").
+ */
+export function gaugeBudgets(budgets: readonly Budget[]): { shown: Budget[]; more: number } {
+  const close = budgets.filter((budget) => budgetStatus(budget) !== 'ok').sort(byUsage);
+  return { shown: close.slice(0, MAX_GAUGES), more: Math.max(0, close.length - MAX_GAUGES) };
+}

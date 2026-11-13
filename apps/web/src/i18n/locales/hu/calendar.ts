@@ -39,13 +39,10 @@ export const calendar: Messages<typeof en.calendar> = {
     perDay_other: 'Naponta kb. {{amount}}, még {{count}} napig',
     awaiting: 'Benne van a még várt {{name}}: {{amount}}, {{date}}',
     overNote: 'Még {{amount}} rendszeres fizetés várható',
-    legend: {
+    chips: {
       spent: 'Elköltve',
-      toCome: 'Még várható',
       setAside: 'Félretéve',
-      left: 'Maradt',
-      covered: 'Bevételből fedezve',
-      over: 'Túlköltés',
+      toCome: 'Még várható',
     },
     how: 'Hogyan számoljuk?',
     rows: {

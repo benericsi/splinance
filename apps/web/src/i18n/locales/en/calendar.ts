@@ -40,13 +40,11 @@ export const calendar = {
     /** While income is still on its way: "Includes Salary: 690 000 Ft expected 10 Nov". */
     awaiting: 'Includes {{name}}: {{amount}} expected {{date}}',
     overNote: '{{amount}} of payments still to come',
-    legend: {
+    /** The parts of the month under the number. */
+    chips: {
       spent: 'Spent',
-      toCome: 'Still to come',
       setAside: 'Set aside',
-      left: 'Left',
-      covered: 'Covered by income',
-      over: 'Over',
+      toCome: 'To come',
     },
     how: 'How is this calculated',
     rows: {

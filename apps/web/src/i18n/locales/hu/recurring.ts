@@ -82,8 +82,13 @@ export const recurring: Messages<typeof en.recurring> = {
   upcoming: {
     title: 'Hamarosan',
     all: 'Összes rendszeres',
-    found_one: '{{count}} lehetséges rendszeres fizetést találtunk. Átnézem',
-    found_other: '{{count}} lehetséges rendszeres fizetést találtunk. Átnézem',
+    more: '+{{count}} további a héten',
+  },
+  review: {
+    title: 'Átnézendő',
+    text_one: 'lehetséges rendszeres fizetés',
+    text_other: 'lehetséges rendszeres fizetés',
+    link: 'Javaslatok átnézése',
   },
   preview: {
     matches_one: '{{count}} korábbi fizetéssel egyezik',

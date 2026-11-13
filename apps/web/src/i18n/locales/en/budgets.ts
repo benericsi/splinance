@@ -23,6 +23,8 @@ export const budgets = {
   alerts: {
     title: 'Budgets this month',
     all: 'All budgets',
+    /** Budgets close to their limit beyond the gauges shown. */
+    more: '+{{count}} more',
   },
   dialog: {
     setTitle: 'Set budget',

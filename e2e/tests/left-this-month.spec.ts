@@ -58,9 +58,8 @@ test('the overview says what is left of the month once a salary is tracked', asy
   await expect(left.getByRole('listitem').filter({ hasText: 'Spent' })).toContainText(
     money('20 000 Ft'),
   );
-  await expect(left.getByRole('listitem').filter({ hasText: 'Left' })).toContainText(
-    money('670 000 Ft'),
-  );
+  // The big number: what is left.
+  await expect(left).toContainText(money('670 000 Ft'));
 
   // The sum behind it opens on request.
   await left.getByRole('button', { name: 'How is this calculated' }).click();

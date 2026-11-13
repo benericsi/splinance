@@ -85,3 +85,19 @@ export const signFor = (kind: TransactionKind) => (kind === 'income' ? '+' : '')
 /** "+11%", "-5%" */
 export const formatChange = (change: number) =>
   `${change > 0 ? '+' : '-'}${String(Math.round(Math.abs(change) * 100))}%`;
+
+/**
+ * The overview's "Coming up": the soonest payment due or income expected within a week
+ * (or a few days late), and how many more there are in that window.
+ */
+export function comingUp(
+  series: readonly RecurringSeries[],
+  today: string,
+  memberCount: number,
+): { next: SeriesView | null; more: number } {
+  const upcoming = series
+    .map((one) => viewSeries(one, today, memberCount))
+    .filter((view) => view.timing === 'due' || view.timing === 'soon')
+    .sort((a, b) => a.daysUntil - b.daysUntil);
+  return { next: upcoming[0] ?? null, more: Math.max(0, upcoming.length - 1) };
+}

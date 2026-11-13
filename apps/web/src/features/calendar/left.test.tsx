@@ -20,7 +20,7 @@ import {
   testHousehold,
   testUser,
 } from '../../../test/utils';
-import { leftSegments, leftThisMonth, roughly } from './left';
+import { dayBars, leftThisMonth, roughly } from './left';
 
 const SERIES = '01a12509-0f61-75bc-b406-1301087805';
 
@@ -171,34 +171,31 @@ describe('left this month', () => {
     expect(roughly(0)).toBe(0);
   });
 
-  it('splits the bar into the income, or into what the income covers when over', () => {
-    const within = leftThisMonth(november({ days: paid, events: [rent, gas] }));
-    if (!within) throw new Error('no month');
-    expect(leftSegments(within)).toEqual([
-      { key: 'spent', amount: 312_400 },
-      { key: 'toCome', amount: 148_900 },
-      { key: 'left', amount: 228_700 },
-    ]);
-    expect(leftSegments(within).reduce((sum, { amount }) => sum + amount, 0)).toBe(690_000);
-
-    const over = leftThisMonth(
+  it("draws the viewer's share per day: past filled, today marked, days ahead as stubs", () => {
+    const bars = dayBars(
       november({
-        days: { '2026-11-10': { income: 300_000, yourIncome: 300_000, yourExpenses: 280_000 } },
-        events: [rent],
+        days: {
+          '2026-11-03': { yourExpenses: 200_000 },
+          '2026-11-10': { expenses: 90_000, yourExpenses: 50_000 },
+          // Dated ahead: drawn as a stub, and not the scale either.
+          '2026-11-20': { yourExpenses: 999_000 },
+        },
       }),
     );
-    if (!over) throw new Error('no month');
-    expect(leftSegments(over)).toEqual([
-      { key: 'covered', amount: 300_000 },
-      { key: 'over', amount: 80_000 },
-    ]);
+    expect(bars).toHaveLength(30);
+    expect(bars[0]).toEqual({ date: '2026-11-01', when: 'past', level: 0 });
+    expect(bars[2]).toEqual({ date: '2026-11-03', when: 'past', level: 1 });
+    // By square root: a quarter of the busiest day is half a bar.
+    expect(bars[9]).toEqual({ date: '2026-11-10', when: 'past', level: 0.5 });
+    expect(bars[12]).toEqual({ date: '2026-11-13', when: 'today', level: 0 });
+    expect(bars[19]).toEqual({ date: '2026-11-20', when: 'future', level: 0 });
+    expect(bars.filter((bar) => bar.when === 'future')).toHaveLength(17);
+  });
 
-    // Nothing spent and nothing expected: one slice, no empty ones.
-    const untouched = leftThisMonth(
-      november({ days: { '2026-11-10': { income: 1000, yourIncome: 1000 } } }),
-    );
-    if (!untouched) throw new Error('no month');
-    expect(leftSegments(untouched)).toEqual([{ key: 'left', amount: 1000 }]);
+  it('draws an earlier month as all past, and flat without spending', () => {
+    const bars = dayBars(november({ today: '2026-12-02' }));
+    expect(new Set(bars.map((bar) => bar.when))).toEqual(new Set(['past']));
+    expect(new Set(bars.map((bar) => bar.level))).toEqual(new Set([0]));
   });
 });
 
@@ -277,15 +274,23 @@ describe('overview: left this month', () => {
     expect(new Set(asked)).toEqual(new Set([`?month=${currentMonth()}`]));
     expect(within(left).getByText(money('^228 700 Ft$'), { selector: '.sr-only' })).toBeDefined();
     expect(within(left).getByText(sentence('About 12 700 Ft a day for 18 days'))).toBeVisible();
+    // Its parts as chips; nothing set aside, so no chip for it.
     expect(
       within(left)
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual([
       expect.stringMatching(money('^Spent312 400 Ft$')),
-      expect.stringMatching(money('^Still to come148 900 Ft$')),
-      expect.stringMatching(money('^Left228 700 Ft$')),
+      expect.stringMatching(money('^To come148 900 Ft$')),
     ]);
+    // The month by day, decoration only: 12 days gone, today, 17 ahead.
+    const bars = within(left).getByTestId('day-bars');
+    expect(bars).toHaveAttribute('aria-hidden', 'true');
+    expect(bars.querySelectorAll('[data-when="past"]')).toHaveLength(12);
+    expect(bars.querySelectorAll('[data-when="today"]')).toHaveLength(1);
+    expect(bars.querySelectorAll('[data-when="future"]')).toHaveLength(17);
+    // The page's one tinted surface.
+    expect(left).toHaveClass('bg-positive-tint');
     expect(within(left).getByRole('link', { name: 'See the month' })).toHaveAttribute(
       'href',
       `/h/${testHousehold.id}/calendar?view=mine`,
@@ -342,9 +347,10 @@ describe('overview: left this month', () => {
         .getAllByRole('listitem')
         .map((item) => item.textContent),
     ).toEqual([
-      expect.stringMatching(money('^Covered by income300 000 Ft$')),
-      expect.stringMatching(money('^Over80 000 Ft$')),
+      expect.stringMatching(money('^Spent280 000 Ft$')),
+      expect.stringMatching(money('^To come100 000 Ft$')),
     ]);
+    expect(over).toHaveClass('bg-negative-tint');
   });
 
   it('offers to track a salary when there is no income to go by', async () => {
@@ -419,27 +425,12 @@ describe('left this month, with savings', () => {
     return result;
   };
 
-  it('takes what was set aside out of what is left, as its own slice', () => {
-    const saved = month(100_000);
-    expect(saved).toMatchObject({ setAside: 100_000, left: 128_700, perDay: 7150 });
-    expect(leftSegments(saved)).toEqual([
-      { key: 'spent', amount: 312_400 },
-      { key: 'toCome', amount: 148_900 },
-      { key: 'setAside', amount: 100_000 },
-      { key: 'left', amount: 128_700 },
-    ]);
-    // The bar is still the income.
-    expect(leftSegments(saved).reduce((sum, { amount }) => sum + amount, 0)).toBe(690_000);
+  it('takes what was set aside out of what is left', () => {
+    expect(month(100_000)).toMatchObject({ setAside: 100_000, left: 128_700, perDay: 7150 });
   });
 
-  it('gives money taken out of savings back to the month, without a slice', () => {
-    const takenOut = month(-50_000);
-    expect(takenOut).toMatchObject({ setAside: -50_000, left: 278_700 });
-    expect(leftSegments(takenOut).map((segment) => segment.key)).toEqual([
-      'spent',
-      'toCome',
-      'left',
-    ]);
+  it('gives money taken out of savings back to the month', () => {
+    expect(month(-50_000)).toMatchObject({ setAside: -50_000, left: 278_700 });
     // Spending it afterwards is neutral: the month ends where it would have without savings.
     const spentIt = month(
       -50_000,
@@ -455,12 +446,7 @@ describe('left this month, with savings', () => {
     const tight = november({
       days: { '2026-11-10': { income: 300_000, yourIncome: 300_000, yourExpenses: 250_000 } },
     });
-    const over = month(80_000, tight);
-    expect(over.left).toBe(-30_000);
-    expect(leftSegments(over)).toEqual([
-      { key: 'covered', amount: 300_000 },
-      { key: 'over', amount: 30_000 },
-    ]);
+    expect(month(80_000, tight).left).toBe(-30_000);
     const covered = month(-20_000, {
       ...tight,
       days: tight.days.map((day) =>
@@ -468,10 +454,6 @@ describe('left this month, with savings', () => {
       ),
     });
     expect(covered.left).toBe(-30_000);
-    expect(leftSegments(covered)).toEqual([
-      { key: 'covered', amount: 320_000 },
-      { key: 'over', amount: 30_000 },
-    ]);
   });
 
   it('still needs income to measure against', () => {
@@ -513,7 +495,7 @@ describe('overview: savings', () => {
     );
   }
 
-  it('takes what was set aside out of the card, with a slice and a row of its own', async () => {
+  it('takes what was set aside out of the card, with a chip and a row of its own', async () => {
     const user = userEvent.setup();
     fakeApi(november({ days: paid, events: [rent, gas] }));
     savingsApi([trip], 100_000);
@@ -529,9 +511,8 @@ describe('overview: savings', () => {
         .map((item) => item.textContent),
     ).toEqual([
       expect.stringMatching(money('^Spent312 400 Ft$')),
-      expect.stringMatching(money('^Still to come148 900 Ft$')),
       expect.stringMatching(money('^Set aside100 000 Ft$')),
-      expect.stringMatching(money('^Left128 700 Ft$')),
+      expect.stringMatching(money('^To come148 900 Ft$')),
     ]);
 
     await user.click(within(left).getByRole('button', { name: 'How is this calculated' }));
@@ -563,7 +544,7 @@ describe('overview: savings', () => {
     );
   });
 
-  it('lists the goal picked for the viewer, or their pins, with a link to each', async () => {
+  it('rings the goal picked for the viewer, or their pins, with a link to each', async () => {
     fakeApi(november({ days: paid }));
     savingsApi([trip, fund, pot, old], 0);
     renderRoute(`/h/${testHousehold.id}`);
@@ -572,7 +553,8 @@ describe('overview: savings', () => {
     // Nothing pinned: the one with the nearest date.
     const items = within(savings).getAllByRole('listitem');
     expect(items.map((item) => item.textContent.replace(/\s/g, ' '))).toEqual([
-      expect.stringMatching(/^Summer in Italy420 000 Ft of 600 000 Ft30 000 Ft to 75%$/),
+      // The ring's percent (decoration), the name, the amounts and the next step.
+      expect.stringMatching(/^70%Summer in Italy420 000 Ft of 600 000 Ft30 000 Ft to 75%$/),
     ]);
     expect(within(savings).getByRole('link', { name: 'Summer in Italy' })).toHaveAttribute(
       'href',
@@ -584,14 +566,17 @@ describe('overview: savings', () => {
     );
 
     cleanup();
-    savingsApi([trip, { ...fund, pinned: true }, { ...pot, pinned: true }, old], 0);
+    const week = goal('b5', 'Week away', { pinned: true });
+    savingsApi([trip, { ...fund, pinned: true }, { ...pot, pinned: true }, week, old], 0);
     renderRoute(`/h/${testHousehold.id}`);
     const pinned = await card('Savings');
-    expect(
-      within(pinned)
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual(['All goals', 'Emergency fund', 'Rainy day pot']);
+    // Two rings at most; a goal without a target has an empty one and no percent.
+    const goals = within(pinned).getAllByRole('listitem');
+    expect(goals.map((item) => within(item).getByRole('link').textContent)).toEqual([
+      'Emergency fund',
+      'Rainy day pot',
+    ]);
+    expect(goals[1]).not.toHaveTextContent('%');
   });
 
   it('falls back to any open goal, and hides without one', async () => {
