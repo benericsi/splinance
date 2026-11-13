@@ -38,6 +38,25 @@
       "port": 5173
     },
     {
+      "name": "api-demo",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@splinance/api", "dev"],
+      "port": 3200,
+      "env": {
+        "PORT": "3200",
+        "DEMO_MODE": "true",
+        "APP_ORIGIN": "http://localhost:5174",
+        "DATABASE_URL": "postgres://splinance:splinance@localhost:5432/splinance_demo"
+      }
+    },
+    {
+      "name": "web-demo",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@splinance/web", "dev:demo"],
+      "port": 5174,
+      "env": { "API_PROXY_TARGET": "http://localhost:3200" }
+    },
+    {
       "name": "web-running",
       "url": "http://check.localhost:5173",
       "port": 5173
