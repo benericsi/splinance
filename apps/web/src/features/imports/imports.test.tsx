@@ -106,6 +106,7 @@ const batch: ImportBatch = {
   source: 'kh',
   fileName: 'export.csv',
   rowCount: 2,
+  savingsCount: 0,
   createdBy: { userId: testUser.id, displayName: 'Anna' },
   createdAt: '2026-10-12T10:00:00.000Z',
   undoneAt: null,
@@ -142,6 +143,7 @@ function fakeApi({ history = [] as ImportBatch[] } = {}) {
                 id: '01a1250a-8673-7669-9f80-8f4006ca5e01',
                 description: 'Pizza night',
                 occurredOn: '2026-10-09',
+                goalId: null,
               },
             };
           }

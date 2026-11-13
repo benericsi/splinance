@@ -36,6 +36,7 @@ const results: ImportCheckResult[] = [
       id: '01a1250a-8673-7669-9f80-8f4006ca5e01',
       description: 'Groceries',
       occurredOn: '2026-10-09',
+      goalId: null,
     },
   },
   { fingerprint: 'kh:3', status: 'new', match: null },

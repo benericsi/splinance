@@ -13,6 +13,7 @@ export * from './recurring-series';
 export * from './savings-entries';
 export * from './savings-goal-pins';
 export * from './savings-goals';
+export * from './savings-rules';
 export * from './sessions';
 export * from './settlements';
 export * from './transaction-splits';

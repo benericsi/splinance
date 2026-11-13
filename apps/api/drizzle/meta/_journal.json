@@ -169,6 +169,13 @@
       "when": 1794515858854,
       "tag": "0023_savings_goal_pins",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794568718568,
+      "tag": "0024_savings_import",
+      "breakpoints": true
     }
   ]
 }
