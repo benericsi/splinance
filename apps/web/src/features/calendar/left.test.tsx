@@ -20,7 +20,7 @@ import {
   testHousehold,
   testUser,
 } from '../../../test/utils';
-import { dayBars, leftThisMonth, roughly } from './left';
+import { dayBars, labelAlign, leftThisMonth, roughly } from './left';
 
 const SERIES = '01a12509-0f61-75bc-b406-1301087805';
 
@@ -183,13 +183,25 @@ describe('left this month', () => {
       }),
     );
     expect(bars).toHaveLength(30);
-    expect(bars[0]).toEqual({ date: '2026-11-01', when: 'past', level: 0 });
-    expect(bars[2]).toEqual({ date: '2026-11-03', when: 'past', level: 1 });
+    expect(bars[0]).toEqual({ date: '2026-11-01', when: 'past', amount: 0, level: 0 });
+    expect(bars[2]).toEqual({ date: '2026-11-03', when: 'past', amount: 200_000, level: 1 });
     // By square root: a quarter of the busiest day is half a bar.
-    expect(bars[9]).toEqual({ date: '2026-11-10', when: 'past', level: 0.5 });
-    expect(bars[12]).toEqual({ date: '2026-11-13', when: 'today', level: 0 });
-    expect(bars[19]).toEqual({ date: '2026-11-20', when: 'future', level: 0 });
+    expect(bars[9]).toEqual({ date: '2026-11-10', when: 'past', amount: 50_000, level: 0.5 });
+    expect(bars[12]).toEqual({ date: '2026-11-13', when: 'today', amount: 0, level: 0 });
+    expect(bars[19]).toEqual({ date: '2026-11-20', when: 'future', amount: 0, level: 0 });
     expect(bars.filter((bar) => bar.when === 'future')).toHaveLength(17);
+  });
+
+  it("keeps a pointed day's label inside the bars near the ends", () => {
+    expect([0, 2, 3, 15, 26, 27, 29].map((index) => labelAlign(index, 30))).toEqual([
+      'start',
+      'start',
+      'center',
+      'center',
+      'center',
+      'end',
+      'end',
+    ]);
   });
 
   it('draws an earlier month as all past, and flat without spending', () => {
@@ -289,6 +301,16 @@ describe('overview: left this month', () => {
     expect(bars.querySelectorAll('[data-when="past"]')).toHaveLength(12);
     expect(bars.querySelectorAll('[data-when="today"]')).toHaveLength(1);
     expect(bars.querySelectorAll('[data-when="future"]')).toHaveLength(17);
+    // Pointing at a day shows its date and the viewer's share; days ahead show nothing.
+    const column = (date: number) => bars.querySelectorAll('[data-when]')[date - 1]?.parentElement;
+    await user.hover(column(3) as HTMLElement);
+    expect(within(left).getByTestId('day-bar-label')).toHaveTextContent(
+      money('^Tue 3 Nov( 2026)? 200 000 Ft$'),
+    );
+    await user.hover(column(13) as HTMLElement);
+    expect(within(left).getByTestId('day-bar-label')).toHaveTextContent(money('^Today 0 Ft$'));
+    await user.hover(column(20) as HTMLElement);
+    expect(within(left).queryByTestId('day-bar-label')).toBeNull();
     // The page's one tinted surface.
     expect(left).toHaveClass('bg-positive-tint');
     expect(within(left).getByRole('link', { name: 'See the month' })).toHaveAttribute(

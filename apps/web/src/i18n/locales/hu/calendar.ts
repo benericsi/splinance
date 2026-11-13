@@ -67,6 +67,9 @@ export const calendar: Messages<typeof en.calendar> = {
       action: 'Tranzakció hozzáadása',
     },
   },
+  bars: {
+    today: 'Ma',
+  },
   grid: {
     label: 'Napok · {{month}}',
   },

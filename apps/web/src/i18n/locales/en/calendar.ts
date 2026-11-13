@@ -70,6 +70,10 @@ export const calendar = {
       action: 'Add transaction',
     },
   },
+  /** The overview's day bars: the label of the day pointed at ("Today 12 400 Ft"). */
+  bars: {
+    today: 'Today',
+  },
   grid: {
     label: 'Days of {{month}}',
   },

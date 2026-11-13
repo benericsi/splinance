@@ -94,6 +94,8 @@ function daysLeftIn(month: string, today: string, daysInMonth: number): number {
 export interface DayBar {
   date: string;
   when: 'past' | 'today' | 'future';
+  /** The viewer's share spent that day; 0 ahead of today. */
+  amount: number;
   /**
    * The viewer's spending that day against the month's busiest day so far, 0 to 1, by
    * square root (like the calendar's tint) so the rent does not flatten every other day.
@@ -120,7 +122,18 @@ export function dayBars(calendar: Calendar): DayBar[] {
     return {
       date: day.date,
       when: state,
+      amount: state === 'future' ? 0 : day.yourExpenses,
       level: state === 'future' || max === 0 ? 0 : Math.sqrt(day.yourExpenses / max),
     };
   });
+}
+
+/**
+ * Where a day's label sits against its bar: centred, except near the ends, where it starts
+ * at the first bar or ends at the bar so it never sticks out of the hero.
+ */
+export function labelAlign(index: number, count: number): 'start' | 'center' | 'end' {
+  if (index < 3) return 'start';
+  if (index > count - 4) return 'end';
+  return 'center';
 }
