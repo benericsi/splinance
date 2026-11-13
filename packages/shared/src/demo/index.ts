@@ -16,6 +16,8 @@ export {
   type DemoRecurringAdded,
   type DemoRecurringConfirmed,
   type DemoRule,
+  type DemoSavingsEntry,
+  type DemoSavingsGoal,
   type DemoSettlement,
   type DemoShare,
   demoShares,

@@ -26,6 +26,10 @@ export const DEMO_TEXT: Record<Exclude<Locale, 'en'>, Readonly<Record<string, st
     'Account fee': 'Számlavezetési díj',
     'Rent share': 'Lakbér része',
     'Settling up': 'Elszámolás',
+    'Summer in Italy': 'Nyaralás Olaszországban',
+    'Emergency fund': 'Vésztartalék',
+    'Rainy day pot': 'Esős napokra',
+    'Deposit for the house': 'Foglaló a szállásra',
   },
 };
 
@@ -66,6 +70,13 @@ export function localizeDemoStory(story: DemoStory, locale: Locale): DemoStory {
         ...a,
         name: text(a.name),
         category: category(a.category),
+      })),
+    },
+    savings: {
+      goals: story.savings.goals.map((g) => ({ ...g, name: text(g.name) })),
+      entries: story.savings.entries.map((e) => ({
+        ...e,
+        note: e.note === null ? null : text(e.note),
       })),
     },
   };

@@ -18,6 +18,7 @@ import { syncNotifications } from '../notifications/sync';
 import { acceptInvite, createInvite } from '../invites/invites.service';
 import { confirmSuggestion, createSeries } from '../recurring/recurring.service';
 import { createRule } from '../rules/rules.service';
+import { addEntry, createGoal, pinGoal } from '../savings/savings.service';
 import { createSettlement } from '../settlements/settlements.service';
 import { createTransaction } from '../transactions/transactions.service';
 
@@ -27,8 +28,8 @@ export type DemoPeople = Record<DemoPerson, string>;
 /**
  * Turns a demo story into a real household, only through the services the routes use: the
  * partner joins with an invite, bank history arrives as monthly imports of the story's
- * exports (read by `parseStatement`, like the import page does), the rest is entered by
- * hand. Splits, the deferred split-sum check, audit entries, fingerprints and balances
+ * exports (read by `parseStatement`, like the import page does), the rest (also the savings
+ * goals and what went into them) is entered by hand. Splits, the deferred split-sum check, audit entries, fingerprints and balances
  * therefore hold exactly as for real users. Each call is its own database transaction;
  * the caller deletes the sandbox if one fails.
  */
@@ -158,6 +159,30 @@ export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<st
         settledOn: settlement.settledOn,
         note: settlement.note,
       }),
+    );
+  }
+
+  // Savings: each goal by its maker, then every entry in date order (so a withdrawal finds
+  // the money there), then the pins.
+  const goalIds = new Map<string, string>();
+  for (const goal of story.savings.goals) {
+    const created = await createGoal(scopeOf(goal.person), {
+      name: goal.name,
+      targetAmount: goal.targetAmount,
+      targetDate: goal.targetDate,
+      visibility: goal.visibility,
+    });
+    goalIds.set(goal.id, created.id);
+    for (const person of goal.pinnedBy) {
+      await pinGoal({ ...scopeOf(person), goalId: created.id });
+    }
+  }
+  for (const entry of story.savings.entries) {
+    const goalId = goalIds.get(entry.goal);
+    if (!goalId) throw new Error(`Demo story names an unknown savings goal "${entry.goal}"`);
+    await addEntry(
+      { ...scopeOf(entry.person), goalId },
+      { amount: entry.amount, entryOn: entry.entryOn, note: entry.note },
     );
   }
 
