@@ -269,9 +269,9 @@ function OverviewSkeleton() {
       <PageHeader title={greeting(new Date().getHours(), user?.displayName ?? '')} />
       <div className="flex flex-col gap-4">
         <Card>
-          <CardContent>
+          <CardContent className="@container">
             <SkeletonLine className="w-32" />
-            <div className="mt-1 grid gap-x-10 gap-y-4 md:grid-cols-[auto_minmax(0,1fr)]">
+            <div className="mt-1 grid gap-x-10 gap-y-4 @4xl:grid-cols-[minmax(0,max-content)_minmax(16rem,1fr)]">
               <div>
                 <SkeletonLine line="h-10 md:h-12" className="w-48" />
                 <SkeletonLine className="mt-1 w-64 max-w-full" />
@@ -280,7 +280,7 @@ function OverviewSkeleton() {
                   <Skeleton className="h-7 w-24 rounded-full" />
                 </div>
               </div>
-              <Skeleton className="h-32 w-full rounded-md md:h-full" />
+              <Skeleton className="h-32 w-full rounded-md @4xl:h-full" />
             </div>
             <div className="mt-4 border-t pt-3">
               <SkeletonLine className="w-44" />

@@ -123,12 +123,14 @@ export function LeftThisMonthCard({
       role="region"
       aria-labelledby={headingId}
       className={cn(
-        // The page's one accent surface; muted text needs a darker grey on the tint.
-        '[--muted-foreground:var(--tint-muted-foreground)]',
+        // The page's one accent surface; muted text needs a darker grey on the tint. Not
+        // clipped, so a day's label can rise above the card over a tall bar.
+        '[--muted-foreground:var(--tint-muted-foreground)] overflow-visible',
         over ? 'bg-negative-tint ring-negative/15' : 'bg-positive-tint ring-positive/15',
       )}
     >
-      <CardContent>
+      {/* Side by side only when the hero itself is wide enough (the sidebar takes its share). */}
+      <CardContent className="@container">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id={headingId} className="text-muted-foreground text-sm">
             {over ? t('left.overTitle') : t('left.title')}
@@ -142,7 +144,7 @@ export function LeftThisMonthCard({
             {t('left.month')}
           </Link>
         </div>
-        <div className="mt-1 grid gap-x-10 gap-y-4 md:grid-cols-[auto_minmax(0,1fr)]">
+        <div className="mt-1 grid gap-x-10 gap-y-4 @4xl:grid-cols-[minmax(0,max-content)_minmax(16rem,1fr)]">
           <div className="min-w-0">
             <p
               className={cn(
@@ -171,12 +173,12 @@ export function LeftThisMonthCard({
                 ))}
             </ul>
           </div>
-          {/* The number takes what it needs; the month gets the rest of the width and its height. */}
+          {/* The number takes what it needs (chips wrap first); the month gets the rest, 16rem at least. */}
           <DayBars
             calendar={calendar}
             setAsideByDay={setAsideByDay}
             over={over}
-            className="md:h-full"
+            className="@4xl:h-full"
           />
         </div>
 
