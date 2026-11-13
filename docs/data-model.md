@@ -279,16 +279,16 @@ One item in one person's bell. Only ids and numbers: names come from the current
 
 One bank export imported by one person. The file itself is never uploaded: the browser parses it and sends normalized rows.
 
-| Column       | Type                  | Notes                                                                       |
-| ------------ | --------------------- | --------------------------------------------------------------------------- |
-| id           | uuid PK               | uuidv7                                                                      |
-| household_id | uuid                  | `(household_id, id)` unique: target of the transactions' composite FK       |
-| created_by   | uuid                  | Composite FK -> members                                                     |
-| source       | enum `import_source`  | `revolut`, `kh` (`STATEMENT_SOURCES`)                                       |
-| file_name    | text, nullable        | Up to 200 characters, for the import history                                |
-| row_count    | integer               | Transactions created (rows the person already had are skipped, not counted) |
-| undone_at    | timestamptz, nullable | Undo soft deletes the import's live transactions with this same timestamp   |
-| created_at   | timestamptz           | Indexed with `(household_id, created_by)` for "my imports"                  |
+| Column       | Type                  | Notes                                                                                                                    |
+| ------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| id           | uuid PK               | uuidv7                                                                                                                   |
+| household_id | uuid                  | `(household_id, id)` unique: target of the transactions' composite FK                                                    |
+| created_by   | uuid                  | Composite FK -> members                                                                                                  |
+| source       | enum `import_source`  | `revolut`, `kh` (`STATEMENT_SOURCES`)                                                                                    |
+| file_name    | text, nullable        | Up to 200 characters, for the import history                                                                             |
+| row_count    | integer               | Transactions created (rows the person already had are skipped, not counted); savings entries are counted from their rows |
+| undone_at    | timestamptz, nullable | Undo soft deletes the import's live transactions and savings entries with this same timestamp                            |
+| created_at   | timestamptz           | Indexed with `(household_id, created_by)` for "my imports"                                                               |
 
 - Imports are personal bank data: only the importer lists or undoes them. The transactions they create follow the normal rules (private ones stay private).
 - A transaction deleted at exactly `undone_at` was removed by the undo; one deleted earlier was the person's own choice. The duplicate check tells the two apart (`undone` vs `deleted`).
@@ -349,22 +349,43 @@ Something a household or one person saves for. The app moves no money: a goal is
 
 Money a member put into a goal (positive) or took out of it (negative). Not a transaction: it never counts as spending and creates no debt between members.
 
-| Column                 | Type                  | Notes                                                                           |
-| ---------------------- | --------------------- | ------------------------------------------------------------------------------- |
-| id                     | uuid PK               | uuidv7                                                                          |
-| household_id           | uuid                  | Part of both composite FKs                                                      |
-| goal_id                | uuid                  | Composite FK `(household_id, goal_id)` -> savings_goals                         |
-| user_id                | uuid                  | Who put it in or took it out. Composite FK `(household_id, user_id)` -> members |
-| amount                 | bigint                | Signed minor units, not 0, within +-10^12 (`savings_entries_amount_range`)      |
-| entry_on               | date                  | The day the money moved                                                         |
-| note                   | text, nullable        | Up to 200 characters                                                            |
-| deleted_at             | timestamptz, nullable | Soft delete, by its author                                                      |
-| created_at, updated_at | timestamptz           |                                                                                 |
+| Column                 | Type                  | Notes                                                                                               |
+| ---------------------- | --------------------- | --------------------------------------------------------------------------------------------------- |
+| id                     | uuid PK               | uuidv7                                                                                              |
+| household_id           | uuid                  | Part of both composite FKs                                                                          |
+| goal_id                | uuid                  | Composite FK `(household_id, goal_id)` -> savings_goals                                             |
+| user_id                | uuid                  | Who put it in or took it out. Composite FK `(household_id, user_id)` -> members                     |
+| amount                 | bigint                | Signed minor units, not 0, within +-10^12 (`savings_entries_amount_range`)                          |
+| entry_on               | date                  | The day the money moved                                                                             |
+| note                   | text, nullable        | Up to 200 characters                                                                                |
+| import_batch_id        | uuid, nullable        | Composite FK `(household_id, import_batch_id)` -> import_batches                                    |
+| import_fingerprint     | text, nullable        | The bank row it came from; set exactly with `import_batch_id` (`savings_entries_import_consistent`) |
+| deleted_at             | timestamptz, nullable | Soft delete, by its author, or by undoing its import                                                |
+| created_at, updated_at | timestamptz           |                                                                                                     |
 
 - Never edited: a wrong entry is deleted and recorded again.
 - A goal's balance never goes below zero. A CHECK cannot see other rows, so the service locks the goal row before a withdrawal or the removal of a deposit.
 - Partial indexes (`WHERE deleted_at IS NULL`): `savings_entries_goal_entry_idx` on `(goal_id, entry_on DESC, id DESC)` for a goal's history and balance, `savings_entries_user_entry_idx` on `(household_id, user_id, entry_on)` for what one person set aside in a month.
+- Partial unique index `savings_entries_import_fingerprint_unique` on `(household_id, user_id, import_fingerprint) WHERE import_fingerprint IS NOT NULL AND deleted_at IS NULL`: like transactions', a bank row is imported once per person, and an undone import can come back. A row is either a transaction or an entry; the import service keeps it so, since no index spans both tables (architecture hard part 38).
 - Not in the `analytics` views (names and notes are free text, and private goals would need stubs).
+
+### `savings_rules`
+
+"A bank row whose merchant or description contains this text moved money to or from this goal", per person: the import review pre-fills the goal from it.
+
+| Column                 | Type        | Notes                                                               |
+| ---------------------- | ----------- | ------------------------------------------------------------------- |
+| id                     | uuid PK     | uuidv7; the oldest matching rule wins                               |
+| household_id           | uuid        | Part of both composite FKs                                          |
+| user_id                | uuid        | Whose rule it is. Composite FK `(household_id, user_id)` -> members |
+| goal_id                | uuid        | Composite FK `(household_id, goal_id)` -> savings_goals             |
+| pattern                | text        | As typed, 2-60 characters (`savings_rules_pattern_length`)          |
+| pattern_key            | text        | `matchKey(pattern)`: accents and case dropped, spaces collapsed     |
+| created_at, updated_at | timestamptz |                                                                     |
+
+- Unique `(household_id, user_id, pattern_key)` (`savings_rules_user_pattern_unique`).
+- Per person, not per household like `category_rules`: a pocket is one person's account, and the goal may be their private one. Only its author reads or changes it; the service checks that the goal is open and one they can see when a rule is made or moved (a CHECK cannot). A rule on a goal closed later stays; the review skips it.
+- Settings, not money records: deleting one removes the row. Account deletion deletes the person's rules.
 
 ### `savings_goal_pins`
 

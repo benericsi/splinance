@@ -36,9 +36,10 @@ export const goalNotFound = () =>
 export const entryNotFound = () =>
   new HttpError(404, 'Savings entry not found', 'SAVINGS_ENTRY_NOT_FOUND');
 
-const goalArchived = () => new HttpError(409, 'This goal is closed', 'SAVINGS_GOAL_ARCHIVED');
+export const goalArchived = () =>
+  new HttpError(409, 'This goal is closed', 'SAVINGS_GOAL_ARCHIVED');
 
-const insufficientSavings = () =>
+export const insufficientSavings = () =>
   new HttpError(409, 'The goal does not hold that much', 'INSUFFICIENT_SAVINGS');
 
 const pinLimit = () =>
@@ -50,7 +51,7 @@ const notYourGoal = () =>
 const notYourEntry = () =>
   new HttpError(403, 'Only the person who recorded this can remove it', 'FORBIDDEN');
 
-interface HouseholdScope {
+export interface HouseholdScope {
   userId: string;
   householdId: string;
 }
@@ -68,7 +69,7 @@ export interface EntryScope extends GoalScope {
  * ones only for the person who made them. Every read and write of a goal goes through it,
  * so a private goal is a 404 for everyone else, owners included.
  */
-const goalVisibleTo = (userId: string) =>
+export const goalVisibleTo = (userId: string) =>
   or(eq(savingsGoals.visibility, 'shared'), eq(savingsGoals.createdBy, userId));
 
 const liveEntry = isNull(savingsEntries.deletedAt);
@@ -355,12 +356,51 @@ export async function listEntries(
 }
 
 /** What the goal holds. Call it with the goal row locked, so it cannot change underneath. */
-async function balanceOf(tx: Db, goalId: string): Promise<number> {
+export async function balanceOf(tx: Db, goalId: string): Promise<number> {
   const [sum] = await tx
     .select({ amount: entrySum })
     .from(savingsEntries)
     .where(and(eq(savingsEntries.goalId, goalId), liveEntry));
   return sum?.amount ?? 0;
+}
+
+/** Where an entry came from when a bank row made it. */
+export interface EntryOrigin {
+  importBatchId: string;
+  importFingerprint: string;
+}
+
+/**
+ * Records an entry of the caller in a goal they can see, which the caller has locked
+ * (`findGoal` with `lock`, or `lockGoals`): refused on a closed goal, and for a withdrawal
+ * the goal does not hold.
+ */
+export async function insertEntry(
+  tx: Db,
+  scope: HouseholdScope,
+  goal: SavingsGoalRow,
+  input: SavingsEntryInput,
+  origin?: EntryOrigin,
+): Promise<SavingsEntryRow> {
+  if (goal.archivedAt) throw goalArchived();
+  if (input.amount < 0 && (await balanceOf(tx, goal.id)) + input.amount < 0) {
+    throw insufficientSavings();
+  }
+  const [row] = await tx
+    .insert(savingsEntries)
+    .values({
+      householdId: scope.householdId,
+      goalId: goal.id,
+      userId: scope.userId,
+      amount: input.amount,
+      entryOn: input.entryOn,
+      note: input.note || null,
+      importBatchId: origin?.importBatchId ?? null,
+      importFingerprint: origin?.importFingerprint ?? null,
+    })
+    .returning();
+  if (!row) throw new Error('Savings entry insert returned no row');
+  return row;
 }
 
 /**
@@ -374,28 +414,82 @@ export async function addEntry(
 ): Promise<{ entry: SavingsEntry; goal: SavingsGoal }> {
   return inWriteTransaction(scope, async (tx) => {
     const goal = await findGoal(tx, scope, { lock: true });
-    if (goal.archivedAt) throw goalArchived();
-    if (input.amount < 0 && (await balanceOf(tx, goal.id)) + input.amount < 0) {
-      throw insufficientSavings();
-    }
-
-    const [row] = await tx
-      .insert(savingsEntries)
-      .values({
-        householdId: scope.householdId,
-        goalId: goal.id,
-        userId: scope.userId,
-        amount: input.amount,
-        entryOn: input.entryOn,
-        note: input.note || null,
-      })
-      .returning();
-    if (!row) throw new Error('Savings entry insert returned no row');
-
+    const row = await insertEntry(tx, scope, goal, input);
     const [entry] = await toEntries(tx, [row]);
     if (!entry) throw new Error('toEntries returned nothing');
     return { entry, goal: await toGoal(tx, goal, scope.userId) };
   });
+}
+
+/**
+ * Locks the goals the caller can see among `goalIds`, in id order (the one lock order, so
+ * two writers over the same goals cannot deadlock), and returns them by id. Ids of goals
+ * that do not exist or that the caller cannot see are missing from the map.
+ */
+export async function lockGoals(
+  tx: Db,
+  scope: HouseholdScope,
+  goalIds: readonly string[],
+): Promise<Map<string, SavingsGoalRow>> {
+  if (goalIds.length === 0) return new Map();
+  const rows = await tx
+    .select()
+    .from(savingsGoals)
+    .where(
+      and(
+        inArray(savingsGoals.id, [...new Set(goalIds)]),
+        eq(savingsGoals.householdId, scope.householdId),
+        goalVisibleTo(scope.userId),
+      ),
+    )
+    .orderBy(savingsGoals.id)
+    .for('update');
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
+/**
+ * Soft deletes the import's live entries with the undo's timestamp. Removing what a bank
+ * row put in is a withdrawal in effect: refused when it would take a goal below zero
+ * (later withdrawals used the money). Closed goals are corrected too: the import was the
+ * mistake, not the entry. Returns how many entries went.
+ */
+export async function undoImportedEntries(
+  tx: Db,
+  scope: HouseholdScope,
+  importBatchId: string,
+  at: Date,
+): Promise<number> {
+  const rows = await tx
+    .select({ goalId: savingsEntries.goalId, amount: savingsEntries.amount })
+    .from(savingsEntries)
+    .where(
+      and(
+        eq(savingsEntries.householdId, scope.householdId),
+        eq(savingsEntries.importBatchId, importBatchId),
+        liveEntry,
+      ),
+    );
+  if (rows.length === 0) return 0;
+
+  const net = new Map<string, number>();
+  for (const row of rows) net.set(row.goalId, (net.get(row.goalId) ?? 0) + row.amount);
+  // Every goal, also one the caller could no longer see (they can: entries are in goals
+  // they could see, and visibility never changes), in id order.
+  await tx
+    .select({ id: savingsGoals.id })
+    .from(savingsGoals)
+    .where(inArray(savingsGoals.id, [...net.keys()]))
+    .orderBy(savingsGoals.id)
+    .for('update');
+  for (const [goalId, amount] of net) {
+    if (amount > 0 && (await balanceOf(tx, goalId)) - amount < 0) throw insufficientSavings();
+  }
+
+  await tx
+    .update(savingsEntries)
+    .set({ deletedAt: at })
+    .where(and(eq(savingsEntries.importBatchId, importBatchId), liveEntry));
+  return rows.length;
 }
 
 /**

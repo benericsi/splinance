@@ -275,6 +275,7 @@ describe('POST /imports/check', () => {
       id: groceries.id,
       description: 'Groceries',
       occurredOn: '2026-08-31',
+      goalId: null,
     });
   });
 

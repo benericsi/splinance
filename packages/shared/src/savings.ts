@@ -3,6 +3,7 @@ import { settlementNoteSchema } from './balances';
 import { currencySchema } from './households';
 import { msg } from './i18n/validation';
 import { amountMinorSchema, MAX_AMOUNT_MINOR } from './money';
+import { matchKey, rulePatternSchema, type RuleSubject } from './rules';
 import {
   monthSchema,
   occurredOnSchema,
@@ -154,3 +155,51 @@ export const savingsEntryListResponseSchema = z.object({
 });
 
 export type SavingsEntryListResponse = z.infer<typeof savingsEntryListResponseSchema>;
+
+/**
+ * "A bank row whose merchant or description contains `pattern` moved money to or from this
+ * goal": the import review pre-fills the goal from it. Each person has their own (a pocket
+ * is one person's account, and the goal may be their private one).
+ */
+export const savingsRuleInputSchema = z.object({
+  pattern: rulePatternSchema,
+  goalId: z.uuid(),
+});
+
+export type SavingsRuleInput = z.infer<typeof savingsRuleInputSchema>;
+
+export const updateSavingsRuleInputSchema = savingsRuleInputSchema.partial();
+export type UpdateSavingsRuleInput = z.infer<typeof updateSavingsRuleInputSchema>;
+
+export const savingsRuleSchema = z.object({
+  id: z.uuid(),
+  pattern: z.string(),
+  goalId: z.uuid(),
+});
+
+export type SavingsRule = z.infer<typeof savingsRuleSchema>;
+
+export const savingsRuleResponseSchema = z.object({ rule: savingsRuleSchema });
+export type SavingsRuleResponse = z.infer<typeof savingsRuleResponseSchema>;
+
+/** The caller's own rules, oldest first (the order they apply in). */
+export const savingsRuleListResponseSchema = z.object({ rules: z.array(savingsRuleSchema) });
+export type SavingsRuleListResponse = z.infer<typeof savingsRuleListResponseSchema>;
+
+/**
+ * The first rule (in the order given) whose text appears in the row's counterparty or
+ * description. Either direction matches: the same pocket takes money in and gives it back.
+ * Pass only rules whose goal is open.
+ */
+export function firstMatchingSavingsRule<T extends Pick<SavingsRule, 'pattern'>>(
+  rules: readonly T[],
+  subject: Omit<RuleSubject, 'kind'>,
+): T | undefined {
+  const texts = [subject.counterparty, subject.description]
+    .filter((text): text is string => text !== null)
+    .map(matchKey);
+  return rules.find((rule) => {
+    const needle = matchKey(rule.pattern);
+    return needle !== '' && texts.some((text) => text.includes(needle));
+  });
+}

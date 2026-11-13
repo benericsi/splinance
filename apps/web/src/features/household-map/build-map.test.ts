@@ -50,6 +50,7 @@ function batch(n: number, overrides: Partial<ImportBatch> = {}): ImportBatch {
     source: 'revolut',
     fileName: null,
     rowCount: 10,
+    savingsCount: 0,
     createdBy: anna,
     createdAt: '2026-11-08T09:00:00.000Z',
     undoneAt: null,

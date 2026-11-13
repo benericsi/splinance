@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { settlementNoteSchema } from '../balances';
 import { amountMinorSchema } from '../money';
 import {
   occurredOnSchema,
@@ -54,8 +55,18 @@ export type ImportRowStatus = z.infer<typeof importRowStatusSchema>;
 export const importCheckResultSchema = z.object({
   fingerprint: z.string(),
   status: importRowStatusSchema,
-  /** The existing transaction the status refers to, if any. */
-  match: z.object({ id: z.uuid(), description: z.string(), occurredOn: z.iso.date() }).nullable(),
+  /**
+   * What the status refers to, if anything: a transaction, or a savings entry (`goalId` set;
+   * `id` is the entry's, `description` the goal's name, `occurredOn` the entry's day).
+   */
+  match: z
+    .object({
+      id: z.uuid(),
+      description: z.string(),
+      occurredOn: z.iso.date(),
+      goalId: z.uuid().nullable(),
+    })
+    .nullable(),
 });
 
 export type ImportCheckResult = z.infer<typeof importCheckResultSchema>;
@@ -64,12 +75,41 @@ export type ImportCheckResult = z.infer<typeof importCheckResultSchema>;
 export const importCheckResponseSchema = z.object({ rows: z.array(importCheckResultSchema) });
 export type ImportCheckResponse = z.infer<typeof importCheckResponseSchema>;
 
-/** A row to create: an ordinary transaction plus where it came from. */
-export const importRowSchema = z.object({
+/** A row to create as an ordinary transaction, plus where it came from. */
+export const importTransactionRowSchema = z.object({
   fingerprint: fingerprintSchema,
   counterparty: counterpartySchema,
   transaction: transactionInputSchema,
 });
+
+export type ImportTransactionRow = z.infer<typeof importTransactionRowSchema>;
+
+/**
+ * A bank row that moved the importer's money to or from a savings goal (a pocket, a savings
+ * account). It becomes a savings entry of the importer, never a transaction. `kind` is the
+ * row's direction at the bank: money out (`expense`) went into the goal, money in
+ * (`income`) came out of it; `amount` is positive like a transaction's.
+ */
+export const importSavingsRowSchema = z.object({
+  fingerprint: fingerprintSchema,
+  savings: z.object({
+    goalId: z.uuid(),
+    kind: transactionKindSchema,
+    amount: amountMinorSchema,
+    entryOn: occurredOnSchema,
+    note: settlementNoteSchema,
+  }),
+});
+
+export type ImportSavingsRow = z.infer<typeof importSavingsRowSchema>;
+
+/** The signed savings entry amount for a bank row: out of the account is into the goal. */
+export function savingsEntryAmount({ kind, amount }: ImportSavingsRow['savings']): number {
+  return kind === 'expense' ? amount : -amount;
+}
+
+/** A row to create: a transaction or a savings entry. */
+export const importRowSchema = z.union([importTransactionRowSchema, importSavingsRowSchema]);
 
 export type ImportRow = z.infer<typeof importRowSchema>;
 
@@ -87,6 +127,8 @@ export const importBatchSchema = z.object({
   fileName: z.string().nullable(),
   /** Transactions this import created. */
   rowCount: z.number().int().nonnegative(),
+  /** Savings entries this import created (bank rows that went to or came from a goal). */
+  savingsCount: z.number().int().nonnegative(),
   createdBy: personSchema,
   createdAt: z.iso.datetime({ offset: true }),
   undoneAt: z.iso.datetime({ offset: true }).nullable(),

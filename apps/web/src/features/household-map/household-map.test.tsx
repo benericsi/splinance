@@ -52,6 +52,7 @@ const batch = (source: ImportBatch['source'], days: number): ImportBatch => ({
   source,
   fileName: null,
   rowCount: 12,
+  savingsCount: 0,
   createdBy: anna,
   createdAt: daysAgo(days),
   undoneAt: null,

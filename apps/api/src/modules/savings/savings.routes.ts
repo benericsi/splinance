@@ -12,6 +12,7 @@ import {
 import { type Request, Router } from 'express';
 import { rateLimiter } from '../../middleware/rate-limit';
 import { householdScope, idParam } from '../households/scope';
+import { createSavingsRulesRouter } from './savings-rules.routes';
 import {
   addEntry,
   archiveGoal,
@@ -37,6 +38,9 @@ export function createSavingsRouter() {
   const router = Router({ mergeParams: true });
   // Per person and 15 minutes.
   const writes = rateLimiter(60, { perUser: true });
+
+  // Before `/:goalId`, which would read "rules" as a malformed goal id.
+  router.use('/rules', createSavingsRulesRouter(writes));
 
   router.get('/', async (req, res) => {
     const scope = householdScope(req);

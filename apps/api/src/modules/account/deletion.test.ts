@@ -24,6 +24,7 @@ import {
   savingsEntries,
   savingsGoalPins,
   savingsGoals,
+  savingsRules,
   sessions,
   transactions,
   userIdentities,
@@ -175,6 +176,14 @@ async function annasWorld() {
       { goalId: goalId('Bike'), userId: ben.id, amount: 5_000 },
     ].map((entry) => ({ ...entry, householdId: home, entryOn: '2026-10-12' })),
   );
+  // Her savings rules (one on her own goal) and Ben's.
+  await db.insert(savingsRules).values(
+    [
+      { goalId: goalId('Surprise trip'), userId: anna.id, pattern: 'Trip pocket' },
+      { goalId: goalId('New sofa'), userId: anna.id, pattern: 'Sofa pocket' },
+      { goalId: goalId('New sofa'), userId: ben.id, pattern: 'Sofa pocket' },
+    ].map((rule) => ({ ...rule, householdId: home, patternKey: rule.pattern.toLowerCase() })),
+  );
   // Both keep the sofa pinned, she her own trip too.
   await db.insert(savingsGoalPins).values(
     [
@@ -195,12 +204,26 @@ async function annasWorld() {
       createdBy: anna.id,
     })
     .returning();
+  // Put in from a bank export, with a rule for the pocket: rows that point at the import.
+  const [flatImport] = await db
+    .insert(importBatches)
+    .values({ householdId: flat, createdBy: anna.id, source: 'revolut', rowCount: 0 })
+    .returning();
   await db.insert(savingsEntries).values({
     householdId: flat,
     goalId: flatGoal?.id ?? '',
     userId: anna.id,
     amount: 1_000,
     entryOn: '2026-10-12',
+    importBatchId: flatImport?.id,
+    importFingerprint: 'revolut:pocket-1',
+  });
+  await db.insert(savingsRules).values({
+    householdId: flat,
+    goalId: flatGoal?.id ?? '',
+    userId: anna.id,
+    pattern: 'Deposit pocket',
+    patternKey: 'deposit pocket',
   });
   await addTransaction(flat, anna, { visibility: 'private', description: 'Rent' });
 
@@ -355,6 +378,8 @@ describe('delete', () => {
       (await db.select().from(savingsGoals).orderBy(savingsGoals.name)).map((g) => g.name),
     ).toEqual(['Bike', 'New sofa']);
     expect(await db.select().from(savingsEntries)).toHaveLength(3);
+    // Her rules are gone (also in the flat, deleted whole), Ben's stays.
+    expect((await db.select().from(savingsRules)).map((rule) => rule.userId)).toEqual([ben.id]);
     // Her pins are gone, Ben's stays.
     expect((await db.select().from(savingsGoalPins)).map((pin) => pin.userId)).toEqual([ben.id]);
     const saved = await request(app)
