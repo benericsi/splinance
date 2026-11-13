@@ -129,10 +129,8 @@ describe('balances on the overview', () => {
     // MoneyFlow (mocked in tests) renders the digits and a screen reader copy.
     expect(screen.getAllByText(money('12 000 Ft'))[0]).toBeInTheDocument();
 
-    const rest = screen
-      .getByRole('heading', { name: 'Also in Otthon' })
-      .closest('[data-slot=card]');
-    if (!(rest instanceof HTMLElement)) throw new Error('No card');
+    // Under the big line, in the same tile.
+    const rest = screen.getByRole('region', { name: 'Also in Otthon' });
     expect(within(rest).getByText('You owe Cili')).toBeVisible();
     expect(within(rest).getByText('Cili owes Bela')).toBeVisible();
     // Only debts the viewer is part of can be settled from here.

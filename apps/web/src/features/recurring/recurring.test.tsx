@@ -20,6 +20,7 @@ import {
 } from '../../../test/utils';
 import { toIsoDate } from '../transactions/dates';
 import { seriesForRow } from './match';
+import { comingUp } from './view';
 
 const base = `/api/households/${testHousehold.id}`;
 const page = `/h/${testHousehold.id}/recurring`;
@@ -461,17 +462,45 @@ describe('overview', () => {
     fakeApi();
     renderRoute(`/h/${testHousehold.id}`);
 
-    const card = (await screen.findByText('Coming up')).closest('[data-slot="card"]');
-    if (!(card instanceof HTMLElement)) throw new Error('no card');
-    // Netflix in 3 days; the phone (20 days) and the stopped gym stay out.
-    expect(
-      within(card)
-        .getAllByRole('listitem')
-        .map((li) => li.textContent),
-    ).toEqual([expect.stringMatching(/^NetflixDue in 3 days4990\sFt$/)]);
-    expect(
-      within(card).getByRole('link', { name: /1 possible recurring payment found/ }),
-    ).toBeVisible();
+    // Netflix in 3 days, alone in the week: the phone (20 days) and the stopped gym stay out.
+    const coming = await screen.findByRole('region', { name: 'Coming up' });
+    expect(coming).toHaveTextContent(/^Coming up4990\sFtNetflixDue in 3 days$/);
+    expect(within(coming).getByRole('link', { name: 'All recurring' })).toHaveAttribute(
+      'href',
+      `/h/${testHousehold.id}/recurring`,
+    );
+
+    const review = screen.getByRole('region', { name: 'To review' });
+    expect(review).toHaveTextContent(/^To review1possible recurring payment$/);
+    expect(within(review).getByRole('link', { name: 'Review the suggestions' })).toHaveAttribute(
+      'href',
+      `/h/${testHousehold.id}/recurring`,
+    );
+  });
+});
+
+describe('coming up', () => {
+  it('takes the soonest within the week, late ones first, and counts the rest', () => {
+    const today = '2026-11-13';
+    const netflix = series({ anchorOn: '2026-10-16', lastPaidOn: '2026-10-16' });
+    const gym = series({
+      id: '01a12509-0f61-75bc-b406-1301087805a2',
+      name: 'Gym',
+      anchorOn: '2026-10-11',
+      lastPaidOn: '2026-10-11',
+    });
+    const phone = series({
+      id: '01a12509-0f61-75bc-b406-1301087805a3',
+      name: 'Phone',
+      anchorOn: '2026-10-30',
+      lastPaidOn: '2026-10-30',
+    });
+    const { next, more } = comingUp([netflix, gym, phone], today, 2);
+    // The gym is two days late; Netflix is in three; the phone is weeks away.
+    expect(next?.series.name).toBe('Gym');
+    expect(next?.daysUntil).toBe(-2);
+    expect(more).toBe(1);
+    expect(comingUp([phone], today, 2)).toEqual({ next: null, more: 0 });
   });
 });
 

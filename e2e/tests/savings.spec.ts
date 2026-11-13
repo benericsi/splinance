@@ -123,12 +123,8 @@ test('a couple saves for a goal, and what is set aside leaves the month', async 
   await expect(left.getByRole('listitem').filter({ hasText: 'Set aside' })).toContainText(
     money('160 000 Ft'),
   );
-  await expect(left.getByRole('listitem').filter({ hasText: 'Left' })).toContainText(
-    money('490 000 Ft'),
-  );
-  const card = page.locator('[data-slot=card]').filter({
-    has: page.getByRole('heading', { name: 'Savings' }),
-  });
+  await expect(left).toContainText(money('490 000 Ft'));
+  const card = page.getByRole('region', { name: 'Savings' });
   await expect(card.getByRole('link', { name: 'Surprise for Ben' })).toBeVisible();
   // Saving is no debt: the two are still square.
   await expect(page.getByRole('region', { name: 'Balance' })).toContainText("You're all square");
@@ -149,9 +145,7 @@ test('a couple saves for a goal, and what is set aside leaves the month', async 
   await expect(left.getByRole('listitem').filter({ hasText: 'Set aside' })).toContainText(
     money('100 000 Ft'),
   );
-  await expect(left.getByRole('listitem').filter({ hasText: 'Left' })).toContainText(
-    money('550 000 Ft'),
-  );
+  await expect(left).toContainText(money('550 000 Ft'));
 
   await partnerContext.close();
 });

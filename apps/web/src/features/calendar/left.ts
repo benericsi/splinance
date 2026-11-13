@@ -90,33 +90,37 @@ function daysLeftIn(month: string, today: string, daysInMonth: number): number {
   return Math.max(1, daysInMonth - Number(today.slice(8)) + 1);
 }
 
-/** One slice of the bar: its share is its amount against the others'. */
-export interface LeftSegment {
-  key: 'spent' | 'toCome' | 'setAside' | 'left' | 'covered' | 'over';
-  amount: number;
+/** One day of the month under the hero's number. */
+export interface DayBar {
+  date: string;
+  when: 'past' | 'today' | 'future';
+  /**
+   * The viewer's spending that day against the month's busiest day so far, 0 to 1, by
+   * square root (like the calendar's tint) so the rent does not flatten every other day.
+   * Always 0 ahead of today.
+   */
+  level: number;
 }
 
 /**
- * The bar under the number. Within income it is the income (plus what came back out of
- * savings), split into spent, still to come, set aside and left. Over it, the bar turns into everything going out, split into what the
- * income covers and what it does not (three slices cannot add up to more than the whole).
- * Empty slices are left out.
+ * The viewer's share spent per day of the month (`yourExpenses`), for the bars under the
+ * hero's number: past days filled, today marked, days ahead as stubs. A month before the
+ * browser's is all past, one after it all ahead.
  */
-export function leftSegments(month: LeftThisMonth): LeftSegment[] {
-  const segments: LeftSegment[] =
-    month.left >= 0
-      ? [
-          { key: 'spent', amount: month.spent },
-          { key: 'toCome', amount: month.toCome },
-          { key: 'setAside', amount: Math.max(0, month.setAside) },
-          { key: 'left', amount: month.left },
-        ]
-      : [
-          {
-            key: 'covered',
-            amount: month.received + month.expectedIncome + Math.max(0, -month.setAside),
-          },
-          { key: 'over', amount: -month.left },
-        ];
-  return segments.filter((segment) => segment.amount > 0);
+export function dayBars(calendar: Calendar): DayBar[] {
+  const { today } = calendar;
+  const when = (date: string): DayBar['when'] =>
+    date < today ? 'past' : date === today ? 'today' : 'future';
+  const max = Math.max(
+    0,
+    ...calendar.days.filter((day) => day.date <= today).map((day) => day.yourExpenses),
+  );
+  return calendar.days.map((day) => {
+    const state = when(day.date);
+    return {
+      date: day.date,
+      when: state,
+      level: state === 'future' || max === 0 ? 0 : Math.sqrt(day.yourExpenses / max),
+    };
+  });
 }

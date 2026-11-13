@@ -21,6 +21,8 @@ import {
   goalPace,
   goalProgress,
   memberFills,
+  overviewGoals,
+  ringFraction,
   savingsTotals,
 } from './view';
 
@@ -298,6 +300,23 @@ describe('arranging goals', () => {
     // No dates: 57% beats 10%.
     const laptop = goal('Laptop', { balance: 60_000 });
     expect(arrangeGoals([laptop, fund]).featured).toEqual([fund]);
+  });
+
+  it('gives the overview the featured goals, else any open one, two at most', () => {
+    const one = { ...pot, pinned: true };
+    const two = { ...trip, pinned: true };
+    const three = { ...fund, pinned: true };
+    expect(overviewGoals([one, two, three, old])).toEqual([one, two]);
+    expect(overviewGoals([fund, pot, trip, old])).toEqual([trip]);
+    expect(overviewGoals([pot, old])).toEqual([pot]);
+    expect(overviewGoals([old])).toEqual([]);
+  });
+
+  it('fills a ring by the balance against the target, none without a target', () => {
+    expect(ringFraction({ balance: 150_000, targetAmount: 600_000 })).toBe(0.25);
+    expect(ringFraction({ balance: 700_000, targetAmount: 600_000 })).toBe(1);
+    expect(ringFraction({ balance: 0, targetAmount: 600_000 })).toBe(0);
+    expect(ringFraction({ balance: 90_000, targetAmount: null })).toBeNull();
   });
 
   it('features nothing when no open goal has a target left to reach', () => {

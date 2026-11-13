@@ -5,7 +5,7 @@ import { AnimatePresence, m } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TileBox } from '@/components/tile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,57 +60,52 @@ export function SettlementList({
     [settlement.from.userId, settlement.to.userId, settlement.createdBy.userId].includes(viewerId);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t('settlements.title')}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ul>
-          <AnimatePresence initial={false}>
-            {settlements.map((settlement) => (
-              // A divider between rows, not under the last one.
-              <m.li key={settlement.id} {...COLLAPSE} className="not-last:border-b">
-                <div className="flex min-h-12 items-center gap-3 py-2">
-                  <ArrowLeftRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate">
-                      {describePayment(settlement.from, settlement.to, viewerId)}
-                    </p>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {formatDayHeading(settlement.settledOn)}
-                      {settlement.note ? ` · ${settlement.note}` : ''}
-                    </p>
-                  </div>
-                  <span className="font-medium tabular-nums">
-                    <Amount minor={settlement.amount} currency={settlement.currency} />
-                  </span>
-                  {mayDelete(settlement) ? (
-                    <SettlementActions
-                      onDelete={() => {
-                        deleteSettlement(settlement);
-                      }}
-                    />
-                  ) : (
-                    <span className="size-8 shrink-0" aria-hidden />
-                  )}
+    <TileBox title={t('settlements.title')}>
+      <ul>
+        <AnimatePresence initial={false}>
+          {settlements.map((settlement) => (
+            // A divider between rows, not under the last one.
+            <m.li key={settlement.id} {...COLLAPSE} className="not-last:border-b">
+              <div className="flex min-h-12 items-center gap-3 py-2">
+                <ArrowLeftRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate">
+                    {describePayment(settlement.from, settlement.to, viewerId)}
+                  </p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {formatDayHeading(settlement.settledOn)}
+                    {settlement.note ? ` · ${settlement.note}` : ''}
+                  </p>
                 </div>
-              </m.li>
-            ))}
-          </AnimatePresence>
-        </ul>
-        {list.hasNextPage && (
-          <div className="mt-4 flex justify-center">
-            <Button
-              variant="outline"
-              disabled={list.isFetchingNextPage}
-              onClick={() => void list.fetchNextPage()}
-            >
-              {list.isFetchingNextPage ? t('common:loading') : t('common:loadMore')}
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                <span className="font-medium tabular-nums">
+                  <Amount minor={settlement.amount} currency={settlement.currency} />
+                </span>
+                {mayDelete(settlement) ? (
+                  <SettlementActions
+                    onDelete={() => {
+                      deleteSettlement(settlement);
+                    }}
+                  />
+                ) : (
+                  <span className="size-8 shrink-0" aria-hidden />
+                )}
+              </div>
+            </m.li>
+          ))}
+        </AnimatePresence>
+      </ul>
+      {list.hasNextPage && (
+        <div className="mt-4 flex justify-center">
+          <Button
+            variant="outline"
+            disabled={list.isFetchingNextPage}
+            onClick={() => void list.fetchNextPage()}
+          >
+            {list.isFetchingNextPage ? t('common:loading') : t('common:loadMore')}
+          </Button>
+        </div>
+      )}
+    </TileBox>
   );
 }
 

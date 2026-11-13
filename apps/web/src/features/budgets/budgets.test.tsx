@@ -7,7 +7,7 @@ import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
 import { authResponse, householdDetail, testHousehold } from '../../../test/utils';
 import { currentMonth } from '../transactions/dates';
-import { budgetNote, budgetStatus } from './status';
+import { budgetNote, budgetStatus, gaugeBudgets } from './status';
 
 const category = (id: string, name: string, overrides: Partial<Category> = {}): Category => ({
   id,
@@ -73,6 +73,17 @@ describe('budget status', () => {
     expect(plain(budgetNote({ amount: 80_000, spent: 62_400 }, 'HUF'))).toBe('17 600 Ft left');
     expect(plain(budgetNote({ amount: 30_000, spent: 27_000 }, 'HUF'))).toBe('3000 Ft left · 90%');
     expect(plain(budgetNote({ amount: 25_000, spent: 29_000 }, 'HUF'))).toBe('Over by 4000 Ft');
+  });
+
+  it('gauges the budgets from 80%, worst first, two of them and the rest counted', () => {
+    const [groceries, eatingOut, transport] = october as [Budget, Budget, Budget];
+    expect(gaugeBudgets(october)).toEqual({ shown: [transport, eatingOut], more: 0 });
+    const nearToo = { ...groceries, spent: 70_000 };
+    expect(gaugeBudgets([nearToo, eatingOut, transport])).toEqual({
+      shown: [transport, eatingOut],
+      more: 1,
+    });
+    expect(gaugeBudgets([groceries])).toEqual({ shown: [], more: 0 });
   });
 });
 
@@ -184,7 +195,7 @@ describe('budgets page', () => {
 });
 
 describe('budgets on the overview', () => {
-  it('lists only the budgets near or over their limit, most used first', async () => {
+  it('draws a gauge for each budget near or over its limit, most used first', async () => {
     const month = currentMonth();
     fakeApi();
     // The overview asks for the current month; answer it with October's numbers.
@@ -205,8 +216,9 @@ describe('budgets on the overview', () => {
           .getAllByRole('listitem')
           .map((item) => item.textContent),
       ).toEqual([
-        expect.stringMatching(/^Transport.*Over by/),
-        expect.stringMatching(/^Eating out.*90%/),
+        // The gauge's percent (decoration), the category and the note in words.
+        expect.stringMatching(/^\d{3}%Transport.*Over by/),
+        expect.stringMatching(/^90%Eating out.*90%/),
       ]);
     });
     expect(within(card).getByRole('link', { name: 'All budgets' })).toBeVisible();

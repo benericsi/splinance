@@ -165,3 +165,21 @@ export function savingsTotals(goals: readonly SavingsGoal[], viewerId: string) {
     ),
   };
 }
+
+/** The overview's savings tile has room for this many rings. */
+export const MAX_RINGS = 2;
+
+/**
+ * The goals the overview shows: the ones the savings page leads with (the viewer's pins,
+ * else the goal picked for them), else any open goal; at most `MAX_RINGS`.
+ */
+export function overviewGoals(goals: readonly SavingsGoal[]): SavingsGoal[] {
+  const { featured, rest } = arrangeGoals(goals);
+  return (featured.length > 0 ? featured : rest).slice(0, MAX_RINGS);
+}
+
+/** How full a goal's ring is: its balance against the target, 0 to 1; null without a target. */
+export function ringFraction({ balance, targetAmount }: GoalMoney): number | null {
+  if (targetAmount === null) return null;
+  return Math.min(1, Math.max(0, balance / targetAmount));
+}

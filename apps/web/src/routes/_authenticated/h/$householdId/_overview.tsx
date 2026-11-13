@@ -7,14 +7,15 @@ import { PageHeader } from '@/components/page-header';
 import { PageTitle } from '@/components/page-title';
 import { PageSkeleton, Reveal, RevealPage } from '@/components/reveal';
 import { SegmentedControl } from '@/components/segmented-control';
-import { SkeletonCard, SkeletonLine, SkeletonRow } from '@/components/skeletons';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { OverviewRow, Tile, TileBox } from '@/components/tile';
+import { SkeletonLine } from '@/components/skeletons';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UserAvatar } from '@/components/user-avatar';
 import { BalanceOverview } from '@/features/balances/components/balance-overview';
 import { SettlementList } from '@/features/balances/components/settlement-list';
 import { balanceQueries } from '@/features/balances/queries';
-import { BudgetAlertsCard } from '@/features/budgets/components/budget-alerts-card';
+import { BudgetGaugesTile } from '@/features/budgets/components/budget-gauges-tile';
 import { currentPreferences, unlessDefault, usePreferences } from '@/features/account/preferences';
 import { budgetQueries } from '@/features/budgets/queries';
 import { LeftThisMonthCard } from '@/features/calendar/components/left-this-month-card';
@@ -24,9 +25,9 @@ import { MapAddMenu } from '@/features/household-map/components/map-add-menu';
 import { MapSkeleton, OverviewMap } from '@/features/household-map/components/overview-map';
 import { householdQueries } from '@/features/households/queries';
 import { importQueries } from '@/features/imports/queries';
-import { UpcomingCard } from '@/features/recurring/components/upcoming-card';
+import { ComingUpTile, ToReviewTile } from '@/features/recurring/components/coming-up-tile';
 import { recurringQueries } from '@/features/recurring/queries';
-import { SavingsCard } from '@/features/savings/components/savings-card';
+import { SavingsTile } from '@/features/savings/components/savings-tile';
 import { savingsQueries } from '@/features/savings/queries';
 import { currentMonth } from '@/features/transactions/dates';
 import { i18n } from '@/i18n';
@@ -46,7 +47,8 @@ const MAP_QUERY = '(min-width: 768px)';
 const mapShows = (view: OverviewView, wide: boolean) => view === 'map' && wide;
 
 /**
- * The household overview: balances first, then recent settlements and the members, or all
+ * The household overview: a bento grid with what is left of the month on top, then the
+ * balance and what is coming up, budgets and savings, settlements and the members; or all
  * of it as a map. A pathless layout, so the settle up dialog can be a child route over it
  * (/h/:id/settle).
  */
@@ -140,52 +142,57 @@ function OverviewPage() {
           recurring={recurring}
         />
       ) : (
-        <div className="space-y-6">
+        // The bento grid: rows of tiles weighted out of four columns (`components/tile.tsx`).
+        <div className="flex flex-col gap-4">
           <Reveal index={0}>
-            <BalanceOverview household={household} balances={balances} viewerId={viewerId} />
-          </Reveal>
-          <Reveal index={1}>
             <LeftThisMonth
               householdId={householdId}
               tracksIncome={recurring.series.some((series) => series.kind === 'income')}
             />
           </Reveal>
-          <Reveal index={2}>
-            <SavingsGoals householdId={householdId} viewerId={viewerId} />
-          </Reveal>
-          <Reveal index={3}>
-            <BudgetAlertsCard householdId={householdId} data={budgets} categories={categories} />
-          </Reveal>
-          <Reveal index={4}>
-            <UpcomingCard
-              householdId={householdId}
-              data={recurring}
-              memberCount={household.members.length}
-            />
-          </Reveal>
-          <Reveal index={5}>
-            <SettlementList household={household} viewerId={viewerId} />
-          </Reveal>
-          <Reveal index={6}>
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('overview.members')}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="flex flex-wrap gap-4">
+          <OverviewRow>
+            <Tile weight={2} index={1}>
+              <BalanceOverview household={household} balances={balances} viewerId={viewerId} />
+            </Tile>
+            <Tile weight={1} index={2}>
+              <ComingUpTile
+                householdId={householdId}
+                data={recurring}
+                memberCount={household.members.length}
+              />
+            </Tile>
+            <Tile weight={1} index={3}>
+              <ToReviewTile householdId={householdId} data={recurring} />
+            </Tile>
+          </OverviewRow>
+          <OverviewRow>
+            <Tile weight={2} index={4}>
+              <BudgetGaugesTile householdId={householdId} data={budgets} categories={categories} />
+            </Tile>
+            <Tile weight={2} index={5}>
+              <SavingsGoals householdId={householdId} />
+            </Tile>
+          </OverviewRow>
+          <OverviewRow>
+            <Tile weight={3} index={6}>
+              <SettlementList household={household} viewerId={viewerId} />
+            </Tile>
+            <Tile weight={1} index={7} stretch={false}>
+              <TileBox title={t('overview.members')}>
+                <ul className="flex flex-wrap gap-x-4 gap-y-3">
                   {household.members.map((member) => (
-                    <li key={member.userId} className="flex items-center gap-2">
+                    <li key={member.userId} className="flex min-w-0 items-center gap-2">
                       <UserAvatar
                         user={{ id: member.userId, displayName: member.displayName }}
                         size={28}
                       />
-                      <span className="text-sm">{member.displayName}</span>
+                      <span className="truncate text-sm">{member.displayName}</span>
                     </li>
                   ))}
                 </ul>
-              </CardContent>
-            </Card>
-          </Reveal>
+              </TileBox>
+            </Tile>
+          </OverviewRow>
         </div>
       )}
 
@@ -219,15 +226,28 @@ function LeftThisMonth({
   ) : null;
 }
 
-/** The savings card, reading its goals itself for the same reason. */
-function SavingsGoals({ householdId, viewerId }: { householdId: string; viewerId: string }) {
+/** The savings tile, reading its goals itself for the same reason. */
+function SavingsGoals({ householdId }: { householdId: string }) {
   const { data: savings } = useQuery(savingsQueries.month(householdId, currentMonth()));
-  return savings ? (
-    <SavingsCard householdId={householdId} savings={savings} viewerId={viewerId} />
-  ) : null;
+  return savings ? <SavingsTile householdId={householdId} savings={savings} /> : null;
 }
 
-/** Balance card, settlements and members; the budget card only shows once it is known. */
+/** A tile's box while loading: its small title and whatever stands for its content. */
+function SkeletonTile({ children }: { children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardHeader>
+        <SkeletonLine className="w-20" />
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+/**
+ * The grid's known boxes: the hero, the balance and the members. Tiles that hide when empty
+ * (coming up, budgets, savings, settlements) only show once they are known.
+ */
 function OverviewSkeleton() {
   const { user } = useAuth();
   // Re-renders on a language switch.
@@ -246,38 +266,53 @@ function OverviewSkeleton() {
   return (
     <PageSkeleton>
       <PageHeader title={greeting(new Date().getHours(), user?.displayName ?? '')} />
-      <div className="space-y-6">
+      <div className="flex flex-col gap-4">
         <Card>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Skeleton className="size-9 rounded-full" />
-              <SkeletonLine line="h-6" className="w-40" />
+          <CardContent>
+            <SkeletonLine className="w-32" />
+            <div className="mt-1 grid gap-x-10 gap-y-4 md:grid-cols-2 md:items-end">
+              <div>
+                <SkeletonLine line="h-10 md:h-12" className="w-48" />
+                <SkeletonLine className="mt-1 w-64 max-w-full" />
+                <div className="mt-3 flex gap-2">
+                  <Skeleton className="h-7 w-28 rounded-full" />
+                  <Skeleton className="h-7 w-24 rounded-full" />
+                </div>
+              </div>
+              <Skeleton className="h-14 w-full rounded-md" />
             </div>
-            <SkeletonLine line="h-10" className="w-48" />
-            <div className="flex gap-2">
-              <Skeleton className="h-9 w-24 rounded-lg" />
-              <Skeleton className="h-9 w-28 rounded-lg" />
+            <div className="mt-4 border-t pt-3">
+              <SkeletonLine className="w-44" />
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="space-y-3">
-            <SkeletonLine line="h-5" className="w-32" />
-            <SkeletonLine line="h-10" className="w-48" />
-            <Skeleton className="h-2.5 w-full rounded-full" />
-            <SkeletonLine line="h-5" className="w-64 max-w-full" />
-          </CardContent>
-        </Card>
-        <SkeletonCard title="w-40">
-          <SkeletonRow className="py-2" />
-          <SkeletonRow className="py-2" />
-        </SkeletonCard>
-        <SkeletonCard title="w-24">
-          <div className="flex gap-4">
-            <Skeleton className="h-7 w-24 rounded-full" />
-            <Skeleton className="h-7 w-24 rounded-full" />
-          </div>
-        </SkeletonCard>
+        <OverviewRow>
+          <Tile weight={2} index={0}>
+            <SkeletonTile>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="size-8 rounded-full" />
+                  <SkeletonLine className="w-32" />
+                </div>
+                <SkeletonLine line="h-10" className="w-44" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-9 w-24 rounded-lg" />
+                  <Skeleton className="h-9 w-36 rounded-lg" />
+                </div>
+              </div>
+            </SkeletonTile>
+          </Tile>
+        </OverviewRow>
+        <OverviewRow>
+          <Tile weight={1} index={1}>
+            <SkeletonTile>
+              <div className="flex items-center gap-2">
+                <Skeleton className="size-7 rounded-full" />
+                <SkeletonLine className="w-24" />
+              </div>
+            </SkeletonTile>
+          </Tile>
+        </OverviewRow>
       </div>
     </PageSkeleton>
   );

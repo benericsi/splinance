@@ -38,11 +38,9 @@ test('a budget tracks shared spending and warns on the overview', async ({ page,
   await openBudgets(page, householdId);
   await expect(budgetRow(page, 'Groceries')).toContainText(money('1500 Ft left · 85%'));
 
-  // Near the limit, it shows up on the overview.
+  // Near the limit, it shows up on the overview as a gauge.
   await openOverview(page, householdId);
-  const alerts = page.locator('[data-slot=card]').filter({
-    has: page.getByRole('heading', { name: 'Budgets this month' }),
-  });
+  const alerts = page.getByRole('region', { name: 'Budgets this month' });
   await expect(alerts).toContainText('Groceries');
   await expect(alerts).toContainText(money('1500 Ft left · 85%'));
 

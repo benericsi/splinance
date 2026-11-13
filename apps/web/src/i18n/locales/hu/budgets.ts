@@ -26,6 +26,7 @@ export const budgets: Messages<typeof en.budgets> = {
   alerts: {
     title: 'E havi keretek',
     all: 'Összes keret',
+    more: '+{{count}} további',
   },
   dialog: {
     setTitle: 'Keret beállítása',
