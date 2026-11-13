@@ -70,13 +70,14 @@ export function DayBars({
           {...labelPosition(pointed, bars.length)}
         />
       )}
-      <div className="flex h-16">
+      <div className="flex h-32 md:h-full md:min-h-32">
         {bars.map((bar, index) => (
-          // The whole column is the target, so a one-pixel day is as easy to point at.
+          // The whole column is the target, so a one-pixel day is as easy to point at. The top
+          // padding keeps room for an income dot over the tallest day.
           <div
             key={bar.date}
             className={cn(
-              'flex h-full min-w-0 flex-1 flex-col px-px transition-opacity',
+              'flex h-full min-w-0 flex-1 flex-col justify-end px-px pt-3 transition-opacity sm:px-0.5',
               pointed !== null && pointed !== index && 'opacity-50',
             )}
             onPointerEnter={() => {
@@ -86,29 +87,29 @@ export function DayBars({
               setPointed(index);
             }}
           >
-            <div className="flex h-2.5 shrink-0 items-start justify-center">
-              {bar.income > 0 && (
-                <span data-mark="income" className="bg-positive size-1.5 rounded-full" />
-              )}
-              {bar.expectedIncome > 0 && (
-                <span
-                  data-mark="expected-income"
-                  className="border-positive size-1.5 rounded-full border"
-                />
-              )}
-            </div>
-            <div className="flex min-h-0 flex-1 items-end">
-              <DayColumn
-                bar={bar}
-                over={over}
-                grow={grow}
-                delay={reveal.delay + 0.1 + index * 0.008}
-              />
-            </div>
+            <DayColumn
+              bar={bar}
+              over={over}
+              grow={grow}
+              delay={reveal.delay + 0.1 + index * 0.008}
+            />
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+/** Income that came in, or (a ring) income still expected, sitting just over its day. */
+function IncomeMark({ expected }: { expected: boolean }) {
+  return (
+    <span
+      data-mark={expected ? 'expected-income' : 'income'}
+      className={cn(
+        'absolute bottom-full left-1/2 mb-1 size-2 -translate-x-1/2 rounded-full',
+        expected ? 'border-positive border' : 'bg-positive',
+      )}
+    />
   );
 }
 
@@ -124,46 +125,61 @@ function DayColumn({
   delay: number;
 }) {
   if (bar.when === 'future') {
-    return bar.expected > 0 ? (
+    return (
       <div
-        data-when="future"
-        data-expected
-        className="border-foreground/40 w-full rounded-[2px] border border-dashed"
-        style={{ height: `max(4px, ${String(bar.expectedTop * 100)}%)` }}
-      />
-    ) : (
-      <div data-when="future" className="bg-foreground/15 h-[3px] w-full rounded-[2px]" />
+        className="relative w-full"
+        style={{
+          height: bar.expected > 0 ? `max(4px, ${String(bar.expectedTop * 100)}%)` : '3px',
+        }}
+      >
+        {bar.expected > 0 ? (
+          <div
+            data-when="future"
+            data-expected
+            className="border-foreground/40 h-full w-full rounded-[2px] border border-dashed"
+          />
+        ) : (
+          <div data-when="future" className="bg-foreground/15 h-full w-full rounded-[2px]" />
+        )}
+        {bar.expectedIncome > 0 && <IncomeMark expected />}
+      </div>
     );
   }
   // Spent's share of the stack's height; the rest of it is what was set aside.
   const spentShare = bar.stackTop === 0 ? 1 : bar.spentTop / bar.stackTop;
   return (
-    <m.div
-      data-when={bar.when}
-      className="flex w-full origin-bottom flex-col gap-px"
+    // The mark sits outside the growing bar, so it is not squashed while the bar grows.
+    <div
+      className="relative w-full"
       style={{
         height: `max(${bar.when === 'today' ? '6px' : '3px'}, ${String(bar.stackTop * 100)}%)`,
       }}
-      initial={grow ? { scaleY: 0 } : false}
-      animate={{ scaleY: 1 }}
-      transition={grow ? { ...TRANSITION_GROW, delay } : TRANSITION}
     >
-      {spentShare < 1 && (
-        <div
-          data-part="set-aside"
-          className={cn('min-h-px rounded-t-[2px]', SET_ASIDE_FILL)}
-          style={{ height: `${String((1 - spentShare) * 100)}%` }}
-        />
-      )}
-      <div
-        data-part="spent"
-        className={cn(
-          'min-h-0 flex-1 rounded-[2px]',
-          spentShare < 1 && 'rounded-t-none',
-          bar.when === 'today' ? (over ? 'bg-negative' : 'bg-positive') : 'bg-foreground/45',
+      <m.div
+        data-when={bar.when}
+        className="flex h-full w-full origin-bottom flex-col gap-px"
+        initial={grow ? { scaleY: 0 } : false}
+        animate={{ scaleY: 1 }}
+        transition={grow ? { ...TRANSITION_GROW, delay } : TRANSITION}
+      >
+        {spentShare < 1 && (
+          <div
+            data-part="set-aside"
+            className={cn('min-h-px rounded-t-[2px]', SET_ASIDE_FILL)}
+            style={{ height: `${String((1 - spentShare) * 100)}%` }}
+          />
         )}
-      />
-    </m.div>
+        <div
+          data-part="spent"
+          className={cn(
+            'min-h-0 flex-1 rounded-[2px]',
+            spentShare < 1 && 'rounded-t-none',
+            bar.when === 'today' ? (over ? 'bg-negative' : 'bg-positive') : 'bg-foreground/45',
+          )}
+        />
+      </m.div>
+      {bar.income > 0 && <IncomeMark expected={false} />}
+    </div>
   );
 }
 
