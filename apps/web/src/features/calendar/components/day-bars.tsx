@@ -70,14 +70,14 @@ export function DayBars({
           {...labelPosition(pointed, bars.length)}
         />
       )}
-      <div className="flex h-32 md:h-full md:min-h-32">
+      <div className="flex h-32 @4xl:h-full @4xl:min-h-32">
         {bars.map((bar, index) => (
           // The whole column is the target, so a one-pixel day is as easy to point at. The top
           // padding keeps room for an income dot over the tallest day.
           <div
             key={bar.date}
             className={cn(
-              'flex h-full min-w-0 flex-1 flex-col justify-end px-px pt-3 transition-opacity sm:px-0.5',
+              'flex h-full min-w-0 flex-1 flex-col justify-end px-px pt-3 transition-opacity @5xl:px-0.5',
               pointed !== null && pointed !== index && 'opacity-50',
             )}
             onPointerEnter={() => {
@@ -232,7 +232,7 @@ function DayLabel({
     <div
       data-testid="day-bar-label"
       className={cn(
-        'bg-popover text-popover-foreground ring-foreground/10 pointer-events-none absolute bottom-full z-10 mb-1.5 rounded-md px-2.5 py-1.5 text-xs whitespace-nowrap shadow-md ring-1',
+        'bg-popover text-popover-foreground ring-foreground/10 pointer-events-none absolute bottom-full z-20 mb-1.5 rounded-md px-2.5 py-1.5 text-xs whitespace-nowrap shadow-md ring-1',
         className,
       )}
       style={{ left }}
