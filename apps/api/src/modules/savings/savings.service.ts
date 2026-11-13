@@ -1,4 +1,5 @@
 import {
+  type DaySetAside,
   type Savings,
   type SavingsEntry,
   type SavingsEntryInput,
@@ -174,7 +175,8 @@ function monthRange(month: string): { start: string; end: string } {
 
 /**
  * The goals the viewer can see, active first, and (with a month) what they set aside in
- * it. Their own entries are always in goals they can see, so the sum needs no goal filter.
+ * it, in all and per day. Their own entries are always in goals they can see, so the sums
+ * need no goal filter.
  */
 export async function getSavings(scope: HouseholdScope, query: SavingsQuery): Promise<Savings> {
   const { household } = await requireMembership(db, scope);
@@ -186,10 +188,11 @@ export async function getSavings(scope: HouseholdScope, query: SavingsQuery): Pr
     .orderBy(sql`${savingsGoals.archivedAt} is not null`, savingsGoals.id);
 
   let setAside: number | null = null;
+  let setAsideByDay: DaySetAside[] | null = null;
   if (query.month) {
     const { start, end } = monthRange(query.month);
-    const [sum] = await db
-      .select({ amount: entrySum })
+    const days = await db
+      .select({ date: savingsEntries.entryOn, amount: entrySum })
       .from(savingsEntries)
       .where(
         and(
@@ -199,14 +202,19 @@ export async function getSavings(scope: HouseholdScope, query: SavingsQuery): Pr
           gte(savingsEntries.entryOn, start),
           lt(savingsEntries.entryOn, end),
         ),
-      );
-    setAside = sum?.amount ?? 0;
+      )
+      .groupBy(savingsEntries.entryOn)
+      .orderBy(savingsEntries.entryOn);
+    // A day whose entries cancel out is no day of saving.
+    setAsideByDay = days.filter((day) => day.amount !== 0);
+    setAside = days.reduce((sum, day) => sum + day.amount, 0);
   }
 
   return {
     currency: household.baseCurrency,
     goals: await toGoals(db, rows, scope.userId),
     setAside,
+    setAsideByDay,
   };
 }
 

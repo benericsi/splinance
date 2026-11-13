@@ -171,29 +171,45 @@ describe('left this month', () => {
     expect(roughly(0)).toBe(0);
   });
 
-  it("draws the viewer's share per day: past filled, today marked, days ahead as stubs", () => {
+  it('stacks money out per day, marks income, and shows what is still expected ahead', () => {
     const bars = dayBars(
       november({
         days: {
           '2026-11-03': { yourExpenses: 200_000 },
-          '2026-11-10': { expenses: 90_000, yourExpenses: 50_000 },
-          // Dated ahead: drawn as a stub, and not the scale either.
+          '2026-11-10': { expenses: 90_000, yourExpenses: 50_000, yourIncome: 690_000 },
+          // Dated ahead: not a bar, and not the scale either.
           '2026-11-20': { yourExpenses: 999_000 },
         },
+        events: [salaryDue, rent],
       }),
+      [
+        { date: '2026-11-05', amount: -20_000 },
+        { date: '2026-11-10', amount: 150_000 },
+      ],
     );
     expect(bars).toHaveLength(30);
-    expect(bars[0]).toEqual({ date: '2026-11-01', when: 'past', amount: 0, level: 0 });
-    expect(bars[2]).toEqual({ date: '2026-11-03', when: 'past', amount: 200_000, level: 1 });
-    // By square root: a quarter of the busiest day is half a bar.
-    expect(bars[9]).toEqual({ date: '2026-11-10', when: 'past', amount: 50_000, level: 0.5 });
-    expect(bars[12]).toEqual({ date: '2026-11-13', when: 'today', amount: 0, level: 0 });
-    expect(bars[19]).toEqual({ date: '2026-11-20', when: 'future', amount: 0, level: 0 });
+    expect(bars[2]).toMatchObject({ when: 'past', spent: 200_000, spentTop: 1, stackTop: 1 });
+    // Spent and set aside stacked, by square root against the biggest day (200 000 out).
+    expect(bars[9]).toMatchObject({
+      date: '2026-11-10',
+      spent: 50_000,
+      setAside: 150_000,
+      income: 690_000,
+      spentTop: 0.5,
+      stackTop: 1,
+    });
+    // Taken out of savings: in the label, no bar.
+    expect(bars[4]).toMatchObject({ setAside: -20_000, stackTop: 0 });
+    expect(bars[12]).toMatchObject({ date: '2026-11-13', when: 'today', spent: 0 });
+    // Ahead: the salary still expected on the 15th, the rent on the 25th (Anna's half).
+    expect(bars[14]).toMatchObject({ when: 'future', expectedIncome: 690_000, expected: 0 });
+    expect(bars[24]).toMatchObject({ expected: 100_000, expectedTop: Math.sqrt(0.5) });
+    expect(bars[19]).toMatchObject({ when: 'future', spent: 0, expected: 0, stackTop: 0 });
     expect(bars.filter((bar) => bar.when === 'future')).toHaveLength(17);
   });
 
-  it("keeps a pointed day's label inside the bars near the ends", () => {
-    expect([0, 2, 3, 15, 26, 27, 29].map((index) => labelAlign(index, 30))).toEqual([
+  it("keeps a pointed day's label inside the bars: from it, centred on it, or up to it", () => {
+    expect([0, 9, 10, 15, 19, 20, 29].map((index) => labelAlign(index, 30))).toEqual([
       'start',
       'start',
       'center',
@@ -207,7 +223,7 @@ describe('left this month', () => {
   it('draws an earlier month as all past, and flat without spending', () => {
     const bars = dayBars(november({ today: '2026-12-02' }));
     expect(new Set(bars.map((bar) => bar.when))).toEqual(new Set(['past']));
-    expect(new Set(bars.map((bar) => bar.level))).toEqual(new Set([0]));
+    expect(new Set(bars.map((bar) => bar.stackTop))).toEqual(new Set([0]));
   });
 });
 
@@ -301,14 +317,22 @@ describe('overview: left this month', () => {
     expect(bars.querySelectorAll('[data-when="past"]')).toHaveLength(12);
     expect(bars.querySelectorAll('[data-when="today"]')).toHaveLength(1);
     expect(bars.querySelectorAll('[data-when="future"]')).toHaveLength(17);
-    // Pointing at a day shows its date and the viewer's share; days ahead show nothing.
+    // Income is a dot on its day; the payments still expected are dashed stubs ahead.
+    expect(bars.querySelectorAll('[data-mark="income"]')).toHaveLength(1);
+    expect(bars.querySelectorAll('[data-expected]')).toHaveLength(2);
+    // Pointing at a day shows its parts; a day ahead with nothing expected shows nothing.
     const column = (date: number) => bars.querySelectorAll('[data-when]')[date - 1]?.parentElement;
+    const label = () => within(left).getByTestId('day-bar-label');
     await user.hover(column(3) as HTMLElement);
-    expect(within(left).getByTestId('day-bar-label')).toHaveTextContent(
-      money('^Tue 3 Nov( 2026)? 200 000 Ft$'),
+    expect(label()).toHaveTextContent(money('^Tue 3 Nov( 2026)?Spent200 000 Ft$'));
+    await user.hover(column(10) as HTMLElement);
+    expect(label()).toHaveTextContent(
+      money('^Tue 10 Nov( 2026)?Spent112 400 FtIncome\\+690 000 Ft$'),
     );
     await user.hover(column(13) as HTMLElement);
-    expect(within(left).getByTestId('day-bar-label')).toHaveTextContent(money('^Today 0 Ft$'));
+    expect(label()).toHaveTextContent(money('^TodaySpent0 Ft$'));
+    await user.hover(column(25) as HTMLElement);
+    expect(label()).toHaveTextContent(money('^Wed 25 Nov( 2026)?Expected payments100 000 Ft$'));
     await user.hover(column(20) as HTMLElement);
     expect(within(left).queryByTestId('day-bar-label')).toBeNull();
     // The page's one tinted surface.
@@ -512,7 +536,7 @@ describe('overview: savings', () => {
   function savingsApi(goals: SavingsGoal[], setAside: number) {
     server.use(
       mock.get(`${base}/savings`, () =>
-        HttpResponse.json({ savings: { currency: 'HUF', goals, setAside } }),
+        HttpResponse.json({ savings: { currency: 'HUF', goals, setAside, setAsideByDay: [] } }),
       ),
     );
   }

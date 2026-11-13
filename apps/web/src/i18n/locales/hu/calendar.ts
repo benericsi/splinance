@@ -69,6 +69,12 @@ export const calendar: Messages<typeof en.calendar> = {
   },
   bars: {
     today: 'Ma',
+    spent: 'Elköltve',
+    setAside: 'Félretéve',
+    takenOut: 'Kivéve a megtakarításból',
+    income: 'Bevétel',
+    expected: 'Várható fizetések',
+    expectedIncome: 'Várható bevétel',
   },
   grid: {
     label: 'Napok · {{month}}',

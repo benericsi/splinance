@@ -221,6 +221,7 @@ function LeftThisMonth({
       householdId={householdId}
       calendar={calendar}
       setAside={savings?.setAside ?? 0}
+      setAsideByDay={savings?.setAsideByDay ?? []}
       tracksIncome={tracksIncome}
     />
   ) : null;
@@ -279,7 +280,7 @@ function OverviewSkeleton() {
                   <Skeleton className="h-7 w-24 rounded-full" />
                 </div>
               </div>
-              <Skeleton className="h-14 w-full rounded-md" />
+              <Skeleton className="h-16 w-full rounded-md" />
             </div>
             <div className="mt-4 border-t pt-3">
               <SkeletonLine className="w-44" />
