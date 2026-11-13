@@ -89,6 +89,21 @@ async function recordTour(browser: Browser, scheme: (typeof SCHEMES)[number]) {
   });
   await pause(page, 1000);
 
+  // The month by day: pointing at a day shows what it spent and set aside, then the salary day.
+  const bars = page.getByTestId('day-bars');
+  for (const day of [
+    bars.locator('[data-part="set-aside"]').first(),
+    bars.locator('[data-mark="income"]').first(),
+  ]) {
+    const box = await day.boundingBox();
+    if (!box) throw new Error('No day to point at');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 30 });
+    await expect(bars.getByTestId('day-bar-label')).toBeVisible();
+    await pause(page, 2200);
+  }
+  await page.mouse.move(DESKTOP.width / 2, DESKTOP.height / 2, { steps: 20 });
+  await pause(page, 600);
+
   const sections = page.getByRole('navigation', { name: 'Household sections' }).first();
   await glideAndClick(page, sections.getByRole('link', { name: 'Transactions' }));
   await expect(page.getByRole('heading', { name: 'Transactions', level: 1 })).toBeVisible();
