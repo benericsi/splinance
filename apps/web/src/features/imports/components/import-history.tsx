@@ -40,6 +40,9 @@ export function ImportHistory({ householdId }: { householdId: string }) {
                 <p className={batch.undoneAt ? 'text-muted-foreground' : undefined}>
                   {STATEMENT_SOURCE_LABELS[batch.source]} · {importDate(batch.createdAt)} ·{' '}
                   {t('history.transactions', { count: batch.rowCount })}
+                  {batch.savingsCount > 0
+                    ? ` · ${t('history.savings', { count: batch.savingsCount })}`
+                    : ''}
                   {batch.undoneAt ? ` · ${t('history.undone')}` : ''}
                 </p>
                 {batch.fileName && (
@@ -71,7 +74,14 @@ export function ImportHistory({ householdId }: { householdId: string }) {
           }
         }}
         title={t('history.confirmTitle')}
-        description={t('history.confirmDescription', { count: confirming?.rowCount ?? 0 })}
+        description={[
+          t('history.confirmDescription', { count: confirming?.rowCount ?? 0 }),
+          confirming?.savingsCount
+            ? t('history.confirmSavings', { count: confirming.savingsCount })
+            : '',
+        ]
+          .join(' ')
+          .trim()}
         confirmLabel={t('done.undo')}
         pendingLabel={t('done.undoing')}
         destructive

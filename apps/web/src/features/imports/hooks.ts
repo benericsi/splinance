@@ -5,11 +5,15 @@ import { calendarQueries } from '@/features/calendar/queries';
 import { notificationQueries } from '@/features/notifications/queries';
 import { recurringQueries } from '@/features/recurring/queries';
 import { reportQueries } from '@/features/reports/queries';
+import { savingsQueries } from '@/features/savings/queries';
 import { transactionQueries } from '@/features/transactions/queries';
 import { importsApi } from './api';
 import { importQueries } from './queries';
 
-/** An import or its undo changes transactions, balances, recurring payments and the import history. */
+/**
+ * An import or its undo changes transactions, balances, recurring payments, savings goals
+ * and the import history.
+ */
 function useInvalidateAfterImport() {
   const queryClient = useQueryClient();
   return (_data: unknown, { householdId }: { householdId: string }) =>
@@ -21,6 +25,7 @@ function useInvalidateAfterImport() {
       queryClient.invalidateQueries({ queryKey: calendarQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: importQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: recurringQueries.household(householdId) }),
+      queryClient.invalidateQueries({ queryKey: savingsQueries.household(householdId) }),
       queryClient.invalidateQueries({ queryKey: notificationQueries.all() }),
     ]);
 }

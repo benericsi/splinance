@@ -1,4 +1,11 @@
-import { matchKey, type Rule, ruleMatches, suggestRulePattern } from '@splinance/shared';
+import {
+  firstMatchingSavingsRule,
+  matchKey,
+  type Rule,
+  ruleMatches,
+  type SavingsRule,
+  suggestRulePattern,
+} from '@splinance/shared';
 import type { ReviewRow } from './review';
 
 /** A rule worth offering after an import: what the person did by hand, made automatic. */
@@ -24,7 +31,12 @@ export function suggestRules(imported: ReviewRow[], rules: Rule[]): RuleSuggesti
   for (const review of imported) {
     const { counterparty, kind } = review.row;
     // A rule did it already, or nothing to learn from.
-    if (!review.categoryId || review.rule?.categoryId === review.categoryId || !counterparty) {
+    if (
+      review.destination !== 'transaction' ||
+      !review.categoryId ||
+      review.rule?.categoryId === review.categoryId ||
+      !counterparty
+    ) {
       continue;
     }
     const pattern = suggestRulePattern(counterparty);
@@ -54,6 +66,47 @@ export function suggestRules(imported: ReviewRow[], rules: Rule[]): RuleSuggesti
       markShared: rows.every((review) => review.visibility === 'shared'),
       count: rows.length,
     });
+  }
+  return suggestions;
+}
+
+/** A savings rule worth offering after an import: a pocket sent to a goal by hand. */
+export interface SavingsRuleSuggestion {
+  key: string;
+  pattern: string;
+  goalId: string;
+  count: number;
+}
+
+/**
+ * Savings rules for the goals picked by hand in this import: one per pocket (the bank's
+ * name for it without numbers, else the description) whose rows all went to one goal.
+ * Skipped when one of the viewer's savings rules already covers the text.
+ */
+export function suggestSavingsRules(
+  imported: ReviewRow[],
+  rules: Pick<SavingsRule, 'pattern'>[],
+): SavingsRuleSuggestion[] {
+  const groups = new Map<string, { pattern: string; rows: ReviewRow[] }>();
+  for (const review of imported) {
+    if (review.destination !== 'savings' || !review.goalId) continue;
+    if (review.savingsRule?.goalId === review.goalId) continue;
+    const text = review.row.counterparty ?? review.row.description;
+    if (!text.trim()) continue;
+    const pattern = suggestRulePattern(text);
+    const key = `savings:${matchKey(pattern)}`;
+    const group = groups.get(key) ?? { pattern, rows: [] };
+    group.rows.push(review);
+    groups.set(key, group);
+  }
+
+  const suggestions: SavingsRuleSuggestion[] = [];
+  for (const [key, { pattern, rows }] of groups) {
+    const goalIds = new Set(rows.map((review) => review.goalId));
+    const [goalId] = goalIds;
+    if (goalIds.size !== 1 || !goalId || pattern.length < 2) continue;
+    if (firstMatchingSavingsRule(rules, { counterparty: pattern, description: '' })) continue;
+    suggestions.push({ key, pattern, goalId, count: rows.length });
   }
   return suggestions;
 }

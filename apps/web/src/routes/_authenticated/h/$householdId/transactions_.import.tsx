@@ -13,6 +13,8 @@ import { ImportPage } from '@/features/imports/components/import-page';
 import { importQueries } from '@/features/imports/queries';
 import { recurringQueries } from '@/features/recurring/queries';
 import { ruleQueries } from '@/features/rules/queries';
+import { savingsQueries } from '@/features/savings/queries';
+import { currentMonth } from '@/features/transactions/dates';
 import { useAuth } from '@/lib/auth-store';
 
 /**
@@ -26,6 +28,8 @@ export const Route = createFileRoute('/_authenticated/h/$householdId/transaction
       queryClient.query(importQueries.list(householdId)),
       queryClient.query(ruleQueries.list(householdId)),
       queryClient.query(recurringQueries.list(householdId)),
+      queryClient.query(savingsQueries.month(householdId, currentMonth())),
+      queryClient.query(savingsQueries.rules(householdId)),
     ]);
   },
   component: ImportRoute,
@@ -40,6 +44,8 @@ function ImportRoute() {
   const { data: categories } = useSuspenseQuery(categoryQueries.list(householdId));
   const { data: rules } = useSuspenseQuery(ruleQueries.list(householdId));
   const { data: recurring } = useSuspenseQuery(recurringQueries.list(householdId));
+  const { data: savings } = useSuspenseQuery(savingsQueries.month(householdId, currentMonth()));
+  const { data: savingsRules } = useSuspenseQuery(savingsQueries.rules(householdId));
 
   return (
     <RevealPage>
@@ -59,6 +65,8 @@ function ImportRoute() {
           categories={categories}
           rules={rules}
           series={recurring.series}
+          goals={savings.goals.filter((goal) => goal.archivedAt === null)}
+          savingsRules={savingsRules}
           viewerId={user?.id ?? ''}
         />
       </Reveal>

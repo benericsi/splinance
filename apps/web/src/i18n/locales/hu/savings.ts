@@ -104,4 +104,10 @@ export const savings: Messages<typeof en.savings> = {
     created: 'Cél létrehozva',
     saved: 'Cél mentve',
   },
+  picker: {
+    placeholder: 'Válassz célt',
+    search: 'Cél keresése',
+    noMatch: 'Nincs ilyen cél',
+    private: 'Csak te látod',
+  },
 };

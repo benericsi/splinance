@@ -3,6 +3,9 @@ import {
   savingsEntryListResponseSchema,
   savingsEntryResponseSchema,
   type SavingsGoalInput,
+  savingsRuleListResponseSchema,
+  type SavingsRuleInput,
+  savingsRuleResponseSchema,
   savingsGoalResponseSchema,
   savingsResponseSchema,
   type UpdateSavingsGoalInput,
@@ -60,4 +63,10 @@ export const savingsApi = {
     http.post(`${goalPath(ref)}/entries`, savingsEntryResponseSchema, input),
   removeEntry: ({ entryId, ...ref }: GoalRef & { entryId: string }) =>
     http.delete(`${goalPath(ref)}/entries/${encodeURIComponent(entryId)}`, noContent),
+  /** The viewer's own savings rules, oldest first (the order they apply in). */
+  listRules: async ({ householdId, signal }: { householdId: string; signal?: AbortSignal }) =>
+    (await http.get(`${savingsPath(householdId)}/rules`, savingsRuleListResponseSchema, { signal }))
+      .rules,
+  createRule: async ({ householdId, input }: { householdId: string; input: SavingsRuleInput }) =>
+    (await http.post(`${savingsPath(householdId)}/rules`, savingsRuleResponseSchema, input)).rule,
 };

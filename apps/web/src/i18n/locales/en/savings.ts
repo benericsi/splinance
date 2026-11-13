@@ -101,4 +101,10 @@ export const savings = {
     created: 'Goal created',
     saved: 'Goal saved',
   },
+  picker: {
+    placeholder: 'Pick a goal',
+    search: 'Search goals',
+    noMatch: 'No goal found',
+    private: 'Only you see it',
+  },
 };
