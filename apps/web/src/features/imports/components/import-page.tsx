@@ -5,6 +5,8 @@ import {
   parseStatement,
   type RecurringSeries,
   type Rule,
+  type SavingsGoal,
+  type SavingsRule,
   STATEMENT_SOURCE_LABELS,
   StatementError,
   type StatementSource,
@@ -27,8 +29,18 @@ import { readBankNames, rememberBankName } from '../bank-names';
 import { useCheckImport, useCreateImport, useUndoImport } from '../hooks';
 import { takeImportFile } from '../pending-file';
 import { readExport } from '../read-file';
-import { buildReview, type ReviewRow, rowsToCheck, toImportInput, updatePicked } from '../review';
-import { suggestRules } from '../suggestions';
+import { MaskMoney } from '@/features/transactions/components/amount';
+import { formatMoney } from '@/features/transactions/money';
+import {
+  buildReview,
+  pickedRows,
+  type ReviewRow,
+  rowsToCheck,
+  savingsProblems,
+  toImportInput,
+  updatePicked,
+} from '../review';
+import { suggestRules, suggestSavingsRules } from '../suggestions';
 import { FileDrop } from './file-drop';
 import { ImportHistory } from './import-history';
 import { ReviewList } from './review-list';
@@ -76,11 +88,17 @@ export function ImportPage({
   categories,
   rules,
   series,
+  goals,
+  savingsRules,
   viewerId,
 }: {
   household: HouseholdDetail;
   categories: Category[];
   rules: Rule[];
+  /** The viewer's open goals: picked rows can go to one instead of being transactions. */
+  goals: SavingsGoal[];
+  /** The viewer's own savings rules. */
+  savingsRules: SavingsRule[];
   /** The viewer's recurring payments: rows that will count for one say so. */
   series: RecurringSeries[];
   viewerId: string;
@@ -88,6 +106,10 @@ export function ImportPage({
   // Rules whose category was archived since stay listed in settings but do nothing.
   const activeRules = rules.filter((rule) =>
     categories.some((category) => category.id === rule.categoryId && category.archivedAt === null),
+  );
+  // A rule whose goal was closed since stays but sends nothing there.
+  const activeSavingsRules = savingsRules.filter((rule) =>
+    goals.some((goal) => goal.id === rule.goalId),
   );
   const { t } = useTranslation(['imports', 'common']);
   const currency = household.baseCurrency;
@@ -139,7 +161,10 @@ export function ImportPage({
       source: parsed.source,
       firstDay: days[0],
       lastDay: days.at(-1),
-      rows: buildReview(parsed.rows, results, currency, activeRules),
+      rows: buildReview(parsed.rows, results, currency, activeRules, {
+        rules: activeSavingsRules,
+        hasGoals: goals.length > 0,
+      }),
     });
   };
 
@@ -165,6 +190,7 @@ export function ImportPage({
   if (stage.step === 'done') {
     const { batch, skipped } = stage.result;
     const suggestions = suggestRules(stage.imported, rules);
+    const savingsSuggestions = suggestSavingsRules(stage.imported, savingsRules);
     return (
       <div className="space-y-6">
         <Card>
@@ -172,9 +198,16 @@ export function ImportPage({
             <div className="flex items-center gap-3">
               <CircleCheck className="text-positive size-6 shrink-0" aria-hidden />
               <p className="font-heading text-lg font-semibold">
-                {t('done.imported', { count: batch.rowCount })}
+                {batch.rowCount === 0 && batch.savingsCount > 0
+                  ? t('done.savingsOnly', { count: batch.savingsCount })
+                  : t('done.imported', { count: batch.rowCount })}
               </p>
             </div>
+            {batch.rowCount > 0 && batch.savingsCount > 0 && (
+              <p className="text-muted-foreground">
+                {t('done.savings', { count: batch.savingsCount })}
+              </p>
+            )}
             {skipped > 0 && (
               <p className="text-muted-foreground">{t('done.skipped', { count: skipped })}</p>
             )}
@@ -182,6 +215,8 @@ export function ImportPage({
               householdId={household.id}
               suggestions={suggestions}
               categories={categories}
+              savingsSuggestions={savingsSuggestions}
+              goals={goals}
             />
             <div className="flex flex-wrap gap-2">
               <Link
@@ -191,6 +226,15 @@ export function ImportPage({
               >
                 {t('done.viewTransactions')}
               </Link>
+              {batch.savingsCount > 0 && (
+                <Link
+                  to="/h/$householdId/savings"
+                  params={{ householdId: household.id }}
+                  className={buttonVariants({ variant: 'outline', size: 'lg' })}
+                >
+                  {t('done.viewSavings')}
+                </Link>
+              )}
               <Button
                 variant="outline"
                 size="lg"
@@ -227,7 +271,12 @@ export function ImportPage({
   }
 
   const review = stage.step === 'review' ? stage : undefined;
-  const picked = review?.rows.filter((row) => row.included && row.group !== 'left-out').length ?? 0;
+  const pickedNow = review ? pickedRows(review.rows) : [];
+  const picked = pickedNow.length;
+  const toSavings = pickedNow.some((row) => row.destination === 'savings');
+  const problems = savingsProblems(review?.rows ?? [], goals);
+  const [shortGoal] = problems.short.values();
+  const blocked = problems.missingGoal.size > 0 || shortGoal !== undefined;
   const conflict =
     create.error instanceof ApiError &&
     (create.error.code === 'IMPORT_CONFLICT' || create.error.code === 'NOTHING_TO_IMPORT');
@@ -253,7 +302,7 @@ export function ImportPage({
       setStage({
         step: 'done',
         result,
-        imported: review.rows.filter((row) => row.included && row.group !== 'left-out'),
+        imported: pickedRows(review.rows),
       });
     } catch {
       // Shown next to the button.
@@ -330,6 +379,8 @@ export function ImportPage({
           <ReviewList
             rows={review.rows}
             categories={categories}
+            goals={goals}
+            problems={problems}
             seriesOf={(item) =>
               seriesForRow(
                 series,
@@ -366,14 +417,31 @@ export function ImportPage({
             ) : (
               <FormError message={create.error ? errorMessage(create.error) : undefined} />
             )}
+            {problems.missingGoal.size > 0 && (
+              <p className="text-muted-foreground text-right text-sm" aria-live="polite">
+                {t('missingGoal', { count: problems.missingGoal.size })}
+              </p>
+            )}
+            {shortGoal && (
+              <p className="text-negative text-right text-sm" aria-live="polite">
+                <MaskMoney>
+                  {t('shortGoal', {
+                    goal: shortGoal.goal.name,
+                    amount: formatMoney(shortGoal.balance, shortGoal.goal.currency),
+                  })}
+                </MaskMoney>
+              </p>
+            )}
             <div className="flex justify-end">
               <Button
                 size="lg"
-                disabled={picked === 0 || create.isPending}
+                disabled={picked === 0 || blocked || create.isPending}
                 onClick={() => void submit()}
                 className="max-sm:w-full"
               >
-                {create.isPending ? t('importing') : t('submit', { count: picked })}
+                {create.isPending
+                  ? t('importing')
+                  : t(toSavings ? 'submitRows' : 'submit', { count: picked })}
               </Button>
             </div>
           </div>

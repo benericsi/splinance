@@ -53,6 +53,8 @@ export const server = setupServer(
   http.get('/api/households/:id/savings', () =>
     HttpResponse.json({ savings: { currency: 'HUF', goals: [], setAside: 0, setAsideByDay: [] } }),
   ),
+  // The import review's savings rules: none unless a test adds some.
+  http.get('/api/households/:id/savings/rules', () => HttpResponse.json({ rules: [] })),
   http.get('/api/households/:id/recurring', () =>
     HttpResponse.json({
       recurring: { currency: 'HUF', series: [], suggestions: [], dismissed: [] },

@@ -4,6 +4,7 @@ import type {
   ImportCheckResult,
   ImportInput,
   Rule,
+  SavingsGoal,
 } from '@splinance/shared';
 import { screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
@@ -11,7 +12,13 @@ import { http as mock, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it } from 'vitest';
 import { server } from '../../../test/msw';
 import { renderRoute } from '../../../test/router';
-import { authResponse, householdDetail, testHousehold, testUser } from '../../../test/utils';
+import {
+  authResponse,
+  householdDetail,
+  sentence,
+  testHousehold,
+  testUser,
+} from '../../../test/utils';
 
 const ben = {
   userId: '01a1216a-b248-781c-9cc6-cd68276fcdfc',
@@ -154,7 +161,13 @@ function fakeApi({ history = [] as ImportBatch[] } = {}) {
     }),
     mock.post(`${base}/imports`, async ({ request }) => {
       state.imported = (await request.json()) as ImportInput;
-      state.history = [{ ...batch, rowCount: state.imported.rows.length }];
+      state.history = [
+        {
+          ...batch,
+          rowCount: state.imported.rows.filter((row) => 'transaction' in row).length,
+          savingsCount: state.imported.rows.filter((row) => 'savings' in row).length,
+        },
+      ];
       return HttpResponse.json({ batch: state.history[0], skipped: 0 }, { status: 201 });
     }),
     mock.delete(`${base}/imports/:id`, ({ params }) => {
@@ -364,5 +377,122 @@ describe('rules while importing', () => {
     await waitFor(() => {
       expect(screen.queryByRole('region', { name: 'Rule suggestions' })).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('rows to savings', () => {
+  const holiday: SavingsGoal = {
+    id: '01a12509-0f61-790b-b827-6592807079b1',
+    name: 'Holiday',
+    targetAmount: 600_000,
+    targetDate: null,
+    currency: 'HUF',
+    visibility: 'shared',
+    createdBy: { userId: testUser.id, displayName: 'Anna' },
+    archivedAt: null,
+    balance: 0,
+    contributions: [],
+    pinned: false,
+    createdAt: '2026-10-01T00:00:00.000Z',
+  };
+
+  it('sends a transfer to a goal, never as a transaction, and offers a savings rule', async () => {
+    const api = fakeApi();
+    const createdRules: unknown[] = [];
+    server.use(
+      mock.get(`${base}/savings`, () =>
+        HttpResponse.json({
+          savings: { currency: 'HUF', goals: [holiday], setAside: 0, setAsideByDay: [] },
+        }),
+      ),
+      mock.post(`${base}/savings/rules`, async ({ request }) => {
+        const input = (await request.json()) as { pattern: string; goalId: string };
+        createdRules.push(input);
+        return HttpResponse.json(
+          { rule: { id: '01a12509-0f61-790b-b827-6592807079b2', ...input } },
+          { status: 201 },
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderRoute(page);
+
+    await screen.findByRole('heading', { name: 'Import from your bank' });
+    await user.upload(fileInput(), new File([KH], 'export.csv'));
+
+    // The transfer between own accounts starts as savings: ticking it asks for a goal.
+    const needsLook = await screen.findByRole('region', { name: 'Needs a look' });
+    await user.click(within(needsLook).getByLabelText('Import Revolut 1234'));
+    const transferRow = within(needsLook).getByLabelText('Import Revolut 1234').closest('li');
+    if (!(transferRow instanceof HTMLElement)) throw new Error('No row');
+    expect(within(transferRow).getByRole('button', { name: 'Savings' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(within(transferRow).getByText('Into savings, not spending')).toBeVisible();
+    expect(screen.getByText('Pick a goal for 1 savings row')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Import 2 rows' })).toBeDisabled();
+
+    await user.click(within(transferRow).getByLabelText('Goal of Revolut 1234'));
+    await user.click(await screen.findByRole('option', { name: 'Holiday' }));
+    await user.click(screen.getByRole('button', { name: 'Import 2 rows' }));
+
+    expect(await screen.findByText('1 transaction imported')).toBeVisible();
+    expect(screen.getByText('1 went to savings.')).toBeVisible();
+    expect(api.imported?.rows).toContainEqual({
+      fingerprint: 'kh:MSV-3',
+      savings: {
+        goalId: holiday.id,
+        kind: 'expense',
+        amount: 12_320,
+        entryOn: '2026-10-06',
+        note: 'Revolut 1234',
+      },
+    });
+    expect(screen.getByRole('link', { name: 'View savings' })).toBeVisible();
+
+    const suggestions = screen.getByRole('region', { name: 'Rule suggestions' });
+    expect(within(suggestions).getByText('Savings: Holiday')).toBeVisible();
+    await user.click(within(suggestions).getByRole('button', { name: 'Create 1 rule' }));
+    // (The toast text is the same as the category rules test's, which may still be fading out.)
+    await waitFor(() => {
+      expect(createdRules).toEqual([{ pattern: 'revolut', goalId: holiday.id }]);
+    });
+  });
+
+  it('stops a withdrawal the goal cannot cover before sending it', async () => {
+    fakeApi();
+    server.use(
+      mock.get(`${base}/savings`, () =>
+        HttpResponse.json({
+          savings: {
+            currency: 'HUF',
+            goals: [{ ...holiday, balance: 5_000 }],
+            setAside: 0,
+            setAsideByDay: [],
+          },
+        }),
+      ),
+      mock.get(`${base}/savings/rules`, () =>
+        HttpResponse.json({
+          rules: [
+            { id: '01a12509-0f61-790b-b827-6592807079b3', pattern: 'apple', goalId: holiday.id },
+          ],
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderRoute(page);
+
+    await screen.findByRole('heading', { name: 'Import from your bank' });
+    // A refund from the same text comes in: money out of the goal.
+    await user.upload(
+      fileInput(),
+      new File([KH.replace("'-15000'", "'15000'").replace('-15000', '15000')], 'export.csv'),
+    );
+    const ready = await screen.findByRole('region', { name: 'Ready to import' });
+    expect(within(ready).getByText('By savings rule "apple"')).toBeVisible();
+    expect(within(ready).getByText(sentence('Holiday holds only 5000 Ft'))).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Import \d+ rows?$/ })).toBeDisabled();
   });
 });

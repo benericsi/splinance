@@ -50,6 +50,15 @@ export function useRemoveEntry() {
   });
 }
 
+// After an import, "Do the same next time?" counts what was created; a taken text is skipped.
+export function useCreateSavingsRule() {
+  return useMutation({
+    mutationFn: savingsApi.createRule,
+    onSuccess: useInvalidateSavings(),
+    meta: { suppressErrorToast: true },
+  });
+}
+
 /** Errors (the pin limit) go to the global toast. */
 export function useSetGoalPinned() {
   return useMutation({

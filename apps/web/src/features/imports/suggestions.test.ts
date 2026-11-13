@@ -1,7 +1,7 @@
 import type { Rule, StatementRow } from '@splinance/shared';
 import { describe, expect, it } from 'vitest';
 import { buildReview, type ReviewRow } from './review';
-import { suggestRules } from './suggestions';
+import { suggestRules, suggestSavingsRules } from './suggestions';
 
 const GROCERIES = '01a1250a-0000-7000-8000-000000000001';
 const EATING_OUT = '01a1250a-0000-7000-8000-000000000002';
@@ -112,6 +112,52 @@ describe('suggestRules', () => {
         ],
         [tescoRule],
       ),
+    ).toEqual([]);
+  });
+});
+
+describe('suggestSavingsRules', () => {
+  const HOLIDAY = '01a1250a-0000-7000-8000-0000000000b1';
+  const CAR = '01a1250a-0000-7000-8000-0000000000b2';
+  const toGoal = (review: ReviewRow, goalId: string): ReviewRow => ({
+    ...review,
+    included: true,
+    destination: 'savings',
+    goalId,
+  });
+  const reviewOf = (...rows: StatementRow[]) => buildReview(rows, [], 'HUF');
+
+  it('offers one rule per pocket whose rows all went to one goal', () => {
+    const [a, b, c, d] = reviewOf(
+      row('rev:1', 'Pocket Holiday 2026'),
+      row('rev:2', 'Pocket Holiday 2027'),
+      row('rev:3', 'Car fund'),
+      row('rev:4', 'Car fund'),
+    );
+    if (!a || !b || !c || !d) throw new Error('rows');
+    expect(
+      suggestSavingsRules(
+        [toGoal(a, HOLIDAY), toGoal(b, HOLIDAY), toGoal(c, CAR), toGoal(d, HOLIDAY)],
+        [],
+      ),
+    ).toEqual([
+      { key: 'savings:pocket holiday', pattern: 'pocket holiday', goalId: HOLIDAY, count: 2 },
+    ]);
+  });
+
+  it('skips what a savings rule did or covers, and transactions', () => {
+    const [a, b, c] = reviewOf(
+      row('rev:1', 'Pocket Holiday'),
+      row('rev:2', 'Car fund'),
+      row('rev:3', 'Tesco'),
+    );
+    if (!a || !b || !c) throw new Error('rows');
+    const byRule = {
+      ...toGoal(a, HOLIDAY),
+      savingsRule: { id: 'r1', pattern: 'pocket', goalId: HOLIDAY },
+    };
+    expect(
+      suggestSavingsRules([byRule, toGoal(b, CAR), { ...c, included: true }], [{ pattern: 'car' }]),
     ).toEqual([]);
   });
 });

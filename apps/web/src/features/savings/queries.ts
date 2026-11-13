@@ -11,6 +11,12 @@ export const savingsQueries = {
       queryKey: [...savingsQueries.household(householdId), 'goals', month],
       queryFn: ({ signal }) => savingsApi.get({ householdId, month, signal }),
     }),
+  /** The viewer's own savings rules (the import review pre-fills goals from them). */
+  rules: (householdId: string) =>
+    queryOptions({
+      queryKey: [...savingsQueries.household(householdId), 'rules'],
+      queryFn: ({ signal }) => savingsApi.listRules({ householdId, signal }),
+    }),
   /** A goal's history, newest first, paged by the API's cursor. */
   entries: (householdId: string, goalId: string) =>
     infiniteQueryOptions({

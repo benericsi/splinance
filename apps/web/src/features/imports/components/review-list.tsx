@@ -3,10 +3,11 @@ import {
   CURRENCIES,
   type Currency,
   type RecurringSeries,
+  type SavingsGoal,
   type StatementRow,
   type TransactionVisibility,
 } from '@splinance/shared';
-import { ChevronDown, Lock, Repeat, Tags, Users, WandSparkles } from 'lucide-react';
+import { ChevronDown, Lock, Repeat, Tags, Target, Users, WandSparkles } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Collapse } from '@/components/collapse';
@@ -25,8 +26,19 @@ import { Input } from '@/components/ui/input';
 import { CategoryPicker } from '@/features/categories/components/category-picker';
 import { formatShortDate as shortDate } from '@/features/transactions/dates';
 import { formatMoney, MONEY_LOCALE } from '@/features/transactions/money';
+import { GoalPicker } from '@/features/savings/components/goal-picker';
+import { MaskMoney } from '@/features/transactions/components/amount';
 import { cn } from '@/lib/utils';
-import { type ReviewGroup, type ReviewReason, type ReviewRow, reasonText } from '../review';
+import {
+  type ReviewGroup,
+  type ReviewReason,
+  type ReviewRow,
+  reasonText,
+  type SavingsProblems,
+} from '../review';
+
+/** The row's switch: who a transaction is for, or that it is savings. */
+type RowUse = TransactionVisibility | 'savings';
 
 /** Signed, in the row's own currency (which may be one the app does not support yet). */
 function rowAmount(row: StatementRow): string {
@@ -51,6 +63,10 @@ function leftOutKind(reason: ReviewReason | undefined): 'imported' | 'pending' |
 interface ListProps {
   rows: ReviewRow[];
   categories: Category[];
+  /** The viewer's open goals: a row can go to one of them instead of being a transaction. */
+  goals: SavingsGoal[];
+  /** Savings rows without a goal, and goals the picked rows would overdraw. */
+  problems: SavingsProblems;
   /** The recurring payment a picked row will count for, if any. */
   seriesOf: (review: ReviewRow) => RecurringSeries | undefined;
   onChange: (key: string, patch: Partial<ReviewRow>) => void;
@@ -65,18 +81,27 @@ interface ListProps {
  * row says why), "Ready to import" (picked, with bulk actions) and what cannot be imported,
  * folded away.
  */
-export function ReviewList({ rows, categories, seriesOf, onChange, onBulk }: ListProps) {
+export function ReviewList({
+  rows,
+  categories,
+  goals,
+  problems,
+  seriesOf,
+  onChange,
+  onBulk,
+}: ListProps) {
   const { t } = useTranslation('imports');
   const inGroup = (group: ReviewGroup) => rows.filter((review) => review.group === group);
   const needsLook = inGroup('needs-look');
   const ready = inGroup('ready');
   const leftOut = inGroup('left-out');
+  const rowProps = { categories, goals, problems, seriesOf, onChange };
 
   return (
     <div className="space-y-6">
       {needsLook.length > 0 && (
         <Section title={t('review.needsLook')} count={needsLook.length}>
-          <Rows rows={needsLook} categories={categories} seriesOf={seriesOf} onChange={onChange} />
+          <Rows rows={needsLook} {...rowProps} />
         </Section>
       )}
       {ready.length > 0 && (
@@ -85,7 +110,7 @@ export function ReviewList({ rows, categories, seriesOf, onChange, onBulk }: Lis
           count={ready.length}
           actions={<BulkActions categories={categories} onBulk={onBulk} />}
         >
-          <Rows rows={ready} categories={categories} seriesOf={seriesOf} onChange={onChange} />
+          <Rows rows={ready} {...rowProps} />
         </Section>
       )}
       {leftOut.length > 0 && <LeftOut rows={leftOut} />}
@@ -117,27 +142,13 @@ function Section({
   );
 }
 
-function Rows({
-  rows,
-  categories,
-  seriesOf,
-  onChange,
-}: {
-  rows: ReviewRow[];
-  categories: Category[];
-  seriesOf: ListProps['seriesOf'];
-  onChange: ListProps['onChange'];
-}) {
+type RowProps = Pick<ListProps, 'categories' | 'goals' | 'problems' | 'seriesOf' | 'onChange'>;
+
+function Rows({ rows, ...props }: RowProps & { rows: ReviewRow[] }) {
   return (
     <ul>
       {rows.map((review) => (
-        <ReviewItem
-          key={review.key}
-          review={review}
-          categories={categories}
-          series={review.included ? seriesOf(review) : undefined}
-          onChange={onChange}
-        />
+        <ReviewItem key={review.key} review={review} {...props} />
       ))}
     </ul>
   );
@@ -146,18 +157,25 @@ function Rows({
 function ReviewItem({
   review,
   categories,
-  series,
+  goals,
+  problems,
+  seriesOf,
   onChange,
-}: {
-  review: ReviewRow;
-  categories: Category[];
-  series: RecurringSeries | undefined;
-  onChange: ListProps['onChange'];
-}) {
+}: RowProps & { review: ReviewRow }) {
   const { t } = useTranslation(['imports', 'transactions']);
   const { row } = review;
   const income = row.kind === 'income';
   const options = categories.filter((c) => c.kind === row.kind && c.archivedAt === null);
+  const savings = review.destination === 'savings';
+  const series = review.included && !savings ? seriesOf(review) : undefined;
+  // Money that came in from a goal the picked rows would overdraw.
+  const short = savings && income ? problems.short.get(review.goalId) : undefined;
+  const use: RowUse = savings ? 'savings' : review.visibility;
+  const uses: { value: RowUse; label: string }[] = [
+    { value: 'shared', label: t('transactions:dialog.shared') },
+    { value: 'private', label: t('transactions:dialog.justMe') },
+  ];
+  if (goals.length > 0 || savings) uses.push({ value: 'savings', label: t('review.toSavings') });
 
   return (
     // Wraps on narrow screens: the controls move under the description, like a card.
@@ -191,10 +209,38 @@ function ReviewItem({
         {review.reason && (
           <p className="text-muted-foreground mt-0.5 text-xs">{reasonText(review.reason)}</p>
         )}
-        {review.included && review.rule && review.rule.categoryId === review.categoryId && (
+        {review.included &&
+          !savings &&
+          review.rule &&
+          review.rule.categoryId === review.categoryId && (
+            <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
+              <WandSparkles className="size-3" aria-hidden />
+              {t('review.byRule', { pattern: review.rule.pattern })}
+            </p>
+          )}
+        {review.included && savings && (
           <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
-            <WandSparkles className="size-3" aria-hidden />
-            {t('review.byRule', { pattern: review.rule.pattern })}
+            {review.savingsRule && review.savingsRule.goalId === review.goalId ? (
+              <>
+                <WandSparkles className="size-3" aria-hidden />
+                {t('review.bySavingsRule', { pattern: review.savingsRule.pattern })}
+              </>
+            ) : (
+              <>
+                <Target className="size-3" aria-hidden />
+                {income ? t('review.outOfSavings') : t('review.intoSavings')}
+              </>
+            )}
+          </p>
+        )}
+        {review.included && short && (
+          <p className="text-negative mt-0.5 text-xs">
+            <MaskMoney>
+              {t('review.holdsOnly', {
+                goal: short.goal.name,
+                amount: formatMoney(short.balance, short.goal.currency),
+              })}
+            </MaskMoney>
           </p>
         )}
         {series && (
@@ -207,28 +253,43 @@ function ReviewItem({
       {review.included && (
         <>
           <div className="w-40 shrink-0">
-            <CategoryPicker
-              id={`category-${review.key}`}
-              label={t('review.categoryOf', { description: row.description })}
-              compact
-              categories={options}
-              value={review.categoryId}
-              onChange={(categoryId) => {
-                onChange(review.key, { categoryId });
-              }}
-            />
+            {savings ? (
+              <GoalPicker
+                id={`goal-${review.key}`}
+                label={t('review.goalOf', { description: row.description })}
+                goals={goals}
+                value={review.goalId}
+                invalid={problems.missingGoal.has(review.key)}
+                onChange={(goalId) => {
+                  onChange(review.key, { goalId });
+                }}
+              />
+            ) : (
+              <CategoryPicker
+                id={`category-${review.key}`}
+                label={t('review.categoryOf', { description: row.description })}
+                compact
+                categories={options}
+                value={review.categoryId}
+                onChange={(categoryId) => {
+                  onChange(review.key, { categoryId });
+                }}
+              />
+            )}
           </div>
-          <SegmentedControl<TransactionVisibility>
+          <SegmentedControl<RowUse>
             label={t('review.whoFor', { description: row.description })}
-            className="w-36 shrink-0"
-            value={review.visibility}
-            onChange={(visibility) => {
-              onChange(review.key, { visibility });
+            className={cn('shrink-0', uses.length > 2 ? 'w-60' : 'w-36')}
+            value={use}
+            onChange={(next) => {
+              onChange(
+                review.key,
+                next === 'savings'
+                  ? { destination: 'savings' }
+                  : { destination: 'transaction', visibility: next },
+              );
             }}
-            options={[
-              { value: 'shared', label: t('transactions:dialog.shared') },
-              { value: 'private', label: t('transactions:dialog.justMe') },
-            ]}
+            options={uses}
           />
         </>
       )}

@@ -1,7 +1,14 @@
-import type { ImportCheckResult, StatementRow } from '@splinance/shared';
+import type { ImportCheckResult, SavingsGoal, SavingsRule, StatementRow } from '@splinance/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { readBankNames, rememberBankName } from './bank-names';
-import { buildReview, reasonText, rowsToCheck, toImportInput, updatePicked } from './review';
+import {
+  buildReview,
+  reasonText,
+  rowsToCheck,
+  savingsProblems,
+  toImportInput,
+  updatePicked,
+} from './review';
 
 const row = (overrides: Partial<StatementRow>): StatementRow => ({
   line: 2,
@@ -155,5 +162,125 @@ describe('bank names', () => {
     rememberBankName('u1', 'Anna K. Szabó');
     expect(readBankNames('u1')).toEqual(['Anna K. Szabó', 'KOVÁCS ANNA']);
     expect(readBankNames('u2')).toEqual([]);
+  });
+});
+
+describe('rows to savings', () => {
+  const HOLIDAY = '01a1250a-0000-7000-8000-0000000000b1';
+  const goal = (balance: number): SavingsGoal => ({
+    id: HOLIDAY,
+    name: 'Holiday',
+    targetAmount: null,
+    targetDate: null,
+    currency: 'HUF',
+    visibility: 'shared',
+    createdBy: { userId: 'anna', displayName: 'Anna' },
+    archivedAt: null,
+    balance,
+    contributions: [],
+    pinned: false,
+    createdAt: '2026-10-01T00:00:00.000Z',
+  });
+  const rule: SavingsRule = { id: 'r1', pattern: 'pocket holiday', goalId: HOLIDAY };
+  const pocketOut = row({ fingerprint: 'rev:1', description: 'To pocket Holiday', amount: 50_000 });
+  const pocketIn = row({
+    fingerprint: 'rev:2',
+    description: 'From pocket Holiday',
+    kind: 'income',
+    amount: 20_000,
+  });
+  const transfer = row({ fingerprint: 'rev:3', description: 'To ANNA K', flags: ['own-transfer'] });
+
+  it('sends what a savings rule matches to its goal, picked, in either direction', () => {
+    const review = buildReview([pocketOut, pocketIn], [], 'HUF', [], {
+      rules: [rule],
+      hasGoals: true,
+    });
+    expect(review.map((r) => [r.destination, r.goalId, r.included, r.savingsRule?.id])).toEqual([
+      ['savings', HOLIDAY, true, 'r1'],
+      ['savings', HOLIDAY, true, 'r1'],
+    ]);
+  });
+
+  it('starts a transfer between own accounts as savings without a goal, and not picked', () => {
+    const [own] = buildReview([transfer], [], 'HUF', [], { rules: [], hasGoals: true });
+    expect(own).toMatchObject({ destination: 'savings', goalId: '', included: false });
+    // Without an open goal there is nowhere to send it.
+    const [none] = buildReview([transfer], [], 'HUF', [], { rules: [rule], hasGoals: false });
+    expect(none?.destination).toBe('transaction');
+  });
+
+  it('picks an own transfer a rule explains, but not a possible duplicate', () => {
+    const ownPocket = { ...transfer, description: 'To pocket Holiday' };
+    const duplicate: ImportCheckResult = {
+      fingerprint: 'rev:1',
+      status: 'possible-duplicate',
+      match: { id: 'e1', description: 'Holiday', occurredOn: '2026-10-09', goalId: HOLIDAY },
+    };
+    const [own, dup] = buildReview([ownPocket, pocketOut], [duplicate], 'HUF', [], {
+      rules: [rule],
+      hasGoals: true,
+    });
+    expect(own).toMatchObject({ destination: 'savings', goalId: HOLIDAY, included: true });
+    expect(dup).toMatchObject({ destination: 'savings', goalId: HOLIDAY, included: false });
+    expect(dup?.reason && reasonText(dup.reason)).toMatch(/^Maybe already recorded in "Holiday"/);
+  });
+
+  it('builds savings rows for the API and leaves them out of bulk changes', () => {
+    const review = buildReview([pocketOut, pocketIn, rows[1] ?? row({})], [], 'HUF', [], {
+      rules: [rule],
+      hasGoals: true,
+    });
+    const shared = updatePicked(review, { visibility: 'shared', categoryId: 'cat-food' });
+    expect(shared.map((r) => [r.destination, r.visibility, r.categoryId])).toEqual([
+      ['savings', 'private', ''],
+      ['savings', 'private', ''],
+      ['transaction', 'shared', 'cat-food'],
+    ]);
+    const input = toImportInput(shared, {
+      source: 'revolut',
+      fileName: 'x.csv',
+      viewerId: 'anna',
+      memberIds: ['anna'],
+    });
+    expect(input.rows.slice(0, 2)).toEqual([
+      {
+        fingerprint: 'rev:1',
+        savings: {
+          goalId: HOLIDAY,
+          kind: 'expense',
+          amount: 50_000,
+          entryOn: '2026-10-10',
+          note: 'To pocket Holiday',
+        },
+      },
+      {
+        fingerprint: 'rev:2',
+        savings: {
+          goalId: HOLIDAY,
+          kind: 'income',
+          amount: 20_000,
+          entryOn: '2026-10-10',
+          note: 'From pocket Holiday',
+        },
+      },
+    ]);
+  });
+
+  it('finds savings rows without a goal and goals the file would overdraw', () => {
+    const review = buildReview([pocketIn, transfer], [], 'HUF', [], {
+      rules: [rule],
+      hasGoals: true,
+    });
+    const picked = review.map((r) => ({ ...r, included: true }));
+    const problems = savingsProblems(picked, [goal(10_000)]);
+    expect([...problems.missingGoal]).toEqual(['rev:3']);
+    expect(problems.short.get(HOLIDAY)?.balance).toBe(10_000);
+    // Money put in by the same file counts first.
+    const withDeposit = buildReview([pocketIn, pocketOut], [], 'HUF', [], {
+      rules: [rule],
+      hasGoals: true,
+    });
+    expect(savingsProblems(withDeposit, [goal(0)]).short.size).toBe(0);
   });
 });
