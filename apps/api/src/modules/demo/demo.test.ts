@@ -8,6 +8,7 @@ import {
   householdDetailResponseSchema,
   meResponseSchema,
   notificationListResponseSchema,
+  savingsResponseSchema,
   recurringListResponseSchema,
   renderDemoBankFiles,
 } from '@splinance/shared';
@@ -195,6 +196,25 @@ describe('POST /api/demo', { timeout: 30_000 }, () => {
     );
     expect(series.find((s) => s.name === 'Spotify Duo')?.paymentCount).toBe(6);
     expect(series.find((s) => s.name === 'Gym membership')?.paymentCount).toBe(8);
+
+    // Savings as the visitor sees them: both shared goals and his own, his two pins, and
+    // what he set aside this month (the fund on the 11th, the holiday on the 5th).
+    const savingsRes = await request(app)
+      .get(`/api/households/${demo.householdId}/savings`)
+      .query({ month: TODAY.slice(0, 7) })
+      .set('Authorization', auth)
+      .expect(200);
+    const { goals, setAside } = savingsResponseSchema.parse(savingsRes.body).savings;
+    expect(goals.map((g) => [g.name, g.balance, g.pinned])).toEqual([
+      ['Summer in Italy', 385_000, true],
+      ['Emergency fund', 600_000, true],
+      ['Rainy day pot', 60_000, false],
+    ]);
+    expect(goals[0]?.contributions.map((c) => [c.displayName, c.amount])).toEqual([
+      ['Jane Doe', 200_000],
+      ['John Doe', 185_000],
+    ]);
+    expect(setAside).toBe(80_000);
 
     // The bell on first visit: Jane's last few days and the budget alert, not her whole year.
     const bellRes = await request(app)

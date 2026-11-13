@@ -3,7 +3,7 @@ import type { StatementSource } from '../imports';
 import type { RecurringCadence, RecurringScope } from '../recurring';
 import { addMonths, monthsBetween } from '../reports';
 import { allocate, PERCENT_SCALE } from '../splits';
-import type { TransactionKind } from '../transactions';
+import type { TransactionKind, TransactionVisibility } from '../transactions';
 import { localizeDemoStory } from './locale';
 import { createRandom, type Random } from './random';
 
@@ -132,6 +132,30 @@ export interface DemoBudget {
   amount: number;
 }
 
+/** Something the couple, or one of them, saves for. */
+export interface DemoSavingsGoal {
+  id: string;
+  /** Who made it; a private goal is theirs alone. */
+  person: DemoPerson;
+  name: string;
+  /** Forint; null for a pot without a target. */
+  targetAmount: number | null;
+  targetDate: string | null;
+  visibility: TransactionVisibility;
+  /** Who keeps it on top of their savings page. */
+  pinnedBy: DemoPerson[];
+}
+
+/** Money put into a goal (positive) or taken out of it (negative). */
+export interface DemoSavingsEntry {
+  /** A `DemoSavingsGoal` id. */
+  goal: string;
+  person: DemoPerson;
+  amount: number;
+  entryOn: string;
+  note: string | null;
+}
+
 export interface DemoStory {
   seed: number;
   /** The visitor's language: typed text and category names are in it (`localizeDemoStory`). */
@@ -149,6 +173,8 @@ export interface DemoStory {
   rules: DemoRule[];
   budgets: DemoBudget[];
   recurring: { confirmed: DemoRecurringConfirmed[]; added: DemoRecurringAdded[] };
+  /** Entries sorted by date, so a goal never goes below zero on the way. */
+  savings: { goals: DemoSavingsGoal[]; entries: DemoSavingsEntry[] };
 }
 
 const RENT = 320_000;
@@ -725,6 +751,73 @@ function addMonth(
   }
 }
 
+/**
+ * What the two put aside: a holiday they save for together (with one withdrawal, for the
+ * deposit), the visitor's own emergency fund and a pot without a target. The same amounts
+ * on the same days every month, drawn from no random stream: the story's other numbers
+ * (and so the bank files) are exactly what they were without it. Saving is a transfer, not
+ * spending, so none of it is a transaction; the bank rows do not show it either (the app
+ * does not match them to goals yet).
+ */
+function demoSavings(months: string[], today: string): DemoStory['savings'] {
+  const current = today.slice(0, 7);
+  const entries: DemoSavingsEntry[] = [];
+  const put = (
+    goal: string,
+    person: DemoPerson,
+    amount: number,
+    month: string,
+    day: number,
+    note: string | null = null,
+  ) => {
+    const entryOn = `${month}-${pad(day)}`;
+    // Nothing happens after the story's day.
+    if (entryOn <= today) entries.push({ goal, person, amount, entryOn, note });
+  };
+  months.forEach((month, index) => {
+    const monthsAgo = months.length - 1 - index;
+    put('emergency', 'you', 50_000, month, 11);
+    if (monthsAgo <= 7) {
+      put('holiday', 'you', 30_000, month, 5);
+      put('holiday', 'partner', 25_000, month, 8);
+    }
+    if (monthsAgo === 2) put('holiday', 'you', -55_000, month, 14, 'Deposit for the house');
+    if (monthsAgo <= 5) put('pot', 'partner', 10_000, month, 20);
+  });
+  return {
+    goals: [
+      {
+        id: 'holiday',
+        person: 'you',
+        name: 'Summer in Italy',
+        targetAmount: 600_000,
+        targetDate: `${addMonths(current, 8)}-01`,
+        visibility: 'shared',
+        pinnedBy: ['you', 'partner'],
+      },
+      {
+        id: 'emergency',
+        person: 'you',
+        name: 'Emergency fund',
+        targetAmount: 2_000_000,
+        targetDate: null,
+        visibility: 'private',
+        pinnedBy: ['you'],
+      },
+      {
+        id: 'pot',
+        person: 'partner',
+        name: 'Rainy day pot',
+        targetAmount: null,
+        targetDate: null,
+        visibility: 'shared',
+        pinnedBy: [],
+      },
+    ],
+    entries: entries.sort((a, b) => a.entryOn.localeCompare(b.entryOn)),
+  };
+}
+
 const byDate =
   <T extends { id: string }>(dateOf: (item: T) => string) =>
   (a: T, b: T) =>
@@ -814,6 +907,7 @@ export function buildDemoStory({
         },
       ],
     },
+    savings: demoSavings(months, today),
   };
   return localizeDemoStory(story, locale);
 }

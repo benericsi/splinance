@@ -317,6 +317,80 @@ describe('the story as recurring payments', () => {
   });
 });
 
+describe('the story as savings', () => {
+  const held = (s: DemoStory, goal: string, person?: DemoPerson) =>
+    s.savings.entries
+      .filter((e) => e.goal === goal && (person === undefined || e.person === person))
+      .reduce((sum, e) => sum + e.amount, 0);
+
+  it('saves for a holiday together, for emergencies alone, and keeps a pot', () => {
+    expect(story.savings.goals.map((g) => [g.name, g.visibility, g.targetAmount])).toEqual([
+      ['Summer in Italy', 'shared', 600_000],
+      ['Emergency fund', 'private', 2_000_000],
+      ['Rainy day pot', 'shared', null],
+    ]);
+    // Eight months of both putting in, less the deposit: past halfway, short of 75%.
+    expect(held(story, 'holiday', 'you')).toBe(185_000);
+    expect(held(story, 'holiday', 'partner')).toBe(200_000);
+    expect(held(story, 'emergency')).toBe(600_000);
+    expect(held(story, 'pot')).toBe(60_000);
+    // The holiday is ahead of the story's day, on the first of a month.
+    expect(story.savings.goals[0]?.targetDate).toBe('2027-06-01');
+    expect(story.savings.goals.filter((g) => g.pinnedBy.includes('you'))).toHaveLength(2);
+  });
+
+  it('names known goals and people, and never takes a goal below zero', () => {
+    const ids = new Set(story.savings.goals.map((g) => g.id));
+    const balance = new Map<string, number>();
+    let previous = '';
+    for (const entry of story.savings.entries) {
+      expect(ids.has(entry.goal)).toBe(true);
+      expect(entry.amount).not.toBe(0);
+      expect(entry.entryOn >= previous).toBe(true);
+      previous = entry.entryOn;
+      const next = (balance.get(entry.goal) ?? 0) + entry.amount;
+      expect(next).toBeGreaterThanOrEqual(0);
+      balance.set(entry.goal, next);
+      // Only its maker reaches a private goal.
+      const goal = story.savings.goals.find((g) => g.id === entry.goal);
+      if (goal?.visibility === 'private') expect(entry.person).toBe(goal.person);
+    }
+    for (const goal of story.savings.goals) {
+      if (goal.visibility === 'private') expect(goal.pinnedBy).toEqual([goal.person]);
+    }
+  });
+
+  it('has nothing after today, also early in a month', () => {
+    const early = buildDemoStory({ seed: 1, today: '2026-10-06' });
+    expect(early.savings.entries.every((e) => e.entryOn <= '2026-10-06')).toBe(true);
+    // Only the visitor's holiday money (the 5th) is in by the 6th.
+    expect(early.savings.entries.filter((e) => e.entryOn.startsWith('2026-10'))).toEqual([
+      { goal: 'holiday', person: 'you', amount: 30_000, entryOn: '2026-10-05', note: null },
+    ]);
+  });
+
+  it('does not depend on the seed, and leaves the rest of the story as it was', () => {
+    const other = buildDemoStory({ seed: 2, today: TODAY });
+    expect(other.savings).toEqual(story.savings);
+    // Saving is not spending: no transaction or bank row names a goal.
+    const names = new Set(story.savings.goals.map((g) => g.name));
+    expect(story.transactions.filter((t) => names.has(t.description))).toEqual([]);
+  });
+
+  it('is in Hungarian what the couple typed', () => {
+    const hu = buildDemoStory({ seed: 1, today: TODAY, locale: 'hu' });
+    expect(hu.savings.goals.map((g) => g.name)).toEqual([
+      'Nyaralás Olaszországban',
+      'Vésztartalék',
+      'Esős napokra',
+    ]);
+    expect(hu.savings.entries.find((e) => e.note !== null)?.note).toBe('Foglaló a szállásra');
+    expect(hu.savings.entries.map((e) => e.amount)).toEqual(
+      story.savings.entries.map((e) => e.amount),
+    );
+  });
+});
+
 describe('the story in Hungarian', () => {
   const hu = buildDemoStory({ seed: 1, today: TODAY, locale: 'hu' });
 
@@ -349,6 +423,8 @@ describe('the story in Hungarian', () => {
       ...story.transactions.map((t) => t.description),
       ...story.settlements.map((s) => s.note),
       ...story.recurring.added.map((a) => a.name),
+      ...story.savings.goals.map((g) => g.name),
+      ...story.savings.entries.flatMap((e) => (e.note === null ? [] : [e.note])),
     ]);
     expect(Object.keys(DEMO_TEXT.hu).filter((word) => !typed.has(word))).toEqual([]);
   });
