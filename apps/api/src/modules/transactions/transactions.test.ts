@@ -341,6 +341,16 @@ describe('listing', () => {
     expect(pages).toBe(3);
   });
 
+  it('answers a crafted cursor with 400, not 500', async () => {
+    const cursor = Buffer.from(`2026-99-99|${'-'.repeat(36)}`).toString('base64url');
+    const res = await request(app)
+      .get(base())
+      .query({ cursor })
+      .set('Authorization', await bearer(anna))
+      .expect(400);
+    expect(errorCode(res)).toBe('VALIDATION_ERROR');
+  });
+
   it('filters by month, kind, visibility, category, member and text', async () => {
     const groceries = await categoryId('Groceries');
     const september = await create(anna, sharedInput({ occurredOn: '2026-09-30' }));
@@ -450,6 +460,30 @@ describe('updating', () => {
       before: original,
       after: updated,
     });
+  });
+
+  it('shows people in the history under their current names', async () => {
+    const original = await create(anna, sharedInput());
+    await put(ben, original.id, { ...sharedInput({ amount: 3000 }), version: 1 });
+    await request(app)
+      .patch('/api/account')
+      .set('Authorization', await bearer(anna))
+      .send({ displayName: 'Anna Renamed' })
+      .expect(200);
+
+    const entries = await history(ben, original.id);
+    const annas = entries.flatMap((entry) =>
+      [entry.before, entry.after].flatMap((snapshot) =>
+        snapshot
+          ? [snapshot.paidBy, snapshot.createdBy, ...(snapshot.split?.shares ?? [])]
+              .filter((p) => p.userId === anna.id)
+              .map((p) => p.displayName)
+          : [],
+      ),
+    );
+    expect(annas.length).toBeGreaterThan(0);
+    expect(new Set(annas)).toEqual(new Set(['Anna Renamed']));
+    expect(entries[0]?.actor.displayName).toBe('Anna Renamed');
   });
 
   it('refuses a stale version, also when two edits race', async () => {

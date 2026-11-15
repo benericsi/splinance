@@ -270,7 +270,7 @@ One item in one person's bell. Only ids and numbers: names come from the current
 | count                   | integer, nullable                    | Transactions an import added that involve the reader                                                                                                       |
 | dedupe_key              | text, nullable                       | State rows: one per reader and fact (`renewal_due:<series>:<date>`)                                                                                        |
 | created_at              | timestamptz                          | Moved forward when an unread activity row folds in a newer change                                                                                          |
-| read_at, resolved_at    | timestamptz, nullable                | Read by the person; a state row that no longer holds                                                                                                       |
+| read_at, resolved_at    | timestamptz, nullable                | Read by the person; a state row that no longer holds (both cleared when it holds again)                                                                    |
 
 - Unique `(user_id, dedupe_key)` (`notifications_user_dedupe_unique`; activity rows have no key, and NULLs never collide). Partial unique `(user_id, subject_id) WHERE read_at IS NULL AND type is an activity type` (`notifications_activity_unread_unique`): later changes fold into the unread row.
 - Deleted when the reader leaves the household, with their account, with a sandbox (`deleteHouseholdContents`), and by the maintenance job (read over 90 days ago, or older than 180). Not in the `analytics` views; backed up.
@@ -427,8 +427,8 @@ Private and deleted rows never count. Debts are netted within each pair (`netDeb
 | after        | jsonb, nullable     | After the change (null for delete)                              |
 | created_at   | timestamptz         | Indexed with `(entity, entity_id)`                              |
 
-- Append-only, written in the same database transaction as the change: never a change without its entry, or the other way round.
-- Snapshots are the API shape, including display names at that time.
+- Append-only, written in the same database transaction as the change: never a change without its entry, or the other way round. (The one exception, data migration 0025, blanked the names in older snapshots.)
+- Snapshots are the API shape with every `displayName` blank: people are kept as ids and their current names are read from `users` when the history is read, so an erased account leaves no copy of its name here.
 
 ### `demos`
 
