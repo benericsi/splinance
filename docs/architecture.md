@@ -532,7 +532,7 @@ Self-service (GDPR Art. 17) in `modules/account/deletion.service.ts`. The user r
 
 - **Preview first** (`GET /api/account/deletion`): the dialog lists exactly this, and the blockers: an open balance with anyone (`UNSETTLED_BALANCE`) or being the only owner of a household that still has other members (`LAST_OWNER`). A blocked deletion shows only the way to resolve it, never a form.
 - **The delete** (`POST /api/account/delete`): `lockUser`, the session still active, the email typed again (`CONFIRMATION_MISMATCH`), the step-up, then every household of the user locked in id order and the plan computed again under those locks, so a new expense naming them cannot slip in (hard part 33). Refused as a whole while a blocker exists. Logs `account.deleted` with the user id and counts.
-- **A still-valid access token** (up to 15 minutes) finds its sessions gone (401 on the account routes and `/api/me`), its memberships ended (404), and `POST /api/households` and invite accept refuse a deleted user (`assertLiveUser`).
+- **A still-valid access token** (up to 15 minutes) finds its sessions gone (401 on the account routes and `/api/me`), its memberships ended (404), `POST /api/households` and invite accept refuse a deleted user (`assertLiveUser`), and the profile and preference writes match only a row without `deleted_at` (401), so nothing is written back over "Former member".
 - **Backups** keep the data up to 13 months; a restore brings deleted accounts back, so the restore runbook repeats every `account.deleted` made after the backup's date with `account:erase` (deploy.md 5), the same erasure without the step-up and blockers.
 
 ### Refresh rotation (the core of the design)
