@@ -73,7 +73,17 @@ export interface DemoSettlement {
 }
 
 export type DemoBankMove =
-  'card' | 'transfer-in' | 'transfer-out' | 'direct-debit' | 'fee' | 'top-up' | 'atm';
+  | 'card'
+  | 'transfer-in'
+  | 'transfer-out'
+  | 'direct-debit'
+  | 'fee'
+  | 'top-up'
+  | 'atm'
+  /** Money moved into one of the person's pockets (savings inside the bank). */
+  | 'pocket-out'
+  /** Money moved back out of a pocket. */
+  | 'pocket-in';
 
 /** One movement on a bank account, before it is written in the bank's export format. */
 export interface DemoBankRow {
@@ -86,16 +96,17 @@ export interface DemoBankRow {
   move: DemoBankMove;
   /** Signed: negative is money leaving the account. */
   amount: number;
-  /** The merchant or other party as the bank names it; null for top-ups and fees. */
+  /** The merchant or other party as the bank names it (the pocket's name for pocket moves); null for top-ups and fees. */
   party: string | null;
   /** What the sender wrote on a transfer or direct debit. */
   note: string;
   /**
-   * What the row is in the app: a transaction imported from it, a settlement (recorded by
-   * hand, the row is left out of the import), or nothing (own transfers, cash withdrawals,
-   * which the import leaves out by default).
+   * What the row is in the app: a transaction imported from it, a savings entry imported
+   * from it (a pocket move), a settlement (recorded by hand, the row is left out of the
+   * import), or nothing (own transfers, cash withdrawals, which the import leaves out by
+   * default).
    */
-  ref: { transaction: string } | { settlement: string } | null;
+  ref: { transaction: string } | { savings: string } | { settlement: string } | null;
 }
 
 export interface DemoRule {
@@ -148,12 +159,26 @@ export interface DemoSavingsGoal {
 
 /** Money put into a goal (positive) or taken out of it (negative). */
 export interface DemoSavingsEntry {
+  id: string;
   /** A `DemoSavingsGoal` id. */
   goal: string;
   person: DemoPerson;
   amount: number;
   entryOn: string;
   note: string | null;
+  /**
+   * Imported from the person's bank export (a pocket move; one bank row refers to it), or
+   * typed in.
+   */
+  source: 'bank' | 'manual';
+}
+
+/** "A bank row naming this pocket moved money to or from this goal", for one person. */
+export interface DemoSavingsRule {
+  person: DemoPerson;
+  pattern: string;
+  /** A `DemoSavingsGoal` id. */
+  goal: string;
 }
 
 export interface DemoStory {
@@ -174,7 +199,7 @@ export interface DemoStory {
   budgets: DemoBudget[];
   recurring: { confirmed: DemoRecurringConfirmed[]; added: DemoRecurringAdded[] };
   /** Entries sorted by date, so a goal never goes below zero on the way. */
-  savings: { goals: DemoSavingsGoal[]; entries: DemoSavingsEntry[] };
+  savings: { goals: DemoSavingsGoal[]; entries: DemoSavingsEntry[]; rules: DemoSavingsRule[] };
 }
 
 const RENT = 320_000;
@@ -752,16 +777,33 @@ function addMonth(
 }
 
 /**
+ * The visitor's pockets at Revolut, by goal: what they named them in the bank's app. Bank
+ * text, so never translated. Their entries into these goals happen at the bank and are
+ * imported from the Revolut file; everything else is typed in.
+ */
+export const DEMO_POCKETS: Partial<Record<string, string>> = {
+  holiday: 'Italy trip',
+  emergency: 'Emergency',
+};
+
+/** Mixed into the seed for the pocket moves' own random stream. */
+const POCKET_STREAM = 0x5eed_9000;
+
+/** How Revolut names a pocket in its export ("To pocket HUF Italy trip from HUF"). */
+export const demoPocketRule = (pocket: string) => `pocket HUF ${pocket}`;
+
+/**
  * What the two put aside: a holiday they save for together (with one withdrawal, for the
  * deposit), the visitor's own emergency fund and a pot without a target. The same amounts
- * on the same days every month, drawn from no random stream: the story's other numbers
- * (and so the bank files) are exactly what they were without it. Saving is a transfer, not
- * spending, so none of it is a transaction; the bank rows do not show it either (the app
- * does not match them to goals yet).
+ * on the same days every month, drawn from no random stream: the story's other numbers are
+ * exactly what they were without it. Saving is a transfer, not spending, so none of it is
+ * a transaction. The visitor moves their part into Revolut pockets (`DEMO_POCKETS`), so
+ * those entries come from their bank file, with a savings rule per pocket; the partner
+ * types theirs in.
  */
 function demoSavings(months: string[], today: string): DemoStory['savings'] {
   const current = today.slice(0, 7);
-  const entries: DemoSavingsEntry[] = [];
+  const entries: Omit<DemoSavingsEntry, 'id'>[] = [];
   const put = (
     goal: string,
     person: DemoPerson,
@@ -772,7 +814,9 @@ function demoSavings(months: string[], today: string): DemoStory['savings'] {
   ) => {
     const entryOn = `${month}-${pad(day)}`;
     // Nothing happens after the story's day.
-    if (entryOn <= today) entries.push({ goal, person, amount, entryOn, note });
+    if (entryOn > today) return;
+    const source = person === 'you' && DEMO_POCKETS[goal] ? 'bank' : 'manual';
+    entries.push({ goal, person, amount, entryOn, note, source });
   };
   months.forEach((month, index) => {
     const monthsAgo = months.length - 1 - index;
@@ -814,8 +858,37 @@ function demoSavings(months: string[], today: string): DemoStory['savings'] {
         pinnedBy: [],
       },
     ],
-    entries: entries.sort((a, b) => a.entryOn.localeCompare(b.entryOn)),
+    entries: entries
+      .sort((a, b) => a.entryOn.localeCompare(b.entryOn))
+      .map((entry, index) => ({ id: `saving-${pad(index + 1, 3)}`, ...entry })),
+    rules: Object.entries(DEMO_POCKETS).map(([goal, pocket]) => ({
+      person: 'you' as const,
+      pattern: demoPocketRule(pocket ?? ''),
+      goal,
+    })),
   };
+}
+
+/**
+ * The bank rows of entries made at the bank, numbered on after the story's other rows, with
+ * times from a stream of their own (`rng`), so adding them shifts no other row, id or
+ * random draw, while another seed still gives other rows (the demo's sample export).
+ */
+function pocketRows(entries: DemoSavingsEntry[], firstNumber: number, rng: Random): DemoBankRow[] {
+  return entries
+    .filter((entry) => entry.source === 'bank')
+    .map((entry, index) => ({
+      id: `row-${pad(firstNumber + index, 4)}`,
+      person: entry.person,
+      occurredOn: entry.entryOn,
+      time: `${pad(rng.int(6, 22))}:${pad(rng.int(0, 59))}:${pad(rng.int(0, 59))}`,
+      move: entry.amount > 0 ? 'pocket-out' : 'pocket-in',
+      // Into the goal is out of the account.
+      amount: -entry.amount,
+      party: DEMO_POCKETS[entry.goal] ?? null,
+      note: '',
+      ref: { savings: entry.id },
+    }));
 }
 
 const byDate =
@@ -854,6 +927,14 @@ export function buildDemoStory({
   });
 
   const first = months[0] ?? current;
+  const savings = demoSavings(months, today);
+  builder.bankRows.push(
+    ...pocketRows(
+      savings.entries,
+      builder.bankRows.length + 1,
+      createRandom((seed ^ POCKET_STREAM) >>> 0),
+    ),
+  );
   const story: DemoStory = {
     seed,
     locale: 'en',
@@ -907,7 +988,7 @@ export function buildDemoStory({
         },
       ],
     },
-    savings: demoSavings(months, today),
+    savings,
   };
   return localizeDemoStory(story, locale);
 }

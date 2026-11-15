@@ -85,3 +85,41 @@ export async function chooseExport(page: Page, content: string, name = 'kh-expor
     buffer: Buffer.from(content, 'utf8'),
   });
 }
+
+/** A row of a Revolut account statement export. */
+export interface RevolutRow {
+  type: string;
+  /** `YYYY-MM-DD HH:MM:SS`. */
+  started: string;
+  description: string;
+  /** Signed forint, e.g. -30000. */
+  amount: number;
+}
+
+/**
+ * A made-up Revolut statement (comma separated, oldest first, like the real one). Pocket
+ * transfers are written the way the demo story writes them: no real pocket export was at
+ * hand. Every value is invented.
+ */
+export function revolutExport(rows: RevolutRow[]): string {
+  const money = (amount: number) => `${amount < 0 ? '-' : ''}${String(Math.abs(amount))}.00`;
+  let balance = 500_000;
+  return [
+    'Type,Product,Started Date,Completed Date,Description,Amount,Fee,Currency,State,Balance',
+    ...rows.map((row) => {
+      balance += row.amount;
+      return [
+        row.type,
+        'Current',
+        row.started,
+        row.started,
+        row.description,
+        money(row.amount),
+        '0.00',
+        'HUF',
+        'COMPLETED',
+        money(balance),
+      ].join(',');
+    }),
+  ].join('\n');
+}
