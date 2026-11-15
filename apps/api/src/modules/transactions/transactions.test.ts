@@ -341,6 +341,16 @@ describe('listing', () => {
     expect(pages).toBe(3);
   });
 
+  it('answers a crafted cursor with 400, not 500', async () => {
+    const cursor = Buffer.from(`2026-99-99|${'-'.repeat(36)}`).toString('base64url');
+    const res = await request(app)
+      .get(base())
+      .query({ cursor })
+      .set('Authorization', await bearer(anna))
+      .expect(400);
+    expect(errorCode(res)).toBe('VALIDATION_ERROR');
+  });
+
   it('filters by month, kind, visibility, category, member and text', async () => {
     const groceries = await categoryId('Groceries');
     const september = await create(anna, sharedInput({ occurredOn: '2026-09-30' }));
