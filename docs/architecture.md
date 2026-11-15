@@ -129,11 +129,12 @@ Middleware order:
 helmet()                 security headers (CSP, HSTS, nosniff, ...)
 pinoHttp()               request id, req.log, one log line per request (method, url, status only;
                          invite tokens in the url are redacted)
-express.json             body parsing with a size cap: 100kb, 1mb for bank imports (a thousand rows);
-                         no compressed bodies (inflate: false), so the cap bounds memory
+express.json             body parsing with a size cap of 100kb; the two bank import routes skip it and
+                         parse up to 1mb (a thousand rows) in their router, after requireAuth and the
+                         import limit; no compressed bodies (inflate: false), so the cap bounds memory
 cookieParser()           req.cookies (needed for the refresh token)
 /api router
-  /health                live + ready
+  /health                live + ready (ready asks the database at most once per 5 s)
   rateLimiter(1000)      ceiling per IP and 15 minutes for everything below
   /auth                  register, login, refresh, logout (rate limited)
   GET /me                requireAuth -> getMe
