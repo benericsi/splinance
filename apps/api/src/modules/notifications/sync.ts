@@ -198,17 +198,58 @@ export async function syncNotifications(
   });
 }
 
+/** The sync running for each household, and households changed again while it ran. */
+const running = new Map<string, Promise<void>>();
+const changedMeanwhile = new Set<string>();
+
 /**
  * After a write that can change what is due (a payment, a series, a budget): brings the
- * household's notifications up to date. Runs after the write committed; a failure is
- * logged and never fails the request (the hourly sweep catches up).
+ * household's notifications up to date. Routes wait for it only briefly (`syncAfterWrite`).
+ * One sync per household at a time: writes arriving while one runs mark the household,
+ * and it runs once more afterwards, so a burst of writes costs at most two syncs. A
+ * failure is logged and never fails anything (the hourly sweep catches up).
  */
-export async function syncAfterChange(householdId: string): Promise<void> {
-  try {
-    await syncNotifications(householdId);
-  } catch (err) {
-    logger.error({ err, householdId }, 'Notification sync failed');
+export function syncAfterChange(householdId: string): Promise<void> {
+  const current = running.get(householdId);
+  if (current) {
+    changedMeanwhile.add(householdId);
+    return current;
   }
+  const run = (async () => {
+    do {
+      changedMeanwhile.delete(householdId);
+      try {
+        await syncNotifications(householdId);
+      } catch (err) {
+        logger.error({ err, householdId }, 'Notification sync failed');
+      }
+    } while (changedMeanwhile.has(householdId));
+  })().finally(() => running.delete(householdId));
+  running.set(householdId, run);
+  return run;
+}
+
+/** How long a route waits for the sync its write started (see `syncAfterWrite`). */
+const SYNC_WAIT_MS = 1_000;
+
+/**
+ * For routes, after the write committed: waits for the household's sync up to
+ * SYNC_WAIT_MS, so the bell the web refetches right after a write already shows what the
+ * write caused, but a slow or blocked sync never holds the request longer; it then
+ * finishes in the background.
+ */
+export async function syncAfterWrite(householdId: string): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const waited = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, SYNC_WAIT_MS);
+  });
+  await Promise.race([syncAfterChange(householdId), waited]);
+  clearTimeout(timer);
+}
+
+/** Waits for every sync started by `syncAfterChange` (shutdown, tests). */
+export async function drainSyncs(): Promise<void> {
+  while (running.size > 0) await Promise.all(running.values());
 }
 
 export const NOTIFICATION_SWEEP_LOCK = 'splinance:notification-sweep';
