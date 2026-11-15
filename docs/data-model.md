@@ -427,8 +427,8 @@ Private and deleted rows never count. Debts are netted within each pair (`netDeb
 | after        | jsonb, nullable     | After the change (null for delete)                              |
 | created_at   | timestamptz         | Indexed with `(entity, entity_id)`                              |
 
-- Append-only, written in the same database transaction as the change: never a change without its entry, or the other way round.
-- Snapshots are the API shape, including display names at that time.
+- Append-only, written in the same database transaction as the change: never a change without its entry, or the other way round. (The one exception, data migration 0025, blanked the names in older snapshots.)
+- Snapshots are the API shape with every `displayName` blank: people are kept as ids and their current names are read from `users` when the history is read, so an erased account leaves no copy of its name here.
 
 ### `demos`
 

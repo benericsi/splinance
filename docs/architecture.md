@@ -244,6 +244,7 @@ Transaction input is a union on `visibility`. Both carry `kind, amount, occurred
 Write rules (all in `transactions.service.ts`):
 
 - Every write runs in one database transaction: shared household lock, membership check, the change, the split rows, the audit entry.
+- Audit snapshots (`before`, `after`) are the API shape with every `displayName` blank (`toStored`, likewise for settlements): the history fills in today's names from `users`, so a rename shows everywhere and a deleted account reads "Former member" with no copy of its name left in the log (migration 0025 blanked the names stored before).
 - Payer and split people must be active members, except people who were already on the transaction before this edit, so an old expense with someone who left can still be corrected.
 - New category references must be active, of the transaction's kind, and in this household. Keeping the current category is allowed even if it was archived since.
 - Any member may edit or delete a shared transaction (audited). Only the author may make one private, because the payer becomes the author and the others lose sight of it.
@@ -523,9 +524,9 @@ Self-service (GDPR Art. 17) in `modules/account/deletion.service.ts`. The user r
 | `users` row                                              | stays: `display_name` "Former member", `email` `deleted-<id>@deleted.invalid` (the real address is free again), no password, `deleted_at` set                             |
 | identities, sessions                                     | deleted                                                                                                                                                                   |
 | households nobody else was ever in                       | deleted whole (`deleteHouseholdContents`, the code `deleteDemo` uses)                                                                                                     |
-| households with other members                            | membership ended (as leaving), pending invites revoked; shared entries stay under "Former member"                                                                         |
+| households with other members                            | membership ended (as leaving), pending invites revoked; shared entries and their history stay under "Former member" (audit snapshots hold no names)                       |
 | households only former members were in besides them      | membership ended, archived                                                                                                                                                |
-| private transactions (only their author could read them) | hard deleted with their audit rows (which hold copies)                                                                                                                    |
+| private transactions (only their author could read them) | hard deleted with their audit rows (which hold copies of the text)                                                                                                        |
 | import batches they made                                 | file name cleared (rows stay, shared transactions reference them)                                                                                                         |
 | personal budgets                                         | deleted                                                                                                                                                                   |
 | private savings goals                                    | hard deleted with their entries, and every pin and savings rule of theirs; what they put into shared goals stays under "Former member" (the goal's balance depends on it) |
@@ -533,7 +534,7 @@ Self-service (GDPR Art. 17) in `modules/account/deletion.service.ts`. The user r
 - **Preview first** (`GET /api/account/deletion`): the dialog lists exactly this, and the blockers: an open balance with anyone (`UNSETTLED_BALANCE`) or being the only owner of a household that still has other members (`LAST_OWNER`). A blocked deletion shows only the way to resolve it, never a form.
 - **The delete** (`POST /api/account/delete`): `lockUser`, the session still active, the email typed again (`CONFIRMATION_MISMATCH`), the step-up, then every household of the user locked in id order and the plan computed again under those locks, so a new expense naming them cannot slip in (hard part 33). Refused as a whole while a blocker exists. Logs `account.deleted` with the user id and counts.
 - **A still-valid access token** (up to 15 minutes) finds its sessions gone (401 on the account routes and `/api/me`), its memberships ended (404), `POST /api/households` and invite accept refuse a deleted user (`assertLiveUser`), and the profile and preference writes match only a row without `deleted_at` (401), so nothing is written back over "Former member".
-- **Backups** keep the data up to 13 months; a restore brings deleted accounts back, so the restore runbook repeats every `account.deleted` made after the backup's date with `account:erase` (deploy.md 5), the same erasure without the step-up and blockers.
+- **Backups** keep the data up to 13 months; a restore brings deleted accounts back, so the restore runbook repeats every `account.deleted` made after the backup's date with `account:erase` (deploy.md 5), the same erasure without the step-up and blockers. A backup taken before migration 0025 still holds names in audit snapshots; migrating the restored database runs 0025 again and blanks them.
 
 ### Refresh rotation (the core of the design)
 

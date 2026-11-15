@@ -7,14 +7,9 @@ import type {
 } from '@splinance/shared';
 import { and, desc, eq, gte, inArray, isNull, lt, type SQL, sql } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
-import {
-  auditLog,
-  householdMembers,
-  type SettlementRow,
-  settlements,
-  users,
-} from '../../db/schema';
+import { auditLog, householdMembers, type SettlementRow, settlements } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
+import { nameless, namesOf, personOf } from '../households/people';
 import { decodeCursor, encodeCursor } from '../../lib/keyset-cursor';
 import {
   lockHouseholdShared,
@@ -50,12 +45,7 @@ async function toSettlements(executor: Db, rows: SettlementRow[]): Promise<Settl
   if (rows.length === 0) return [];
   const ids = new Set<string>();
   for (const row of rows) ids.add(row.fromUserId).add(row.toUserId).add(row.createdBy);
-  const people = await executor
-    .select({ id: users.id, displayName: users.displayName })
-    .from(users)
-    .where(inArray(users.id, [...ids]));
-  const nameOf = new Map(people.map((person) => [person.id, person.displayName]));
-  const person = (userId: string) => ({ userId, displayName: nameOf.get(userId) ?? '' });
+  const person = personOf(await namesOf(executor, ids));
 
   return rows.map((row) => ({
     id: row.id,
@@ -148,6 +138,14 @@ function assertMayManage(
   if (!involved.includes(scope.userId)) throw notYourPayment();
 }
 
+/** Ids only, like transaction snapshots: the audit log never keeps a name. */
+const withoutNames = (settlement: Settlement): Settlement => ({
+  ...settlement,
+  from: nameless(settlement.from),
+  to: nameless(settlement.to),
+  createdBy: nameless(settlement.createdBy),
+});
+
 async function recordAudit(
   tx: Db,
   scope: HouseholdScope,
@@ -162,8 +160,8 @@ async function recordAudit(
     entity: 'settlement',
     entityId,
     action,
-    before,
-    after,
+    before: before && withoutNames(before),
+    after: after && withoutNames(after),
   });
   const settlement = after ?? before;
   if (settlement) await recordSettlementActivity(tx, scope, action, settlement);

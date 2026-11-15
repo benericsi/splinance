@@ -1,8 +1,7 @@
 import type { Balances } from '@splinance/shared';
-import { inArray } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { users } from '../../db/schema';
 import { requireMembership } from '../households/households.service';
+import { namesOf, personOf } from '../households/people';
 import { openDebts } from './ledger';
 
 interface HouseholdScope {
@@ -19,15 +18,7 @@ export async function getBalances(scope: HouseholdScope): Promise<Balances> {
   const debts = await openDebts(db, scope.householdId);
 
   const ids = [...new Set(debts.flatMap((debt) => [debt.debtorId, debt.creditorId]))];
-  const people =
-    ids.length === 0
-      ? []
-      : await db
-          .select({ id: users.id, displayName: users.displayName })
-          .from(users)
-          .where(inArray(users.id, ids));
-  const nameOf = new Map(people.map((person) => [person.id, person.displayName]));
-  const person = (userId: string) => ({ userId, displayName: nameOf.get(userId) ?? '' });
+  const person = personOf(await namesOf(db, ids));
 
   return {
     currency: household.baseCurrency,
