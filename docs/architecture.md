@@ -151,7 +151,10 @@ Error handling: route handlers just `throw`. Express 5 forwards rejected promise
 | `ZodError` (from `schema.parse(req.body)`) | 400 `VALIDATION_ERROR` with `details` (Zod tree)                          |
 | `HttpError(status, message, code)`         | that status and code                                                      |
 | body-parser errors (`expose`, `type`)      | 400 `INVALID_JSON`, 413 `PAYLOAD_TOO_LARGE`, 415 `UNSUPPORTED_MEDIA_TYPE` |
+| Postgres `55P03` / `57014` (`isTimeout`)   | 503 `BUSY`, logged at warn: a lock wait or statement ran out of time      |
 | anything else                              | logged with stack, client gets 500 `INTERNAL_ERROR` without internals     |
+
+Database timeouts (`db/client.ts`, `DB_*_TIMEOUT_MS`): every API connection opens with `statement_timeout` 30 s, `lock_timeout` 10 s and `idle_in_transaction_session_timeout` 60 s, so one stuck transaction cannot queue a household's writers (all behind `lockHousehold`) forever; the waiting writes answer 503 `BUSY` and nothing is written. Migrations use their own connection and are not bounded. Tests lower the lock timeout to 2 s.
 
 Every error body matches `apiErrorResponseSchema` from the shared package: `{ "error": { "code": string, "message": string, "details"?: unknown } }`.
 
@@ -503,6 +506,7 @@ browser: boot -> POST /api/auth/refresh -> signed in -> the _auth guard forwards
 `/account` (section 9) manages the profile and the ways into the account, `/account/preferences` how the app behaves for the person; the API is `modules/account`.
 
 - **Step-up for anything that adds or removes a way in** (`requireRecentAuth`): an account with a password confirms with its current password every time; one without must have signed in within 10 minutes (`RECENT_SIGN_IN_MS`, measured from `sessions.created_at`, which refresh never moves), else 403 `REAUTH_REQUIRED`. Without it, a stolen access token (15 minutes) could set a password and keep the account. The caller's session must also still be active (an access token outlives a logout), else 401.
+- **Argon2 never runs under the user lock** (100-300 ms each): `verifyBeforeLock` checks the session, then the current password against the row read without a lock, and returns the hash it matched; under `lockUser`, `requireRecentAuth` accepts only if the locked row still holds that hash (a password changed in between answers `WRONG_PASSWORD`). A new password is hashed before the transaction too.
 - **A wrong current password is 400 `WRONG_PASSWORD`**, never 401: the web client answers every 401 with a refresh and a retry. Failed attempts count against a per-user limit (10 per 15 minutes) and log `account.step_up_failed` at warn.
 - **Changing the password signs out every other session** (`revoked_at`), in the same transaction; the caller's stays. Their access tokens expire within 15 minutes. "Sign out other devices" does the same without a password change.
 - **The user row is locked first** (`lockUser`, `SELECT ... FOR UPDATE`) by every change to how a user signs in, so a later "is there another way in?" check (disconnecting a provider) cannot interleave with another change.

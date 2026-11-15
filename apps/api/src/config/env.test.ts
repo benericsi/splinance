@@ -24,6 +24,9 @@ describe('parseEnv', () => {
       REGISTRATION: 'open',
       REGISTRATION_ALLOWLIST: [],
       OAUTH_GOOGLE_ISSUER: 'https://accounts.google.com',
+      DB_STATEMENT_TIMEOUT_MS: 30_000,
+      DB_LOCK_TIMEOUT_MS: 10_000,
+      DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: 60_000,
     });
   });
 
