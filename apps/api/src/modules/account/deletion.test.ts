@@ -4,6 +4,7 @@ import {
   balancesResponseSchema,
   householdDetailResponseSchema,
   savingsResponseSchema,
+  transactionHistoryResponseSchema,
   transactionListResponseSchema,
 } from '@splinance/shared';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -445,6 +446,63 @@ describe('delete', () => {
       .set('Authorization', ben.auth)
       .expect(401);
     await request(app).get('/api/account').set('Authorization', ben.auth).expect(401);
+  });
+
+  it('leaves no copy of the name in the audit log, and history shows "Former member"', async () => {
+    const [anna, ben] = [await person('Anna'), await person('Ben')];
+    const home = await createHousehold(app, anna, 'Home');
+    await join(app, anna, home, ben);
+    await request(app)
+      .patch(`/api/households/${home}/members/${ben.id}`)
+      .set('Authorization', anna.auth)
+      .send({ role: 'owner' })
+      .expect(200);
+    const id = await addTransaction(home, anna, shared(anna, [anna, ben]));
+    await request(app)
+      .put(`/api/households/${home}/transactions/${id}`)
+      .set('Authorization', ben.auth)
+      .send({
+        kind: 'expense',
+        amount: 12_000,
+        occurredOn: '2026-10-10',
+        description: 'Shop and more',
+        categoryId: null,
+        ...shared(anna, [anna, ben]),
+        version: 1,
+      })
+      .expect(200);
+    await settleUp(app, home, ben);
+
+    await remove(anna).expect(204);
+
+    const res = await request(app)
+      .get(`/api/households/${home}/transactions/${id}/history`)
+      .set('Authorization', ben.auth)
+      .expect(200);
+    const entries = transactionHistoryResponseSchema.parse(res.body).entries;
+    expect(entries.map((e) => e.action)).toEqual(['create', 'update']);
+    const namesOfAnna = entries.flatMap((entry) =>
+      [entry.before, entry.after].flatMap((snapshot) =>
+        snapshot
+          ? [snapshot.paidBy, snapshot.createdBy, ...(snapshot.split?.shares ?? [])]
+              .filter((p) => p.userId === anna.id)
+              .map((p) => p.displayName)
+          : [],
+      ),
+    );
+    expect(namesOfAnna.length).toBeGreaterThan(0);
+    expect(new Set(namesOfAnna)).toEqual(new Set([FORMER_MEMBER_NAME]));
+
+    // Nothing stored still holds the name (transaction and settlement entries alike).
+    const stored = await db.select().from(auditLog);
+    expect(stored.map((row) => row.entity).sort()).toEqual([
+      'settlement',
+      'transaction',
+      'transaction',
+    ]);
+    for (const row of stored) {
+      expect(JSON.stringify([row.before, row.after])).not.toContain('Anna');
+    }
   });
 
   it('cannot race a new expense that names the person', async () => {

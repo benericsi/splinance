@@ -35,9 +35,9 @@ import {
   transactions,
   type TransactionRow,
   transactionSplits,
-  users,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
+import { nameless, namesOf, personOf } from '../households/people';
 import { decodeCursor, encodeCursor } from '../../lib/keyset-cursor';
 import { monthRange } from '../../lib/months';
 import {
@@ -100,12 +100,7 @@ async function toTransactions(executor: Db, rows: TransactionRow[]): Promise<Tra
   const userIds = new Set<string>();
   for (const row of rows) userIds.add(row.paidBy).add(row.createdBy);
   for (const split of splitRows) userIds.add(split.userId);
-  const people = await executor
-    .select({ id: users.id, displayName: users.displayName })
-    .from(users)
-    .where(inArray(users.id, [...userIds]));
-  const nameOf = new Map(people.map((person) => [person.id, person.displayName]));
-  const person = (userId: string) => ({ userId, displayName: nameOf.get(userId) ?? '' });
+  const person = personOf(await namesOf(executor, userIds));
 
   return rows.map((row) => ({
     id: row.id,
@@ -295,21 +290,45 @@ export async function getTransactionHistory(
   if (!row) throw transactionNotFound();
 
   const entries = await db
-    .select({ entry: auditLog, actorName: users.displayName })
+    .select()
     .from(auditLog)
-    .innerJoin(users, eq(users.id, auditLog.actorId))
     .where(and(eq(auditLog.entity, 'transaction'), eq(auditLog.entityId, row.id)))
     .orderBy(asc(auditLog.createdAt), asc(auditLog.id));
+  // Filtered to entity = 'transaction' above, so the snapshots are transactions.
+  const snapshots = (entry: (typeof entries)[number]) =>
+    [entry.before, entry.after] as [Transaction | null, Transaction | null];
 
-  return entries.map(({ entry, actorName }) => ({
-    id: entry.id,
-    action: entry.action,
-    actor: { userId: entry.actorId, displayName: actorName },
-    createdAt: entry.createdAt.toISOString(),
-    // Filtered to entity = 'transaction' above, so the snapshots are transactions.
-    before: entry.before as Transaction | null,
-    after: entry.after as Transaction | null,
-  }));
+  // Snapshots hold ids only (`toStored`); names are today's, so a rename shows everywhere
+  // and an erased account reads "Former member".
+  const ids = new Set(entries.map((entry) => entry.actorId));
+  for (const snapshot of entries.flatMap(snapshots)) {
+    if (!snapshot) continue;
+    ids.add(snapshot.paidBy.userId).add(snapshot.createdBy.userId);
+    for (const share of snapshot.split?.shares ?? []) ids.add(share.userId);
+  }
+  const person = personOf(await namesOf(db, ids));
+  const named = (snapshot: Transaction | null): Transaction | null =>
+    snapshot && {
+      ...snapshot,
+      paidBy: person(snapshot.paidBy.userId),
+      createdBy: person(snapshot.createdBy.userId),
+      split: snapshot.split && {
+        ...snapshot.split,
+        shares: snapshot.split.shares.map((share) => ({ ...share, ...person(share.userId) })),
+      },
+    };
+
+  return entries.map((entry) => {
+    const [before, after] = snapshots(entry);
+    return {
+      id: entry.id,
+      action: entry.action,
+      actor: person(entry.actorId),
+      createdAt: entry.createdAt.toISOString(),
+      before: named(before),
+      after: named(after),
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -404,6 +423,24 @@ async function replaceSplits(tx: Db, row: TransactionRow, shares: PreparedSplit[
     );
 }
 
+/**
+ * A snapshot as the audit log keeps it: the API shape with every name blank (`nameless`).
+ * History fills in today's names, so an erased account leaves no copy of its name behind.
+ */
+function toStored(snapshot: Transaction | null): Transaction | null {
+  return (
+    snapshot && {
+      ...snapshot,
+      paidBy: nameless(snapshot.paidBy),
+      createdBy: nameless(snapshot.createdBy),
+      split: snapshot.split && {
+        ...snapshot.split,
+        shares: snapshot.split.shares.map((share) => ({ ...share, displayName: '' })),
+      },
+    }
+  );
+}
+
 async function recordAudit(
   tx: Db,
   scope: HouseholdScope,
@@ -418,8 +455,9 @@ async function recordAudit(
     entity: 'transaction',
     entityId,
     action,
-    before,
-    after,
+    // The originals stay for the activity notification below, in this transaction.
+    before: toStored(before),
+    after: toStored(after),
   });
   // Same transaction as the change: what others in it hear about it.
   await recordTransactionActivity(tx, scope, action, before, after);
