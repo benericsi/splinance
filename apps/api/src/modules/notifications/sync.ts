@@ -6,7 +6,7 @@ import {
   RENEWAL_LEAD_DAYS,
   seriesTiming,
 } from '@splinance/shared';
-import { and, eq, exists, inArray, isNull, notInArray, or, sql } from 'drizzle-orm';
+import { and, eq, exists, inArray, isNotNull, isNull, notInArray, or, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
 import {
   budgets,
@@ -164,7 +164,21 @@ export async function syncNotifications(
       await tx
         .insert(notifications)
         .values(wanted.map((row) => ({ ...row, householdId })))
-        .onConflictDoNothing();
+        // A fact that holds again (a budget over once more, a payment deleted) reopens its
+        // resolved row as new and unread; a row that never stopped holding stays as it is,
+        // so a read notification does not turn unread on every sync.
+        .onConflictDoUpdate({
+          target: [notifications.userId, notifications.dedupeKey],
+          set: {
+            resolvedAt: null,
+            readAt: null,
+            createdAt: now,
+            dueOn: sql`excluded.due_on`,
+            amount: sql`excluded.amount`,
+            previousAmount: sql`excluded.previous_amount`,
+          },
+          setWhere: isNotNull(notifications.resolvedAt),
+        });
     }
     for (const { userId } of members) {
       const keys = wanted.filter((row) => row.userId === userId).map((row) => row.dedupeKey);
