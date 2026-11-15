@@ -481,7 +481,13 @@ export async function undoImportedEntries(
   await tx
     .update(savingsEntries)
     .set({ deletedAt: at })
-    .where(and(eq(savingsEntries.importBatchId, importBatchId), liveEntry));
+    .where(
+      and(
+        eq(savingsEntries.householdId, scope.householdId),
+        eq(savingsEntries.importBatchId, importBatchId),
+        liveEntry,
+      ),
+    );
   return rows.length;
 }
 
