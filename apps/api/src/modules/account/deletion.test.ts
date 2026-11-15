@@ -532,9 +532,9 @@ describe('delete', () => {
       .select({ displayName: users.displayName, overviewView: users.overviewView })
       .from(users)
       .where(eq(users.id, ben.id));
-   expect(row?.displayName).toBe(FORMER_MEMBER_NAME);
-   expect(row?.overviewView).not.toBe('map');
- });
+    expect(row?.displayName).toBe(FORMER_MEMBER_NAME);
+    expect(row?.overviewView).not.toBe('map');
+  });
 
   it('cannot race a new expense that names the person', async () => {
     const [anna, ben] = [await person('Anna'), await person('Ben')];
