@@ -18,6 +18,7 @@ import { syncNotifications } from '../notifications/sync';
 import { acceptInvite, createInvite } from '../invites/invites.service';
 import { confirmSuggestion, createSeries } from '../recurring/recurring.service';
 import { createRule } from '../rules/rules.service';
+import { createSavingsRule } from '../savings/savings-rules.service';
 import { addEntry, createGoal, pinGoal } from '../savings/savings.service';
 import { createSettlement } from '../settlements/settlements.service';
 import { createTransaction } from '../transactions/transactions.service';
@@ -28,8 +29,9 @@ export type DemoPeople = Record<DemoPerson, string>;
 /**
  * Turns a demo story into a real household, only through the services the routes use: the
  * partner joins with an invite, bank history arrives as monthly imports of the story's
- * exports (read by `parseStatement`, like the import page does), the rest (also the savings
- * goals and what went into them) is entered by hand. Splits, the deferred split-sum check, audit entries, fingerprints and balances
+ * exports (read by `parseStatement`, like the import page does; the visitor's pocket moves
+ * go to their goals as savings rows), the rest is entered by hand. Splits, the deferred
+ * split-sum check, audit entries, fingerprints and balances
  * therefore hold exactly as for real users. Each call is its own database transaction;
  * the caller deletes the sandbox if one fails.
  */
@@ -110,17 +112,66 @@ export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<st
   const quietly = <T>(loud: boolean, work: () => Promise<T>) =>
     loud ? work() : withoutActivity(work);
 
+  // Goals (each by its maker, with its pins) and the visitor's pocket rules come before the
+  // imports, which send the pocket moves to them.
+  const goalIds = new Map<string, string>();
+  for (const goal of story.savings.goals) {
+    const created = await createGoal(scopeOf(goal.person), {
+      name: goal.name,
+      targetAmount: goal.targetAmount,
+      targetDate: goal.targetDate,
+      visibility: goal.visibility,
+    });
+    goalIds.set(goal.id, created.id);
+    for (const person of goal.pinnedBy) {
+      await pinGoal({ ...scopeOf(person), goalId: created.id });
+    }
+  }
+  const goalIdOf = (goal: string): string => {
+    const id = goalIds.get(goal);
+    if (!id) throw new Error(`Demo story names an unknown savings goal "${goal}"`);
+    return id;
+  };
+  for (const rule of story.savings.rules) {
+    await createSavingsRule(scopeOf(rule.person), {
+      pattern: rule.pattern,
+      goalId: goalIdOf(rule.goal),
+    });
+  }
+
   const transactionsById = new Map(story.transactions.map((t) => [t.id, t]));
+  const entriesById = new Map(story.savings.entries.map((e) => [e.id, e]));
   const rowsById = new Map(story.bankRows.map((row) => [row.id, row]));
 
-  // Each person imports their bank export once a month. Rows that are not spending (own
-  // transfers, cash, payments between the two) are left out, as the review would.
+  // Each person imports their bank export once a month. Pocket moves go to their goal;
+  // rows that are not spending (own transfers, cash, payments between the two) are left out,
+  // as the review would.
   for (const file of renderDemoBankFiles(story)) {
     const parsed = parseStatement(file.text, demoParseOptions(file.person));
     const rows: ImportRow[] = [];
     for (const parsedRow of parsed.rows) {
       const rowId = file.lines.find((line) => line.line === parsedRow.line)?.rowId;
       const ref = rowsById.get(rowId ?? '')?.ref;
+      if (ref && 'savings' in ref) {
+        const entry = entriesById.get(ref.savings);
+        if (!entry || !parsedRow.fingerprint) {
+          throw new Error(
+            `${file.fileName} line ${String(parsedRow.line)} does not match the story`,
+          );
+        }
+        rows.push({
+          fingerprint: parsedRow.fingerprint,
+          savings: {
+            goalId: goalIdOf(entry.goal),
+            kind: parsedRow.kind,
+            amount: parsedRow.amount,
+            entryOn: parsedRow.occurredOn,
+            // What the review would keep: the bank's text, unless the visitor wrote a note.
+            note: entry.note ?? parsedRow.description,
+          },
+        });
+        continue;
+      }
       if (!ref || !('transaction' in ref)) continue;
       const transaction = transactionsById.get(ref.transaction);
       if (!transaction || !parsedRow.fingerprint) {
@@ -162,26 +213,12 @@ export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<st
     );
   }
 
-  // Savings: each goal by its maker, then every entry in date order (so a withdrawal finds
-  // the money there), then the pins.
-  const goalIds = new Map<string, string>();
-  for (const goal of story.savings.goals) {
-    const created = await createGoal(scopeOf(goal.person), {
-      name: goal.name,
-      targetAmount: goal.targetAmount,
-      targetDate: goal.targetDate,
-      visibility: goal.visibility,
-    });
-    goalIds.set(goal.id, created.id);
-    for (const person of goal.pinnedBy) {
-      await pinGoal({ ...scopeOf(person), goalId: created.id });
-    }
-  }
+  // Savings typed in (the partner's), in date order, after the imported pocket moves. They
+  // only put money in, so the visitor's imported withdrawal found the money there.
   for (const entry of story.savings.entries) {
-    const goalId = goalIds.get(entry.goal);
-    if (!goalId) throw new Error(`Demo story names an unknown savings goal "${entry.goal}"`);
+    if (entry.source !== 'manual') continue;
     await addEntry(
-      { ...scopeOf(entry.person), goalId },
+      { ...scopeOf(entry.person), goalId: goalIdOf(entry.goal) },
       { amount: entry.amount, entryOn: entry.entryOn, note: entry.note },
     );
   }

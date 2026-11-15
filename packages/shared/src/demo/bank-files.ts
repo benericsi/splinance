@@ -47,6 +47,8 @@ const REVOLUT_TYPES: Record<DemoBankMove, string> = {
   fee: 'Fee',
   'top-up': 'Topup',
   atm: 'ATM',
+  'pocket-out': 'Transfer',
+  'pocket-in': 'Transfer',
 };
 
 const csvCell = (value: string) =>
@@ -61,6 +63,11 @@ function revolutDescription(row: DemoBankRow): string {
       return `Transfer to ${row.party ?? ''}`;
     case 'top-up':
       return `Top-up by *${CARD_DIGITS}`;
+    // Made up: no real Revolut pocket export was at hand when this was written.
+    case 'pocket-out':
+      return `To pocket HUF ${row.party ?? ''} from HUF`;
+    case 'pocket-in':
+      return `From pocket HUF ${row.party ?? ''} to HUF`;
     default:
       return row.party ?? REVOLUT_TYPES[row.move];
   }
@@ -112,6 +119,9 @@ const KH_TYPES: Record<DemoBankMove, string> = {
   fee: 'Számlavezetési díj',
   'top-up': 'Jóváírás',
   atm: 'Készpénzfelvét K&H ATM-ből',
+  // K&H has no pockets; the partner never moves money this way.
+  'pocket-out': 'Átvezetés saját számlára',
+  'pocket-in': 'Átvezetés saját számláról',
 };
 
 interface KhRow {

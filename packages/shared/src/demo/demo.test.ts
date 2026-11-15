@@ -8,6 +8,7 @@ import {
   type RecurringRow,
   seriesTiming,
 } from '../recurring';
+import { firstMatchingSavingsRule } from '../savings';
 import { PERCENT_SCALE } from '../splits';
 import { demoParseOptions, renderDemoBankFiles } from './bank-files';
 import { DEMO_TEXT } from './locale';
@@ -101,7 +102,7 @@ describe('buildDemoStory', () => {
     for (const budget of story.budgets) expect(categories.get(budget.category)).toBe('expense');
   });
 
-  it('links every imported transaction and settlement to bank rows', () => {
+  it('links every imported transaction, savings entry and settlement to bank rows', () => {
     const refs = story.bankRows.flatMap((row) => (row.ref ? [row.ref] : []));
     for (const t of story.transactions) {
       const count = refs.filter((ref) => 'transaction' in ref && ref.transaction === t.id).length;
@@ -109,6 +110,10 @@ describe('buildDemoStory', () => {
     }
     for (const s of story.settlements) {
       expect(refs.filter((ref) => 'settlement' in ref && ref.settlement === s.id)).toHaveLength(2);
+    }
+    for (const e of story.savings.entries) {
+      const count = refs.filter((ref) => 'savings' in ref && ref.savings === e.id).length;
+      expect(count).toBe(e.source === 'bank' ? 1 : 0);
     }
   });
 
@@ -360,11 +365,55 @@ describe('the story as savings', () => {
     }
   });
 
+  it('moves the visitor’s part through Revolut pockets, which their rules send to the goals', () => {
+    for (const entry of story.savings.entries) {
+      expect(entry.source).toBe(entry.person === 'you' ? 'bank' : 'manual');
+    }
+    const files = renderDemoBankFiles(story);
+    const pocketRows = story.bankRows.filter((row) => row.ref && 'savings' in row.ref);
+    expect(pocketRows.length).toBe(story.savings.entries.filter((e) => e.source === 'bank').length);
+    for (const row of pocketRows) {
+      const entry = story.savings.entries.find(
+        (e) => row.ref && 'savings' in row.ref && e.id === row.ref.savings,
+      );
+      expect(row).toMatchObject({
+        person: 'you',
+        occurredOn: entry?.entryOn,
+        amount: -(entry?.amount ?? 0),
+      });
+
+      const file = files.find((f) => f.lines.some((line) => line.rowId === row.id));
+      const line = file?.lines.find((l) => l.rowId === row.id)?.line;
+      const parsed = parseStatement(file?.text ?? '', demoParseOptions('you')).rows.find(
+        (r) => r.line === line,
+      );
+      // Not an own transfer to leave out: the visitor's rule names the goal, either way.
+      expect(parsed?.flags).toEqual([]);
+      expect(parsed?.kind).toBe(row.amount < 0 ? 'expense' : 'income');
+      const rule = firstMatchingSavingsRule(story.savings.rules, {
+        counterparty: parsed?.counterparty ?? null,
+        description: parsed?.description ?? '',
+      });
+      expect(rule?.goal).toBe(entry?.goal);
+    }
+    // Numbered after every other row: adding them moved no other row.
+    const number = (id: string) => Number(id.slice(4));
+    const lastOther = Math.max(
+      ...story.bankRows.filter((row) => !pocketRows.includes(row)).map((row) => number(row.id)),
+    );
+    expect(Math.min(...pocketRows.map((row) => number(row.id)))).toBe(lastOther + 1);
+    // Another seed moves them at other times: the demo's sample export is new to the household.
+    const other = buildDemoStory({ seed: 2, today: TODAY }).bankRows.filter(
+      (row) => row.ref && 'savings' in row.ref,
+    );
+    expect(other.map((row) => row.time)).not.toEqual(pocketRows.map((row) => row.time));
+  });
+
   it('has nothing after today, also early in a month', () => {
     const early = buildDemoStory({ seed: 1, today: '2026-10-06' });
     expect(early.savings.entries.every((e) => e.entryOn <= '2026-10-06')).toBe(true);
     // Only the visitor's holiday money (the 5th) is in by the 6th.
-    expect(early.savings.entries.filter((e) => e.entryOn.startsWith('2026-10'))).toEqual([
+    expect(early.savings.entries.filter((e) => e.entryOn.startsWith('2026-10'))).toMatchObject([
       { goal: 'holiday', person: 'you', amount: 30_000, entryOn: '2026-10-05', note: null },
     ]);
   });

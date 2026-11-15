@@ -9,6 +9,7 @@ import {
   meResponseSchema,
   notificationListResponseSchema,
   savingsResponseSchema,
+  savingsRuleListResponseSchema,
   recurringListResponseSchema,
   renderDemoBankFiles,
 } from '@splinance/shared';
@@ -20,7 +21,7 @@ import { type App, createHousehold, errorCode } from '../../../test/households';
 import { bearer, createTestUser } from '../../../test/users';
 import { createApp } from '../../app';
 import { db, pool } from '../../db/client';
-import { demos, importBatches, settlements, transactions } from '../../db/schema';
+import { demos, importBatches, savingsEntries, settlements, transactions } from '../../db/schema';
 import { REFRESH_COOKIE } from '../auth/refresh-cookie';
 import { CLEANUP_LOCK, deleteExpiredDemos } from './demo.cleanup';
 import { createDemo, createSandbox, type DemoConfig, deleteDemo } from './demo.service';
@@ -215,6 +216,20 @@ describe('POST /api/demo', { timeout: 30_000 }, () => {
       ['John Doe', 185_000],
     ]);
     expect(setAside).toBe(80_000);
+    // His part came from his Revolut files (pocket moves imported as entries), with a rule
+    // per pocket; Jane typed hers in.
+    const entries = await db.select().from(savingsEntries);
+    const john = demo.user.id;
+    expect(entries.filter((e) => e.userId === john).every((e) => e.importBatchId)).toBe(true);
+    expect(entries.filter((e) => e.userId !== john).every((e) => !e.importBatchId)).toBe(true);
+    const rulesRes = await request(app)
+      .get(`/api/households/${demo.householdId}/savings/rules`)
+      .set('Authorization', auth)
+      .expect(200);
+    expect(savingsRuleListResponseSchema.parse(rulesRes.body).rules.map((r) => r.pattern)).toEqual([
+      'pocket HUF Italy trip',
+      'pocket HUF Emergency',
+    ]);
 
     // The bell on first visit: Jane's last few days and the budget alert, not her whole year.
     const bellRes = await request(app)

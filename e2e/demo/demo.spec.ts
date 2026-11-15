@@ -111,7 +111,12 @@ test('a sample export goes through the import', async ({ page }) => {
   await page.getByRole('button', { name: 'No export at hand? Try a sample one' }).click();
   const ready = page.getByRole('region', { name: 'Ready to import' });
   await expect(ready.getByRole('listitem').first()).toBeVisible();
-  await page.getByRole('button', { name: /^Import \d+ transactions?$/ }).click();
+  // From the 5th on, John's holiday pocket move is in the month: his savings rule sends it
+  // to the goal, not into spending.
+  if (new Date().getDate() >= 5) {
+    await expect(ready.getByText('By savings rule "pocket HUF Italy trip"')).toBeVisible();
+  }
+  await page.getByRole('button', { name: /^Import \d+ (transactions?|rows?)$/ }).click();
   await expect(page.getByText(/^\d+ transactions? imported$/).first()).toBeVisible();
 });
 
