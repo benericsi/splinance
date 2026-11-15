@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-router';
 import { render } from '@testing-library/react';
 import { authStore } from '@/lib/auth-store';
-import { rerunGuardsOnSessionEnd } from '@/lib/session-watch';
+import { clearCacheOnUserChange, rerunGuardsOnSessionEnd } from '@/lib/session-watch';
 import { routeTree } from '@/routeTree.gen';
 import { beforeAll, onTestFinished } from 'vitest';
 
@@ -27,6 +27,7 @@ export function renderRoute(path: string, { pendingMs = Infinity }: { pendingMs?
   });
   // Same wiring as main.tsx: logout and expired sessions re-run the route guards.
   onTestFinished(rerunGuardsOnSessionEnd(authStore, router));
+  onTestFinished(clearCacheOnUserChange(authStore, queryClient));
   render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
