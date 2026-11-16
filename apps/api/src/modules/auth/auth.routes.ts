@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   type AuthProvidersResponse,
   type AuthResponse,
@@ -5,7 +6,7 @@ import {
   type MeResponse,
   registerInputSchema,
 } from '@splinance/shared';
-import { type RequestHandler, type Response, Router } from 'express';
+import { type Request, type RequestHandler, type Response, Router } from 'express';
 import { HttpError } from '../../lib/http-error';
 import { closedInDemo } from '../../middleware/demo-mode';
 import { rateLimiter } from '../../middleware/rate-limit';
@@ -41,6 +42,16 @@ function sendAuth(res: Response, status: number, result: AuthResult) {
 }
 
 /** Rate limiters live per router instance, so each app (and test) gets its own counters. */
+/**
+ * Failed logins per account: the email as the login schema normalizes it, hashed, so the
+ * limiter's store holds no addresses. A body without one shares a single key.
+ */
+function loginAccountKey(req: Request): string {
+  const email = (req.body as { email?: unknown } | undefined)?.email;
+  const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  return `login-account:${createHash('sha256').update(normalized).digest('base64url')}`;
+}
+
 export function createAuthRouter({
   demo = false,
   registration = { mode: 'open', allowlist: [] },
@@ -54,15 +65,20 @@ export function createAuthRouter({
   const router = Router();
   const providers = demo ? [] : (oauth?.providers ?? []);
 
+  const loginPerIp = rateLimiter(10, { skipSuccessfulRequests: true });
+  const loginPerAccount = rateLimiter(10, { skipSuccessfulRequests: true, key: loginAccountKey });
+
   if (demo) router.post('/register', closedInDemo);
   router.post('/register', rateLimiter(5), async (req, res) => {
     const input = registerInputSchema.parse(req.body);
     sendAuth(res, 201, await register(input, registration));
   });
 
-  // Only failed attempts count, so normal users never hit the limit. A waiting provider
-  // account (link cookie) is connected by the same successful login.
-  router.post('/login', rateLimiter(10, { skipSuccessfulRequests: true }), async (req, res) => {
+  // Only failed attempts count, so normal users never hit the limit: 10 per IP, and 10 per
+  // account so one account cannot be guessed from many addresses (the same for known and
+  // unknown emails). A waiting provider account (link cookie) is connected by the same
+  // successful login.
+  router.post('/login', loginPerIp, loginPerAccount, async (req, res) => {
     const input = loginInputSchema.parse(req.body);
     const pendingLink = providers.length > 0 ? await readOAuthCookie(req, 'link') : undefined;
     const result = await login(input, pendingLink);
