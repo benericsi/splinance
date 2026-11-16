@@ -177,6 +177,7 @@ A user can belong to any number of households.
 
 - `(household_id, id)` is unique: the target of the split rows' composite FK.
 - Partial index `transactions_household_occurred_idx` on `(household_id, occurred_on DESC, id DESC) WHERE deleted_at IS NULL` serves the list and its keyset pagination.
+- Partial index `transactions_import_batch_idx` on `(household_id, import_batch_id) WHERE import_batch_id IS NOT NULL`: an import's rows (undo, the batch list) and the batch foreign key's lookups. Queries name both columns.
 - Partial unique index `transactions_import_fingerprint_unique` on `(household_id, created_by, import_fingerprint) WHERE import_fingerprint IS NOT NULL AND deleted_at IS NULL`: a bank row is imported once per person. Deleted rows do not count, so an undone import can be imported again; restoring a deleted row whose bank row was imported again since is refused (409 `ALREADY_IMPORTED`).
 - `counterparty` stays as the bank wrote it while `description` is edited, so later rules and recurring detection can match on it. Account numbers are never stored.
 
@@ -366,6 +367,7 @@ Money a member put into a goal (positive) or took out of it (negative). Not a tr
 - Never edited: a wrong entry is deleted and recorded again.
 - A goal's balance never goes below zero. A CHECK cannot see other rows, so the service locks the goal row before a withdrawal or the removal of a deposit.
 - Partial indexes (`WHERE deleted_at IS NULL`): `savings_entries_goal_entry_idx` on `(goal_id, entry_on DESC, id DESC)` for a goal's history and balance, `savings_entries_user_entry_idx` on `(household_id, user_id, entry_on)` for what one person set aside in a month.
+- Partial index `savings_entries_import_batch_idx` on `(household_id, import_batch_id) WHERE import_batch_id IS NOT NULL`: an import's entries (undo, the batch list) and the batch foreign key's lookups.
 - Partial unique index `savings_entries_import_fingerprint_unique` on `(household_id, user_id, import_fingerprint) WHERE import_fingerprint IS NOT NULL AND deleted_at IS NULL`: like transactions', a bank row is imported once per person, and an undone import can come back. A row is either a transaction or an entry; the import service keeps it so, since no index spans both tables (architecture hard part 38).
 - Not in the `analytics` views (names and notes are free text, and private goals would need stubs).
 
@@ -427,8 +429,8 @@ Private and deleted rows never count. Debts are netted within each pair (`netDeb
 | after        | jsonb, nullable     | After the change (null for delete)                              |
 | created_at   | timestamptz         | Indexed with `(entity, entity_id)`                              |
 
-- Append-only, written in the same database transaction as the change: never a change without its entry, or the other way round.
-- Snapshots are the API shape, including display names at that time.
+- Append-only, written in the same database transaction as the change: never a change without its entry, or the other way round. (The one exception, data migration 0025, blanked the names in older snapshots.)
+- Snapshots are the API shape with every `displayName` blank: people are kept as ids and their current names are read from `users` when the history is read, so an erased account leaves no copy of its name here.
 
 ### `demos`
 

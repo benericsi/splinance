@@ -129,11 +129,12 @@ Middleware order:
 helmet()                 security headers (CSP, HSTS, nosniff, ...)
 pinoHttp()               request id, req.log, one log line per request (method, url, status only;
                          invite tokens in the url are redacted)
-express.json             body parsing with a size cap: 100kb, 1mb for bank imports (a thousand rows);
-                         no compressed bodies (inflate: false), so the cap bounds memory
+express.json             body parsing with a size cap of 100kb; the two bank import routes skip it and
+                         parse up to 1mb (a thousand rows) in their router, after requireAuth and the
+                         import limit; no compressed bodies (inflate: false), so the cap bounds memory
 cookieParser()           req.cookies (needed for the refresh token)
 /api router
-  /health                live + ready
+  /health                live + ready (ready asks the database at most once per 5 s)
   rateLimiter(1000)      ceiling per IP and 15 minutes for everything below
   /auth                  register, login, refresh, logout (rate limited)
   GET /me                requireAuth -> getMe
@@ -151,7 +152,10 @@ Error handling: route handlers just `throw`. Express 5 forwards rejected promise
 | `ZodError` (from `schema.parse(req.body)`) | 400 `VALIDATION_ERROR` with `details` (Zod tree)                          |
 | `HttpError(status, message, code)`         | that status and code                                                      |
 | body-parser errors (`expose`, `type`)      | 400 `INVALID_JSON`, 413 `PAYLOAD_TOO_LARGE`, 415 `UNSUPPORTED_MEDIA_TYPE` |
+| Postgres `55P03` / `57014` (`isTimeout`)   | 503 `BUSY`, logged at warn: a lock wait or statement ran out of time      |
 | anything else                              | logged with stack, client gets 500 `INTERNAL_ERROR` without internals     |
+
+Database timeouts (`db/client.ts`, `DB_*_TIMEOUT_MS`): every API connection opens with `statement_timeout` 30 s, `lock_timeout` 10 s and `idle_in_transaction_session_timeout` 60 s, so one stuck transaction cannot queue a household's writers (all behind `lockHousehold`) forever; the waiting writes answer 503 `BUSY` and nothing is written. Migrations use their own connection and are not bounded. Tests lower the lock timeout to 2 s.
 
 Every error body matches `apiErrorResponseSchema` from the shared package: `{ "error": { "code": string, "message": string, "details"?: unknown } }`.
 
@@ -244,9 +248,11 @@ Transaction input is a union on `visibility`. Both carry `kind, amount, occurred
 Write rules (all in `transactions.service.ts`):
 
 - Every write runs in one database transaction: shared household lock, membership check, the change, the split rows, the audit entry.
+- Audit snapshots (`before`, `after`) are the API shape with every `displayName` blank (`toStored`, likewise for settlements): the history fills in today's names from `users`, so a rename shows everywhere and a deleted account reads "Former member" with no copy of its name left in the log (migration 0025 blanked the names stored before).
 - Payer and split people must be active members, except people who were already on the transaction before this edit, so an old expense with someone who left can still be corrected.
 - New category references must be active, of the transaction's kind, and in this household. Keeping the current category is allowed even if it was archived since.
 - Any member may edit or delete a shared transaction (audited). Only the author may make one private, because the payer becomes the author and the others lose sight of it.
+- The history shows the author every entry. Anyone else sees it from the latest moment the transaction became shared (created shared, or an edit from private), with that entry's `before` left out: what it was while private only its author ever saw.
 - The server computes the shares from the entered split. People are sorted by user id first, so the same input always gives the same shares (and the same person gets a leftover unit).
 - `PUT` replaces the transaction and must name the `version` it was based on. The row is locked (`FOR UPDATE`) before the comparison, so two concurrent edits of the same version produce one 200 and one 409. Delete and restore also bump the version, so a form opened before a delete cannot overwrite the restored row.
 - The summary is `{ month, currency, expenses, income, yourExpenses }` over what the caller can see: `yourExpenses` adds their shares of shared expenses and their private expenses. The list is paged, so the client could not total a month itself.
@@ -503,6 +509,7 @@ browser: boot -> POST /api/auth/refresh -> signed in -> the _auth guard forwards
 `/account` (section 9) manages the profile and the ways into the account, `/account/preferences` how the app behaves for the person; the API is `modules/account`.
 
 - **Step-up for anything that adds or removes a way in** (`requireRecentAuth`): an account with a password confirms with its current password every time; one without must have signed in within 10 minutes (`RECENT_SIGN_IN_MS`, measured from `sessions.created_at`, which refresh never moves), else 403 `REAUTH_REQUIRED`. Without it, a stolen access token (15 minutes) could set a password and keep the account. The caller's session must also still be active (an access token outlives a logout), else 401.
+- **Argon2 never runs under the user lock** (100-300 ms each): `verifyBeforeLock` checks the session, then the current password against the row read without a lock, and returns the hash it matched; under `lockUser`, `requireRecentAuth` accepts only if the locked row still holds that hash (a password changed in between answers `WRONG_PASSWORD`). A new password is hashed before the transaction too.
 - **A wrong current password is 400 `WRONG_PASSWORD`**, never 401: the web client answers every 401 with a refresh and a retry. Failed attempts count against a per-user limit (10 per 15 minutes) and log `account.step_up_failed` at warn.
 - **Changing the password signs out every other session** (`revoked_at`), in the same transaction; the caller's stays. Their access tokens expire within 15 minutes. "Sign out other devices" does the same without a password change.
 - **The user row is locked first** (`lockUser`, `SELECT ... FOR UPDATE`) by every change to how a user signs in, so a later "is there another way in?" check (disconnecting a provider) cannot interleave with another change.
@@ -523,9 +530,9 @@ Self-service (GDPR Art. 17) in `modules/account/deletion.service.ts`. The user r
 | `users` row                                              | stays: `display_name` "Former member", `email` `deleted-<id>@deleted.invalid` (the real address is free again), no password, `deleted_at` set                             |
 | identities, sessions                                     | deleted                                                                                                                                                                   |
 | households nobody else was ever in                       | deleted whole (`deleteHouseholdContents`, the code `deleteDemo` uses)                                                                                                     |
-| households with other members                            | membership ended (as leaving), pending invites revoked; shared entries stay under "Former member"                                                                         |
+| households with other members                            | membership ended (as leaving), pending invites revoked; shared entries and their history stay under "Former member" (audit snapshots hold no names)                       |
 | households only former members were in besides them      | membership ended, archived                                                                                                                                                |
-| private transactions (only their author could read them) | hard deleted with their audit rows (which hold copies)                                                                                                                    |
+| private transactions (only their author could read them) | hard deleted with their audit rows (which hold copies of the text)                                                                                                        |
 | import batches they made                                 | file name cleared (rows stay, shared transactions reference them)                                                                                                         |
 | personal budgets                                         | deleted                                                                                                                                                                   |
 | private savings goals                                    | hard deleted with their entries, and every pin and savings rule of theirs; what they put into shared goals stays under "Former member" (the goal's balance depends on it) |
@@ -533,7 +540,7 @@ Self-service (GDPR Art. 17) in `modules/account/deletion.service.ts`. The user r
 - **Preview first** (`GET /api/account/deletion`): the dialog lists exactly this, and the blockers: an open balance with anyone (`UNSETTLED_BALANCE`) or being the only owner of a household that still has other members (`LAST_OWNER`). A blocked deletion shows only the way to resolve it, never a form.
 - **The delete** (`POST /api/account/delete`): `lockUser`, the session still active, the email typed again (`CONFIRMATION_MISMATCH`), the step-up, then every household of the user locked in id order and the plan computed again under those locks, so a new expense naming them cannot slip in (hard part 33). Refused as a whole while a blocker exists. Logs `account.deleted` with the user id and counts.
 - **A still-valid access token** (up to 15 minutes) finds its sessions gone (401 on the account routes and `/api/me`), its memberships ended (404), `POST /api/households` and invite accept refuse a deleted user (`assertLiveUser`), and the profile and preference writes match only a row without `deleted_at` (401), so nothing is written back over "Former member".
-- **Backups** keep the data up to 13 months; a restore brings deleted accounts back, so the restore runbook repeats every `account.deleted` made after the backup's date with `account:erase` (deploy.md 5), the same erasure without the step-up and blockers.
+- **Backups** keep the data up to 13 months; a restore brings deleted accounts back, so the restore runbook repeats every `account.deleted` made after the backup's date with `account:erase` (deploy.md 5), the same erasure without the step-up and blockers. A backup taken before migration 0025 still holds names in audit snapshots; migrating the restored database runs 0025 again and blanks them.
 
 ### Refresh rotation (the core of the design)
 
@@ -732,7 +739,7 @@ invitee: opens /invite#<token>
 
 - Router context carries `queryClient` and `auth` (the store), so guards and loaders work outside React.
 - The `?redirect=` value is validated by `redirectSearchSchema` and `safeRedirect()`: only same-app paths are allowed; `https://...`, `//evil.com` and `/\evil.com` fall back to `/` (open redirect protection).
-- Logout or a failed mid-session refresh flips `authStore` to anonymous. `rerunGuardsOnSessionEnd` (`lib/session-watch.ts`, wired in `main.tsx` and the test router) calls `router.invalidate()` on that transition, so guards re-run and protected pages redirect.
+- Logout or a failed mid-session refresh flips `authStore` to anonymous. `rerunGuardsOnSessionEnd` (`lib/session-watch.ts`, wired in `main.tsx` and the test router) calls `router.invalidate()` on that transition, so guards re-run and protected pages redirect. Next to it, `clearCacheOnUserChange` empties the query cache on that transition and when a different user signs in on the same tab, so an expired or revoked session never leaves its data for the next person (logout, account deletion and the demo's end also clear it themselves).
 - `authStore` remembers why the session ended (`endedBy`). After a failed refresh the guard keeps `?redirect=<page>`, so the same person continues where they were. After an explicit logout it does not: the next person on the browser is often someone else, and the previous user's household would be a 404 for them.
 - Not found and errors: the root shows full-page versions; the router defaults (`defaultNotFoundComponent`, `defaultErrorComponent`) render inline inside layouts. "Try again" resets the error boundary and re-runs loaders.
 - Page titles: each page renders exactly one `<PageTitle title="..." />`. React 19 hoists `<title>` into `<head>`; multiple titles at once are unsupported, so layouts never render one.

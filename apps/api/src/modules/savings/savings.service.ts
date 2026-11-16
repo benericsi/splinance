@@ -20,7 +20,6 @@ import {
   savingsGoalPins,
   type SavingsGoalRow,
   savingsGoals,
-  users,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
 import { decodeCursor, encodeCursor } from '../../lib/keyset-cursor';
@@ -29,6 +28,7 @@ import {
   type Membership,
   requireMembership,
 } from '../households/households.service';
+import { namesOf, personOf } from '../households/people';
 
 export const goalNotFound = () =>
   new HttpError(404, 'Savings goal not found', 'SAVINGS_GOAL_NOT_FOUND');
@@ -76,16 +76,6 @@ const liveEntry = isNull(savingsEntries.deletedAt);
 
 const entrySum = sql<number>`coalesce(sum(${savingsEntries.amount}), 0)::bigint`.mapWith(Number);
 
-async function namesOf(executor: Db, userIds: Iterable<string>): Promise<Map<string, string>> {
-  const ids = [...new Set(userIds)];
-  if (ids.length === 0) return new Map();
-  const people = await executor
-    .select({ id: users.id, displayName: users.displayName })
-    .from(users)
-    .where(inArray(users.id, ids));
-  return new Map(people.map((person) => [person.id, person.displayName]));
-}
-
 /**
  * API representations for the given rows, in the same order, with balances, names and the
  * viewer's own pins.
@@ -116,11 +106,12 @@ async function toGoals(
     )
     .groupBy(savingsEntries.goalId, savingsEntries.userId);
 
-  const nameOf = await namesOf(executor, [
-    ...rows.map((row) => row.createdBy),
-    ...sums.map((sum) => sum.userId),
-  ]);
-  const person = (userId: string) => ({ userId, displayName: nameOf.get(userId) ?? '' });
+  const person = personOf(
+    await namesOf(executor, [
+      ...rows.map((row) => row.createdBy),
+      ...sums.map((sum) => sum.userId),
+    ]),
+  );
 
   return rows.map((row) => {
     const own = sums.filter((sum) => sum.goalId === row.id);
@@ -151,13 +142,15 @@ async function toGoal(executor: Db, row: SavingsGoalRow, viewerId: string): Prom
 }
 
 async function toEntries(executor: Db, rows: SavingsEntryRow[]): Promise<SavingsEntry[]> {
-  const nameOf = await namesOf(
-    executor,
-    rows.map((row) => row.userId),
+  const person = personOf(
+    await namesOf(
+      executor,
+      rows.map((row) => row.userId),
+    ),
   );
   return rows.map((row) => ({
     id: row.id,
-    user: { userId: row.userId, displayName: nameOf.get(row.userId) ?? '' },
+    user: person(row.userId),
     amount: row.amount,
     entryOn: row.entryOn,
     note: row.note,
@@ -488,7 +481,13 @@ export async function undoImportedEntries(
   await tx
     .update(savingsEntries)
     .set({ deletedAt: at })
-    .where(and(eq(savingsEntries.importBatchId, importBatchId), liveEntry));
+    .where(
+      and(
+        eq(savingsEntries.householdId, scope.householdId),
+        eq(savingsEntries.importBatchId, importBatchId),
+        liveEntry,
+      ),
+    );
   return rows.length;
 }
 

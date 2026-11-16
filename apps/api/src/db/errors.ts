@@ -1,4 +1,6 @@
 const UNIQUE_VIOLATION = '23505';
+/** lock_not_available (lock_timeout) and query_canceled (statement_timeout). */
+const TIMED_OUT = new Set(['55P03', '57014']);
 
 interface PgError {
   code?: string;
@@ -13,4 +15,15 @@ export function isUniqueViolation(err: unknown, constraint: string): boolean {
     const pgError = candidate as PgError;
     return pgError.code === UNIQUE_VIOLATION && pgError.constraint === constraint;
   });
+}
+
+/** A statement or lock wait cut off by the connection's timeouts (client.ts). */
+export function isTimeout(err: unknown): boolean {
+  const candidates = [err, err instanceof Error ? err.cause : undefined];
+  return candidates.some(
+    (candidate) =>
+      typeof candidate === 'object' &&
+      candidate !== null &&
+      TIMED_OUT.has((candidate as PgError).code ?? ''),
+  );
 }

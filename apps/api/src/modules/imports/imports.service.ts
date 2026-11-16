@@ -18,10 +18,10 @@ import {
   savingsEntries,
   savingsGoals,
   transactions,
-  users,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
 import { lockHouseholdShared, requireMembership } from '../households/households.service';
+import { namesOf, personOf } from '../households/people';
 import {
   goalNotFound,
   insertEntry,
@@ -48,19 +48,24 @@ const shiftDays = (date: string, days: number) =>
 
 async function toBatches(executor: Db, rows: ImportBatchRow[]): Promise<ImportBatch[]> {
   if (rows.length === 0) return [];
-  const people = await executor
-    .select({ id: users.id, displayName: users.displayName })
-    .from(users)
-    .where(inArray(users.id, [...new Set(rows.map((row) => row.createdBy))]));
-  const nameOf = new Map(people.map((person) => [person.id, person.displayName]));
+  const person = personOf(
+    await namesOf(
+      executor,
+      rows.map((row) => row.createdBy),
+    ),
+  );
   // Every entry the import created, removed ones too (like `row_count`).
   const savings = await executor
     .select({ batchId: savingsEntries.importBatchId, count: count() })
     .from(savingsEntries)
     .where(
-      inArray(
-        savingsEntries.importBatchId,
-        rows.map((row) => row.id),
+      and(
+        // Both columns, so the (household, batch) index serves it.
+        inArray(savingsEntries.householdId, [...new Set(rows.map((row) => row.householdId))]),
+        inArray(
+          savingsEntries.importBatchId,
+          rows.map((row) => row.id),
+        ),
       ),
     )
     .groupBy(savingsEntries.importBatchId);
@@ -71,7 +76,7 @@ async function toBatches(executor: Db, rows: ImportBatchRow[]): Promise<ImportBa
     fileName: row.fileName,
     rowCount: row.rowCount,
     savingsCount: savingsOf.get(row.id) ?? 0,
-    createdBy: { userId: row.createdBy, displayName: nameOf.get(row.createdBy) ?? '' },
+    createdBy: person(row.createdBy),
     createdAt: row.createdAt.toISOString(),
     undoneAt: row.undoneAt?.toISOString() ?? null,
   }));
@@ -490,7 +495,13 @@ export async function undoImport(scope: HouseholdScope & { importId: string }): 
     const rows = await tx
       .select()
       .from(transactions)
-      .where(and(eq(transactions.importBatchId, batch.id), isNull(transactions.deletedAt)))
+      .where(
+        and(
+          eq(transactions.householdId, scope.householdId),
+          eq(transactions.importBatchId, batch.id),
+          isNull(transactions.deletedAt),
+        ),
+      )
       .orderBy(transactions.id)
       .for('update');
     // One timestamp for the rows, the entries and the batch: a row whose deletion matches the

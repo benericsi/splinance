@@ -7,14 +7,16 @@ import {
   revokeSessionsResponseSchema,
 } from '@splinance/shared';
 import { eq } from 'drizzle-orm';
+import type { PoolClient } from 'pg';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDatabase } from '../../../test/db';
 import { createHousehold, errorCode } from '../../../test/households';
 import { createApp } from '../../app';
-import { db } from '../../db/client';
+import { db, pool } from '../../db/client';
 import { sessions, userIdentities, users } from '../../db/schema';
 import { createSession } from '../auth/auth.service';
+import { hashPassword } from '../auth/passwords';
 import { createOidcProvider } from '../auth/oauth/providers';
 import { REFRESH_COOKIE } from '../auth/refresh-cookie';
 import { RECENT_SIGN_IN_MS } from './account.service';
@@ -86,6 +88,39 @@ async function googleOnly(ageMs = 0): Promise<Device & { sessionId: string }> {
     auth: `Bearer ${result.accessToken}`,
     refreshToken: result.refreshCookie.token,
   };
+}
+
+/** Holds the user row lock on another connection while `work` runs, then commits. */
+async function withUserLocked<T>(
+  userId: string,
+  work: (holder: PoolClient) => Promise<T>,
+): Promise<T> {
+  const holder = await pool.connect();
+  try {
+    await holder.query('begin');
+    await holder.query('select id from users where id = $1 for update', [userId]);
+    const result = await work(holder);
+    await holder.query('commit');
+    return result;
+  } catch (err) {
+    await holder.query('rollback');
+    throw err;
+  } finally {
+    holder.release();
+  }
+}
+
+/** Waits until some query of this database is queued behind a row lock. */
+async function untilWaitingOnLock(): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const { rows } = await pool.query<{ waiting: number }>(
+      `select count(*)::int as waiting from pg_stat_activity
+       where datname = current_database() and wait_event_type = 'Lock'`,
+    );
+    if ((rows[0]?.waiting ?? 0) > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('nothing waited on the lock');
 }
 
 let app: App;
@@ -329,6 +364,41 @@ describe('POST /api/account/password', () => {
       newPassword: 'short',
     }).expect(400);
     expect(errorCode(short)).toBe('VALIDATION_ERROR');
+  });
+
+  it('checks the current password before waiting for the account lock', async () => {
+    const here = await registerAnna(app);
+    await withUserLocked(here.userId, async () => {
+      // Argon2 runs before the lock, so a wrong password is answered while it is held.
+      const res = await changePassword(app, here.auth, {
+        currentPassword: 'not my password',
+        newPassword: NEW_PASSWORD,
+      });
+      expect(res.status).toBe(400);
+      expect(errorCode(res)).toBe('WRONG_PASSWORD');
+    });
+  });
+
+  it('refuses when the password changed between that check and the lock', async () => {
+    const here = await registerAnna(app);
+    const otherHash = await hashPassword('changed elsewhere meanwhile');
+    const { change } = await withUserLocked(here.userId, async (holder) => {
+      const change = changePassword(app, here.auth, {
+        currentPassword: anna.password,
+        newPassword: NEW_PASSWORD,
+      }).then((res) => res);
+      await untilWaitingOnLock();
+      await holder.query('update users set password_hash = $1 where id = $2', [
+        otherHash,
+        here.userId,
+      ]);
+      // Wrapped: returning the promise itself would wait for it before the commit.
+      return { change };
+    });
+    const res = await change;
+    expect(res.status).toBe(400);
+    expect(errorCode(res)).toBe('WRONG_PASSWORD');
+    await login(app, 'changed elsewhere meanwhile').expect(200);
   });
 
   it('refuses a session that has ended', async () => {

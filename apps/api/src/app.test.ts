@@ -1,6 +1,7 @@
 import { apiErrorResponseSchema, liveResponseSchema, readyResponseSchema } from '@splinance/shared';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
+import { bearer, createTestUser } from '../test/users';
 import { createApp } from './app';
 
 // Uses the real test database (see test/test-db.ts).
@@ -35,6 +36,25 @@ describe('GET /api/health/ready', () => {
     const res = await request(brokenApp).get('/api/health/ready').expect(503);
     expect(res.body).toEqual({ status: 'error', checks: { database: 'error' } });
   });
+
+  it('asks the database at most once every few seconds, however often it is called', async () => {
+    let pings = 0;
+    let now = 1_000_000;
+    const counted = createApp({
+      pingDatabase: () => {
+        pings++;
+        return Promise.resolve();
+      },
+      now: () => now,
+    });
+    await Promise.all([1, 2, 3].map(() => request(counted).get('/api/health/ready').expect(200)));
+    await request(counted).get('/api/health/ready').expect(200);
+    expect(pings).toBe(1);
+
+    now += 5_001;
+    await request(counted).get('/api/health/ready').expect(200);
+    expect(pings).toBe(2);
+  });
 });
 
 describe('unknown routes', () => {
@@ -59,6 +79,28 @@ describe('request bodies', () => {
   it('answers a body over the limit with 413', async () => {
     const res = await login()
       .send(JSON.stringify({ email: 'a@example.com', password: 'x'.repeat(200_000) }))
+      .expect(413);
+    expect(apiErrorResponseSchema.parse(res.body).error.code).toBe('PAYLOAD_TOO_LARGE');
+  });
+
+  it('does not read an import body before the caller is known', async () => {
+    const path = '/api/households/019a0000-0000-7000-8000-000000000001/imports';
+    const big = JSON.stringify({ rows: 'x'.repeat(1_100_000) });
+    // Over even the import limit: answered 401 because the body was never parsed.
+    for (const route of [path, `${path}/check`]) {
+      const res = await request(app)
+        .post(route)
+        .set('content-type', 'application/json')
+        .send(big)
+        .expect(401);
+      expect(apiErrorResponseSchema.parse(res.body).error.code).toBe('UNAUTHENTICATED');
+    }
+    // Signed in, the import limit still holds.
+    const res = await request(app)
+      .post(path)
+      .set('Authorization', await bearer(await createTestUser('Anna')))
+      .set('content-type', 'application/json')
+      .send(big)
       .expect(413);
     expect(apiErrorResponseSchema.parse(res.body).error.code).toBe('PAYLOAD_TOO_LARGE');
   });

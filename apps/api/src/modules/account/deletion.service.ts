@@ -28,7 +28,13 @@ import { HttpError } from '../../lib/http-error';
 import { openDebts } from '../balances/ledger';
 import { deleteHouseholdContents } from '../households/hard-delete';
 import { endMembership } from '../households/households.service';
-import { activeSession, type Caller, lockUser, requireRecentAuth } from './account.service';
+import {
+  activeSession,
+  type Caller,
+  lockUser,
+  requireRecentAuth,
+  verifyBeforeLock,
+} from './account.service';
 
 /** What a deleted account's row shows wherever its history appears. */
 export const FORMER_MEMBER_NAME = 'Former member';
@@ -244,6 +250,8 @@ export async function deleteAccount(
   input: DeleteAccountInput,
   now = new Date(),
 ): Promise<DeletionResult> {
+  // Argon2 before any lock (see verifyBeforeLock); compared with the locked row below.
+  const verifiedHash = await verifyBeforeLock(caller, input.currentPassword, now);
   return db.transaction(async (tx) => {
     const user = await lockUser(tx, caller.userId);
     if (user.deletedAt) throw sessionEnded();
@@ -251,7 +259,7 @@ export async function deleteAccount(
     if (input.confirmEmail !== user.email) {
       throw new HttpError(400, 'Type your email exactly as shown', 'CONFIRMATION_MISMATCH');
     }
-    await requireRecentAuth(user, session, input.currentPassword, now);
+    requireRecentAuth(user, session, verifiedHash, now);
 
     await lockMemberships(tx, user.id);
     const plan = await planDeletion(tx, user.id);

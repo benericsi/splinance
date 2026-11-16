@@ -8,6 +8,8 @@ export default defineConfig({
       LOG_LEVEL: 'silent',
       DATABASE_URL: TEST_DATABASE_URL,
       JWT_ACCESS_SECRET: 'test-secret-that-is-at-least-32-characters',
+      // Short, so a test of a lock that never frees finishes quickly (503 BUSY).
+      DB_LOCK_TIMEOUT_MS: '2000',
     },
     globalSetup: ['./test/global-setup.ts'],
     setupFiles: ['./test/setup.ts'],
