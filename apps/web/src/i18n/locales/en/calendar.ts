@@ -105,6 +105,10 @@ export const calendar = {
     paidYou: '{{name}} paid you',
     youPaid: 'You paid {{name}}',
     paidOther: '{{from}} paid {{to}}',
+    youPutIn: 'You put in',
+    putIn: '{{name}} put in',
+    youTookOut: 'You took out',
+    tookOut: '{{name}} took out',
   },
   legend: {
     label: 'What the marks mean',
@@ -112,10 +116,11 @@ export const calendar = {
     expected: 'Expected',
     income: 'Recurring income',
     settlement: 'Settle-up',
+    savings: 'Savings',
     spending: 'Darker days: more spent',
   },
   dialog: {
-    marked: 'Recurring and settle-ups',
+    marked: 'Recurring, settle-ups and savings',
     transactions: 'Transactions',
     spent: 'Spent {{amount}}',
     empty: 'Nothing on this day.',

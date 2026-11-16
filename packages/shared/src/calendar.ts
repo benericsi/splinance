@@ -91,10 +91,28 @@ export const calendarSettlementSchema = z.object({
   amount: z.number().int().positive(),
 });
 
+/**
+ * Money a member put into a savings goal or took out of it, in a goal the viewer can see
+ * (shared goals, and their own private ones): everyone's entries in a shared goal, like
+ * settlements. Saving is not spending: it is in no day total.
+ */
+export const calendarSavingsEntrySchema = z.object({
+  type: z.literal('savingsEntry'),
+  date: dateSchema,
+  entryId: z.uuid(),
+  goalId: z.uuid(),
+  /** The goal's name. */
+  name: z.string(),
+  user: personSchema,
+  direction: z.enum(['in', 'out']),
+  amount: z.number().int().positive(),
+});
+
 export const calendarEventSchema = z.discriminatedUnion('type', [
   calendarRecurringPaidSchema,
   calendarRecurringExpectedSchema,
   calendarSettlementSchema,
+  calendarSavingsEntrySchema,
 ]);
 export type CalendarEvent = z.infer<typeof calendarEventSchema>;
 export type CalendarEventType = CalendarEvent['type'];
@@ -106,7 +124,7 @@ export const calendarSchema = z.object({
   currency: currencySchema,
   /** Every day of the month, in order, zero when nothing happened. */
   days: z.array(calendarDaySchema),
-  /** By date, then paid, expected, settlements; largest first within a kind. */
+  /** By date, then paid, expected, settlements, savings; largest first within a kind. */
   events: z.array(calendarEventSchema),
 });
 export type Calendar = z.infer<typeof calendarSchema>;

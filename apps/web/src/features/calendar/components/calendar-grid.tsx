@@ -13,7 +13,7 @@ import { useAuth } from '@/lib/auth-store';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
 import { type CalendarView, daySpent, eventsByDate, leadingBlanks, spendLevel } from '../view';
-import { EVENT_STYLES, INCOME_STYLES } from '../events';
+import { EVENT_STYLES, INCOME_STYLES, isIncome } from '../events';
 import { EventChip } from './event-chip';
 
 /** A Monday: the week's days are named from here on. */
@@ -223,19 +223,26 @@ const EVENT_DOTS: Record<CalendarEvent['type'], string> = {
   recurringPaid: 'bg-foreground/70',
   recurringExpected: 'border-foreground/60 border',
   settlement: 'bg-positive',
+  savingsEntry: 'bg-brand-blue/70 dark:bg-brand-sky',
 };
 
 /** Recurring income takes the "money in" color, received or still expected. */
 function eventDot(event: CalendarEvent): string {
-  if (event.type === 'settlement' || event.kind === 'expense') return EVENT_DOTS[event.type];
+  if (!isIncome(event)) return EVENT_DOTS[event.type];
   return event.type === 'recurringPaid' ? 'bg-positive' : 'border-positive border';
 }
 
 /**
- * What the chips and the tint mean, under the grid. Recurring income gets its line only in
- * a month that has some.
+ * What the chips and the tint mean, under the grid. Recurring income and savings get their
+ * lines only in a month that has some.
  */
-export function CalendarLegend({ income = false }: { income?: boolean }) {
+export function CalendarLegend({
+  income = false,
+  savings = false,
+}: {
+  income?: boolean;
+  savings?: boolean;
+}) {
   const { t } = useTranslation('calendar');
   const items = [
     { type: 'recurringPaid', label: t('legend.paid'), style: EVENT_STYLES.recurringPaid },
@@ -248,6 +255,9 @@ export function CalendarLegend({ income = false }: { income?: boolean }) {
       ? [{ type: 'income', label: t('legend.income'), style: INCOME_STYLES.recurringPaid }]
       : []),
     { type: 'settlement', label: t('legend.settlement'), style: EVENT_STYLES.settlement },
+    ...(savings
+      ? [{ type: 'savings', label: t('legend.savings'), style: EVENT_STYLES.savingsEntry }]
+      : []),
   ];
   return (
     <ul

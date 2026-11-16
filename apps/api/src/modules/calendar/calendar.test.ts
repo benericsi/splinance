@@ -124,7 +124,9 @@ const brief = (events: CalendarEvent[]) =>
   events.map((event) =>
     event.type === 'settlement'
       ? `settlement ${event.date} ${event.from.displayName}>${event.to.displayName} ${String(event.amount)}`
-      : `${event.type} ${event.date} ${event.name} ${String(event.amount)}/${String(event.yourAmount)}`,
+      : event.type === 'savingsEntry'
+        ? `savings ${event.date} ${event.user.displayName} ${event.direction} ${event.name} ${String(event.amount)}`
+        : `${event.type} ${event.date} ${event.name} ${String(event.amount)}/${String(event.yourAmount)}`,
   );
 
 describe('GET /calendar', () => {
@@ -318,6 +320,54 @@ describe('GET /calendar', () => {
         'settlement 2026-10-12 Ben>Anna 5000',
       ]);
     }
+  });
+
+  it('marks savings entries in goals the viewer can see, after the settlements', async () => {
+    const goal = async (user: TestUser, name: string, visibility: 'shared' | 'private') =>
+      (await post(user, '/savings', { name, targetAmount: null, targetDate: null, visibility }))
+        .goal?.id ?? '';
+    const entry = async (user: TestUser, goalId: string, amount: number, entryOn: string) =>
+      (await post(user, `/savings/${goalId}/entries`, { amount, entryOn, note: null })).entry?.id ??
+      '';
+    const trip = await goal(anna, 'Trip', 'shared');
+    const bike = await goal(ben, 'Bike', 'private');
+    await entry(anna, trip, 30_000, '2026-10-05');
+    await entry(ben, trip, 20_000, '2026-10-05');
+    await entry(anna, trip, -10_000, '2026-10-20');
+    await entry(ben, bike, 9_000, '2026-10-05');
+    const removed = await entry(anna, trip, 1_000, '2026-10-21');
+    await request(app)
+      .delete(base(`/savings/${trip}/entries/${removed}`))
+      .set('Authorization', await bearer(anna))
+      .expect(204);
+    await post(ben, '/settlements', {
+      fromUserId: ben.id,
+      toUserId: anna.id,
+      amount: 5000,
+      settledOn: '2026-10-05',
+      note: '',
+    });
+
+    expect(brief((await calendar(anna, '2026-10')).events)).toEqual([
+      'settlement 2026-10-05 Ben>Anna 5000',
+      'savings 2026-10-05 Anna in Trip 30000',
+      'savings 2026-10-05 Ben in Trip 20000',
+      'savings 2026-10-20 Anna out Trip 10000',
+    ]);
+    // Ben also sees his private goal; nobody else does.
+    expect(
+      brief((await calendar(ben, '2026-10')).events).filter((e) => e.includes('Bike')),
+    ).toEqual(['savings 2026-10-05 Ben in Bike 9000']);
+    // Saving is not spending: no day total moves.
+    const days = (await calendar(anna, '2026-10')).days;
+    expect(days.every((d) => d.expenses === 0 && d.yourExpenses === 0)).toBe(true);
+    // A category's calendar has none.
+    const res = await request(app)
+      .get(base('/calendar'))
+      .query({ month: '2026-10', categoryId: entertainment.id })
+      .set('Authorization', await bearer(anna))
+      .expect(200);
+    expect(calendarResponseSchema.parse(res.body).calendar.events).toEqual([]);
   });
 
   it('narrows days and events to one category', async () => {

@@ -5,6 +5,7 @@ import {
   CalendarClock,
   type LucideIcon,
   Repeat,
+  Target,
 } from 'lucide-react';
 import { formatMoney } from '@/features/transactions/money';
 import { i18n } from '@/i18n';
@@ -35,11 +36,22 @@ export const INCOME_STYLES: Record<'recurringPaid' | 'recurringExpected', EventS
   },
 };
 
+/** A tracked series' payment, found or expected (the events that have a kind and a series). */
+export type RecurringEvent = Extract<
+  CalendarEvent,
+  { type: 'recurringPaid' | 'recurringExpected' }
+>;
+
+export const isRecurring = (event: CalendarEvent): event is RecurringEvent =>
+  event.type === 'recurringPaid' || event.type === 'recurringExpected';
+
+/** Recurring income, received or expected. */
+export const isIncome = (event: CalendarEvent): event is RecurringEvent =>
+  isRecurring(event) && event.kind === 'income';
+
 /** The style of one event: by its type, and for a recurring one by whether it is income. */
 export function eventStyle(event: CalendarEvent): EventStyle {
-  return event.type !== 'settlement' && event.kind === 'income'
-    ? INCOME_STYLES[event.type]
-    : EVENT_STYLES[event.type];
+  return isIncome(event) ? INCOME_STYLES[event.type] : EVENT_STYLES[event.type];
 }
 
 export const EVENT_STYLES: Record<CalendarEvent['type'], EventStyle> = {
@@ -49,9 +61,15 @@ export const EVENT_STYLES: Record<CalendarEvent['type'], EventStyle> = {
     className: 'bg-background text-muted-foreground border-foreground/30 border border-dashed',
   },
   settlement: { icon: ArrowLeftRight, className: POSITIVE_FILL },
+  // The set-aside colors of the overview's day bars: saving is not spending.
+  savingsEntry: {
+    icon: Target,
+    className:
+      'text-foreground bg-[color-mix(in_oklab,var(--color-brand-blue)_14%,var(--background))] dark:bg-[color-mix(in_oklab,var(--color-brand-sky)_32%,var(--background))]',
+  },
 };
 
-/** "Netflix", or who paid whom ("Ben paid you") for a settlement. */
+/** "Netflix" or a goal's name, or who paid whom ("Ben paid you") for a settlement. */
 export function eventName(event: CalendarEvent, viewerId: string | undefined): string {
   if (event.type !== 'settlement') return event.name;
   if (event.to.userId === viewerId) {
@@ -75,7 +93,7 @@ export function eventAmountText(
   view: CalendarView,
   currency: Currency,
 ): string {
-  const sign = event.type !== 'settlement' && event.kind === 'income' ? '+' : '';
+  const sign = isIncome(event) ? '+' : '';
   const amount = `${sign}${formatMoney(eventAmount(event, view), currency)}`;
   return event.type === 'recurringExpected' && event.amountVaries
     ? i18n.t('calendar:event.about', { amount })

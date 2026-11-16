@@ -317,7 +317,9 @@ describe('calendar page', () => {
       'href',
       expect.stringContaining(`/transactions/${shop.id}`),
     );
-    expect(within(dialog).queryByRole('region', { name: 'Recurring and settle-ups' })).toBeNull();
+    expect(
+      within(dialog).queryByRole('region', { name: 'Recurring, settle-ups and savings' }),
+    ).toBeNull();
   });
 
   it('shows an expected payment as an estimate, linked to its series', async () => {
@@ -325,7 +327,9 @@ describe('calendar page', () => {
     renderRoute(`/h/${testHousehold.id}/calendar/2026-10-25?month=2026-10`);
 
     const dialog = await screen.findByRole('dialog', { name: /25 Oct/ });
-    const marked = within(dialog).getByRole('region', { name: 'Recurring and settle-ups' });
+    const marked = within(dialog).getByRole('region', {
+      name: 'Recurring, settle-ups and savings',
+    });
     const gasRow = within(marked).getByRole('link', { name: /Gas/ });
     expect(gasRow).toHaveTextContent(money('GasExpectedabout 18 000 Ft'));
     expect(gasRow).toHaveAttribute('href', expect.stringContaining(`/recurring/${gas.seriesId}`));
@@ -333,6 +337,55 @@ describe('calendar page', () => {
       money('GymExpected14 900 Ft'),
     );
     expect(within(dialog).queryByRole('region', { name: 'Transactions' })).toBeNull();
+  });
+
+  it('marks savings entries, names them in the legend and links them to their goal', async () => {
+    fakeApi();
+    const saved: CalendarEvent = {
+      type: 'savingsEntry',
+      date: '2026-10-15',
+      entryId: `${SERIES}05`,
+      goalId: `${SERIES}06`,
+      name: 'Summer in Italy',
+      user: anna,
+      direction: 'in',
+      amount: 30_000,
+    };
+    const tookOut: CalendarEvent = {
+      ...saved,
+      entryId: `${SERIES}07`,
+      user: ben,
+      direction: 'out',
+      amount: 5000,
+    };
+    server.use(
+      mock.get(`${base}/calendar`, () =>
+        HttpResponse.json({
+          calendar: { ...october, events: [...october.events, saved, tookOut] },
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderRoute(page);
+
+    const grid = await days();
+    const fifteenth = within(grid).getByRole('link', { name: /15 October/ });
+    expect(fifteenth).toHaveTextContent('Summer in Italy');
+    // Saving is not spending: the day stays as it was.
+    expect(fifteenth).toHaveAccessibleName(/^Thursday 15 October, 2 events$/);
+    expect(screen.getByRole('list', { name: 'What the marks mean' })).toHaveTextContent(
+      'Settle-upSavingsDarker days',
+    );
+
+    await user.click(fifteenth);
+    const dialog = await screen.findByRole('dialog', { name: /15 Oct/ });
+    const marked = within(dialog).getByRole('region', {
+      name: 'Recurring, settle-ups and savings',
+    });
+    const [mine, bens] = within(marked).getAllByRole('link', { name: /Summer in Italy/ });
+    expect(mine).toHaveTextContent(money('Summer in ItalyYou put in30 000 Ft'));
+    expect(mine).toHaveAttribute('href', expect.stringContaining(`/savings/${saved.goalId}`));
+    expect(bens).toHaveTextContent(money('Summer in ItalyBen took out5000 Ft'));
   });
 
   it('says so when a day has nothing', async () => {
