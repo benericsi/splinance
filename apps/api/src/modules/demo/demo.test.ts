@@ -215,6 +215,15 @@ describe('POST /api/demo', { timeout: 30_000 }, () => {
       ['Jane Doe', 200_000],
       ['John Doe', 185_000],
     ]);
+    // Both plan their monthly part of the holiday, John his fund too.
+    expect(goals.map((g) => g.plans.map((p) => [p.displayName, p.monthlyAmount]))).toEqual([
+      [
+        ['John Doe', 30_000],
+        ['Jane Doe', 25_000],
+      ],
+      [['John Doe', 50_000]],
+      [],
+    ]);
     expect(setAside).toBe(80_000);
     // His part came from his Revolut files (pocket moves imported as entries), with a rule
     // per pocket; Jane typed hers in.

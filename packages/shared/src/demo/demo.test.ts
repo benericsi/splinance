@@ -344,6 +344,28 @@ describe('the story as savings', () => {
     expect(story.savings.goals.filter((g) => g.pinnedBy.includes('you'))).toHaveLength(2);
   });
 
+  it('plans what each person puts in every month, only on goals they can see', () => {
+    for (const plan of story.savings.plans) {
+      const goal = story.savings.goals.find((g) => g.id === plan.goal);
+      expect(goal).toBeDefined();
+      if (goal?.visibility === 'private') expect(plan.person).toBe(goal.person);
+    }
+    // Each plan is what that person puts into the goal in a full month: on track, honestly.
+    const lastFull = story.months.at(-2) ?? '';
+    for (const plan of story.savings.plans) {
+      const putIn = story.savings.entries
+        .filter(
+          (e) =>
+            e.goal === plan.goal &&
+            e.person === plan.person &&
+            e.entryOn.startsWith(lastFull) &&
+            e.amount > 0,
+        )
+        .reduce((sum, e) => sum + e.amount, 0);
+      expect(putIn).toBe(plan.monthlyAmount);
+    }
+  });
+
   it('names known goals and people, and never takes a goal below zero', () => {
     const ids = new Set(story.savings.goals.map((g) => g.id));
     const balance = new Map<string, number>();

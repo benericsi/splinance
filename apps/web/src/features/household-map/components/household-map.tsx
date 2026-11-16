@@ -63,6 +63,9 @@ const NODE_TYPES = { card: CardNodeView };
 
 // React Flow reads these; role tokens keep the canvas in step with both themes. Chrome
 // stays neutral: a debt is a stronger line with its amount, not a color.
+/** Room for the page header above the canvas and the hint line under it. */
+const FIT_PADDING = { top: '150px', bottom: '64px', x: '8%' } as const;
+
 const CANVAS_STYLE = {
   '--xy-background-color': 'transparent',
   '--xy-edge-stroke': 'color-mix(in oklab, var(--muted-foreground) 60%, transparent)',
@@ -198,7 +201,9 @@ function Canvas({ map }: { map: HouseholdMapData }) {
         colorMode={resolved}
         style={CANVAS_STYLE}
         fitView
-        fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+        // The canvas fills the area behind the page header and above the hint line: the
+        // first view keeps every card clear of both, however tall a column grows.
+        fitViewOptions={{ padding: FIT_PADDING, maxZoom: 1 }}
         minZoom={0.4}
         maxZoom={1.5}
         nodesConnectable={false}
