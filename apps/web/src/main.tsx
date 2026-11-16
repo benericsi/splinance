@@ -10,7 +10,7 @@ import { authStore } from '@/lib/auth-store';
 import '@/lib/hide-amounts';
 import { detectLocale, followUserLocale, localeStore } from '@/lib/locale';
 import { createQueryClient } from '@/lib/query-client';
-import { rerunGuardsOnSessionEnd } from '@/lib/session-watch';
+import { clearCacheOnUserChange, rerunGuardsOnSessionEnd } from '@/lib/session-watch';
 import { routeTree } from './routeTree.gen';
 import './index.css';
 
@@ -40,6 +40,7 @@ declare module '@tanstack/react-router' {
 }
 
 rerunGuardsOnSessionEnd(authStore, router);
+clearCacheOnUserChange(authStore, queryClient);
 watchInstallPrompt();
 
 const rootElement = document.getElementById('root');

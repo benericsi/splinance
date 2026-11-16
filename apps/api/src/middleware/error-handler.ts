@@ -1,6 +1,7 @@
 import type { ApiErrorCode, ApiErrorResponse } from '@splinance/shared';
 import type { ErrorRequestHandler, RequestHandler, Response } from 'express';
 import { ZodError, z } from 'zod';
+import { isTimeout } from '../db/errors';
 import { HttpError } from '../lib/http-error';
 
 /** Every code the API sends is in the shared list, so the web has words for it. */
@@ -75,6 +76,14 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, _next)
       err.status,
       BODY_ERRORS[err.type] ?? { code: 'BAD_REQUEST', message: 'Invalid request body' },
     );
+    return;
+  }
+
+  // A lock wait or statement that ran out of time: something else holds the household (or
+  // the database is slow). Nothing was written; the client may try again.
+  if (isTimeout(err)) {
+    req.log.warn({ err }, 'Database timeout');
+    sendError(res, 503, { code: 'BUSY', message: 'Busy right now, please try again' });
     return;
   }
 
