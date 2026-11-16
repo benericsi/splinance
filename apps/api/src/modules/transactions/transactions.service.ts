@@ -540,6 +540,119 @@ export async function insertTransaction(
   return after;
 }
 
+/** Rows per statement in the batched writes: well under Postgres' 65,535 parameters. */
+const BATCH_ROWS = 500;
+
+function chunks<T>(items: T[], size: number): T[][] {
+  const result: T[][] = [];
+  for (let i = 0; i < items.length; i += size) result.push(items.slice(i, i + size));
+  return result;
+}
+
+/** Runs `work` for item `position`, letting the caller name the row in an error. */
+export type ForItem = <T>(position: number, work: () => Promise<T>) => Promise<T>;
+
+/**
+ * `insertTransaction` for many imported rows at once, inside the same kind of write
+ * transaction: every row is checked first (categories in one query; `forItem` names the
+ * failing row), then the rows, their splits and their audit entries go in a few multi-row
+ * statements per BATCH_ROWS. Callers wrap it in `collectingActivity` (one notification per
+ * person, no statement per row). Fingerprints must be distinct (the import dedupes them).
+ */
+export async function insertTransactions(
+  tx: Db,
+  scope: HouseholdScope,
+  household: Membership['household'],
+  items: { input: TransactionInput; origin: TransactionOrigin }[],
+  allowed: Set<string>,
+  forItem: ForItem,
+): Promise<Transaction[]> {
+  const categoryIds = [
+    ...new Set(items.flatMap(({ input }) => (input.categoryId ? [input.categoryId] : []))),
+  ];
+  const usable =
+    categoryIds.length === 0
+      ? []
+      : await tx
+          .select({ id: categories.id, kind: categories.kind })
+          .from(categories)
+          .where(
+            and(
+              inArray(categories.id, categoryIds),
+              eq(categories.householdId, scope.householdId),
+              isNull(categories.archivedAt),
+            ),
+          );
+  const kindOf = new Map(usable.map((category) => [category.id, category.kind]));
+
+  const prepared: { input: TransactionInput; origin: TransactionOrigin; split: PreparedSplit }[] =
+    [];
+  for (const [position, { input, origin }] of items.entries()) {
+    const split = await forItem(position, () => {
+      if (input.categoryId && kindOf.get(input.categoryId) !== input.kind) {
+        throw invalidCategory();
+      }
+      return Promise.resolve(prepareSplit(input, scope.userId, allowed));
+    });
+    prepared.push({ input, origin, split });
+  }
+
+  const created: Transaction[] = [];
+  for (const chunk of chunks(prepared, BATCH_ROWS)) {
+    const rows = await tx
+      .insert(transactions)
+      .values(
+        chunk.map(({ input, origin, split }) => ({
+          householdId: scope.householdId,
+          createdBy: scope.userId,
+          paidBy: split.paidBy,
+          kind: input.kind,
+          visibility: input.visibility,
+          amount: input.amount,
+          currency: household.baseCurrency,
+          occurredOn: input.occurredOn,
+          description: input.description,
+          categoryId: input.categoryId,
+          splitMethod: split.splitMethod,
+          ...origin,
+        })),
+      )
+      .returning();
+    // Matched by fingerprint, not by position: RETURNING promises no order.
+    const idOf = new Map(rows.map((row) => [row.importFingerprint, row.id]));
+    const shares = chunk.flatMap(({ origin, split }) => {
+      const transactionId = idOf.get(origin.importFingerprint);
+      if (!transactionId) throw new Error('Inserted transaction not returned');
+      return split.shares.map((share) => ({
+        ...share,
+        transactionId,
+        householdId: scope.householdId,
+      }));
+    });
+    for (const part of chunks(shares, BATCH_ROWS * 2)) {
+      await tx.insert(transactionSplits).values(part);
+    }
+
+    const after = await toTransactions(tx, rows);
+    await tx.insert(auditLog).values(
+      after.map((snapshot) => ({
+        householdId: scope.householdId,
+        actorId: scope.userId,
+        entity: 'transaction' as const,
+        entityId: snapshot.id,
+        action: 'create' as const,
+        before: null,
+        after: toStored(snapshot),
+      })),
+    );
+    for (const snapshot of after) {
+      await recordTransactionActivity(tx, scope, 'create', null, snapshot);
+    }
+    created.push(...after);
+  }
+  return created;
+}
+
 export async function createTransaction(
   scope: HouseholdScope,
   input: TransactionInput,
@@ -631,6 +744,44 @@ export async function softDeleteTransaction(
     .set({ deletedAt: at, version: existing.version + 1 })
     .where(eq(transactions.id, existing.id));
   await recordAudit(tx, scope, 'delete', existing.id, before, null);
+}
+
+/**
+ * `softDeleteTransaction` for many locked rows at once (an import's undo): a few statements
+ * per BATCH_ROWS. Like `insertTransactions`, callers collect the activity.
+ */
+export async function softDeleteTransactions(
+  tx: Db,
+  scope: HouseholdScope,
+  existing: TransactionRow[],
+  at: Date,
+): Promise<void> {
+  for (const chunk of chunks(existing, BATCH_ROWS)) {
+    const before = await toTransactions(tx, chunk);
+    await tx
+      .update(transactions)
+      .set({ deletedAt: at, version: sql`${transactions.version} + 1` })
+      .where(
+        inArray(
+          transactions.id,
+          chunk.map((row) => row.id),
+        ),
+      );
+    await tx.insert(auditLog).values(
+      before.map((snapshot) => ({
+        householdId: scope.householdId,
+        actorId: scope.userId,
+        entity: 'transaction' as const,
+        entityId: snapshot.id,
+        action: 'delete' as const,
+        before: toStored(snapshot),
+        after: null,
+      })),
+    );
+    for (const snapshot of before) {
+      await recordTransactionActivity(tx, scope, 'delete', snapshot, null);
+    }
+  }
 }
 
 /** Soft delete: gone from lists and balances, kept for history and restore. */

@@ -31,8 +31,8 @@ import {
 import {
   activeMemberIds,
   type HouseholdScope,
-  insertTransaction,
-  softDeleteTransaction,
+  insertTransactions,
+  softDeleteTransactions,
 } from '../transactions/transactions.service';
 import { collectingActivity, recordImportActivity } from '../notifications/activity';
 
@@ -391,17 +391,23 @@ export async function createImport(
 
       const allowed = await activeMemberIds(tx, scope.householdId);
       // One notification per person the import involves, not one per row.
-      const { people } = await collectingActivity(async () => {
-        for (const { row, index } of transactionRows) {
-          await forRow(index, () =>
-            insertTransaction(tx, scope, household, row.transaction, allowed, {
+      const { people } = await collectingActivity(() =>
+        insertTransactions(
+          tx,
+          scope,
+          household,
+          transactionRows.map(({ row }) => ({
+            input: row.transaction,
+            origin: {
               importBatchId: batch.id,
               importFingerprint: row.fingerprint,
               counterparty: row.counterparty || null,
-            }),
-          );
-        }
-      });
+            },
+          })),
+          allowed,
+          (position, work) => forRow(transactionRows[position]?.index ?? position, work),
+        ),
+      );
       await recordImportActivity(tx, scope, batch.id, 'create', people);
 
       // Entries of the caller, in goals they can see, locked like a single entry's goal.
@@ -507,9 +513,7 @@ export async function undoImport(scope: HouseholdScope & { importId: string }): 
     // One timestamp for the rows, the entries and the batch: a row whose deletion matches the
     // undo was deleted by it; an earlier deletion was the person's own choice (checkImport).
     const at = new Date();
-    const { people } = await collectingActivity(async () => {
-      for (const row of rows) await softDeleteTransaction(tx, scope, row, at);
-    });
+    const { people } = await collectingActivity(() => softDeleteTransactions(tx, scope, rows, at));
     await recordImportActivity(tx, scope, batch.id, 'undo', people);
     await undoImportedEntries(tx, scope, batch.id, at);
 
