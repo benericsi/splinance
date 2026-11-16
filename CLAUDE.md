@@ -15,9 +15,15 @@ Household expense app (personal and shared spending, splits, balances, imports, 
 ## Workflow
 
 - A branch per change (`feat/`, `fix/`, `chore/`, `ci/`, `docs/`, `perf/`, `refactor/`), merged by pull request; never commit to `main`. `main` requires branches to be up to date
-- Before a larger change, explain the planned steps and wait for a go-ahead; point out risks and tradeoffs briefly
-- Tested, practical code; every change ends deployable (e2e runs against production builds). Add an e2e flow when a feature ships a new user journey
-- Single hyphens, not em dashes
+- e2e runs against production builds; add an e2e flow when a feature ships a new user journey
+
+## Working rules
+
+- Write tested, practical code; every phase ends deployable
+- Strict TypeScript, shared Zod schemas between web and api
+- Before a larger change, briefly explain the planned steps and wait for a go-ahead
+- Explain tradeoffs briefly, and point out risks or mistakes you notice
+- Use single hyphens, not em dashes
 
 ## Never
 
