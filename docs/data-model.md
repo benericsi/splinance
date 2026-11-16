@@ -403,6 +403,21 @@ The goals a person keeps on top of their savings page. Per person, not per goal.
 - At most 3 per person and household, checked by the service under a lock on the member row (a CHECK cannot count rows).
 - Closing a goal deletes its pins. Index `savings_goal_pins_user_idx` on `(household_id, user_id)`.
 
+### `savings_goal_plans`
+
+What a person plans to put into a goal each month. Per person: on a shared goal each member plans their own part. A row exists while the plan does.
+
+| Column                 | Type        | Notes                                                            |
+| ---------------------- | ----------- | ---------------------------------------------------------------- |
+| household_id           | uuid        | Part of both composite FKs                                       |
+| goal_id                | uuid        | PK part; composite FK `(household_id, goal_id)` -> savings_goals |
+| user_id                | uuid        | PK part; composite FK `(household_id, user_id)` -> members       |
+| monthly_amount         | bigint      | Minor units, 1 to 10^12 (`savings_goal_plans_amount_range`)      |
+| created_at, updated_at | timestamptz |                                                                  |
+
+- Closing a goal deletes its plans (reopening does not bring them back); account deletion deletes the person's. Plans of a member who left stay in the table but no longer show or count.
+- Whether a goal is on track is derived (balance, plans, target, date), never stored. Index `savings_goal_plans_user_idx` on `(household_id, user_id)` for what a person still means to set aside in a month.
+
 ### Balances (derived, not a table)
 
 Who owes whom is computed on every read from live rows, per pair of people:

@@ -12,6 +12,7 @@ export * from './notifications';
 export * from './recurring-series';
 export * from './savings-entries';
 export * from './savings-goal-pins';
+export * from './savings-goal-plans';
 export * from './savings-goals';
 export * from './savings-rules';
 export * from './sessions';

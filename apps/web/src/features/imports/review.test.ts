@@ -179,6 +179,7 @@ describe('rows to savings', () => {
     balance,
     contributions: [],
     pinned: false,
+    plans: [],
     createdAt: '2026-10-01T00:00:00.000Z',
   });
   const rule: SavingsRule = { id: 'r1', pattern: 'pocket holiday', goalId: HOLIDAY };

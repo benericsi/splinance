@@ -393,6 +393,7 @@ describe('rows to savings', () => {
     balance: 0,
     contributions: [],
     pinned: false,
+    plans: [],
     createdAt: '2026-10-01T00:00:00.000Z',
   };
 
@@ -402,7 +403,13 @@ describe('rows to savings', () => {
     server.use(
       mock.get(`${base}/savings`, () =>
         HttpResponse.json({
-          savings: { currency: 'HUF', goals: [holiday], setAside: 0, setAsideByDay: [] },
+          savings: {
+            currency: 'HUF',
+            goals: [holiday],
+            setAside: 0,
+            setAsideByDay: [],
+            toSetAside: 0,
+          },
         }),
       ),
       mock.post(`${base}/savings/rules`, async ({ request }) => {
@@ -470,6 +477,7 @@ describe('rows to savings', () => {
             goals: [{ ...holiday, balance: 5_000 }],
             setAside: 0,
             setAsideByDay: [],
+            toSetAside: 0,
           },
         }),
       ),

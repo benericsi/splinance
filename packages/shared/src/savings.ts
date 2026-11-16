@@ -62,6 +62,20 @@ export const savingsEntryInputSchema = z.object({
 
 export type SavingsEntryInput = z.infer<typeof savingsEntryInputSchema>;
 
+/**
+ * What a person plans to put into a goal each month. Each member plans their own part; a
+ * goal with a target and a date is on track when the parts get it there in time (derived by
+ * the web, nothing is stored but the amount).
+ */
+export const savingsPlanInputSchema = z.object({ monthlyAmount: amountMinorSchema });
+export type SavingsPlanInput = z.infer<typeof savingsPlanInputSchema>;
+
+/** A member's monthly plan for a goal. */
+export const savingsPlanSchema = personSchema.extend({
+  monthlyAmount: z.number().int().positive(),
+});
+export type SavingsPlan = z.infer<typeof savingsPlanSchema>;
+
 /** What one member has in a goal: what they put in minus what they took out. */
 export const savingsContributionSchema = personSchema.extend({ amount: z.number().int() });
 export type SavingsContribution = z.infer<typeof savingsContributionSchema>;
@@ -82,6 +96,11 @@ export const savingsGoalSchema = z.object({
   contributions: z.array(savingsContributionSchema),
   /** The viewer keeps it on top of their savings page; everyone has their own pins. */
   pinned: z.boolean(),
+  /**
+   * Each current member's monthly plan, largest first; members without one are left out
+   * (also those who left). Closed goals have none.
+   */
+  plans: z.array(savingsPlanSchema),
   createdAt: z.iso.datetime({ offset: true }),
 });
 
@@ -112,6 +131,12 @@ export const savingsSchema = z.object({
   currency: currencySchema,
   goals: z.array(savingsGoalSchema),
   setAside: z.number().int().nullable(),
+  /**
+   * What the viewer still means to put in that month: over their plans on open goals, the
+   * plan less what they put in (deposits only; a withdrawal is already in `setAside`),
+   * never below zero per goal. Null without a month.
+   */
+  toSetAside: z.number().int().nonnegative().nullable(),
   setAsideByDay: z.array(daySetAsideSchema).max(31).nullable(),
 });
 
