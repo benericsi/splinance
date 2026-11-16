@@ -14,11 +14,12 @@ import {
   testHousehold,
   testUser,
 } from '../../../test/utils';
-import { paceText, stepText } from './describe';
+import { outlookText, paceText, stepText } from './describe';
 import {
   arrangeGoals,
   barSegments,
   goalPace,
+  goalPlanStatus,
   goalProgress,
   memberFills,
   overviewGoals,
@@ -89,6 +90,8 @@ function fakeApi(goals: SavingsGoal[] = [trip, fund, pot, old], setAside = 100_0
     pins: [] as string[],
     removed: [] as string[],
     archived: [] as string[],
+    reopened: [] as string[],
+    plans: [] as { goalId: string; monthlyAmount: number | null }[],
     history: [
       {
         id: '01a12509-0f61-75bc-b406-1301087805e1',
@@ -148,6 +151,33 @@ function fakeApi(goals: SavingsGoal[] = [trip, fund, pot, old], setAside = 100_0
     mock.post(`${base}/savings/:goalId/archive`, ({ params }) => {
       state.archived.push(String(params.goalId));
       change(String(params.goalId), { archivedAt: '2026-11-12T10:00:00.000Z', pinned: false });
+      return new HttpResponse(null, { status: 204 });
+    }),
+    mock.post(`${base}/savings/:goalId/reopen`, ({ params }) => {
+      state.reopened.push(String(params.goalId));
+      change(String(params.goalId), { archivedAt: null });
+      return HttpResponse.json({ goal: state.goals.find((item) => item.id === params.goalId) });
+    }),
+    mock.put(`${base}/savings/:goalId/plan`, async ({ request, params }) => {
+      const { monthlyAmount } = (await request.json()) as { monthlyAmount: number };
+      const goalId = String(params.goalId);
+      state.plans.push({ goalId, monthlyAmount });
+      const current = state.goals.find((item) => item.id === goalId);
+      change(goalId, {
+        plans: [
+          ...(current?.plans ?? []).filter((plan) => plan.userId !== anna.userId),
+          { ...anna, monthlyAmount },
+        ],
+      });
+      return HttpResponse.json({ goal: state.goals.find((item) => item.id === goalId) });
+    }),
+    mock.delete(`${base}/savings/:goalId/plan`, ({ params }) => {
+      const goalId = String(params.goalId);
+      state.plans.push({ goalId, monthlyAmount: null });
+      const current = state.goals.find((item) => item.id === goalId);
+      change(goalId, {
+        plans: (current?.plans ?? []).filter((plan) => plan.userId !== anna.userId),
+      });
       return new HttpResponse(null, { status: 204 });
     }),
     mock.put(`${base}/savings/:goalId/pin`, ({ params }) => {
@@ -284,6 +314,48 @@ describe('goal pace', () => {
       '25 715 Ft a month gets you there by 1 Jul 2027',
     );
     expect(paceText(trip, '2027-08-01')).toEqual({ text: 'The date has passed', overdue: true });
+  });
+});
+
+describe('plans', () => {
+  const planned = (amounts: number[]) =>
+    amounts.map((monthlyAmount, index) => ({
+      userId: `user-${String(index)}`,
+      displayName: `Person ${String(index)}`,
+      monthlyAmount,
+    }));
+
+  it('is on track when the plans for the months left reach the target', () => {
+    // 180 000 to go in seven whole months: 25 715 a month.
+    expect(goalPlanStatus({ ...trip, plans: planned([15_000, 11_000]) }, '2026-11-12')).toEqual({
+      kind: 'onTrack',
+      planned: 26_000,
+    });
+    expect(goalPlanStatus({ ...trip, plans: planned([20_000]) }, '2026-11-12')).toEqual({
+      kind: 'behind',
+      planned: 20_000,
+      needed: 25_715,
+    });
+  });
+
+  it('says nothing without plans, a target or a date, once reached or past the date', () => {
+    const plans = planned([50_000]);
+    expect(goalPlanStatus(trip, '2026-11-12')).toBeNull();
+    expect(goalPlanStatus({ ...pot, plans }, '2026-11-12')).toBeNull();
+    expect(goalPlanStatus({ ...trip, targetDate: null, plans }, '2026-11-12')).toBeNull();
+    expect(goalPlanStatus({ ...trip, balance: 600_000, plans }, '2026-11-12')).toBeNull();
+    expect(goalPlanStatus({ ...trip, plans }, '2027-08-01')).toBeNull();
+  });
+
+  it('reads as a line in the right tone, else the pace', () => {
+    const onTrack = outlookText({ ...trip, plans: planned([30_000]) }, '2026-11-12');
+    expect(onTrack?.tone).toBe('positive');
+    expect(plain(onTrack?.text)).toBe('On track with 30 000 Ft a month planned');
+    expect(plain(outlookText({ ...trip, plans: planned([20_000]) }, '2026-11-12')?.text)).toBe(
+      'Behind: 20 000 Ft a month planned, 25 715 Ft needed',
+    );
+    expect(outlookText(trip, '2026-11-12')?.tone).toBe('neutral');
+    expect(outlookText(trip, '2027-08-01')?.tone).toBe('warning');
   });
 });
 
@@ -633,6 +705,62 @@ describe('goal dialog', () => {
     expect(
       within(dialog).queryByRole('button', { name: 'Actions for this entry' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('plans a monthly amount, changes and removes it, and says whether it gets there', async () => {
+    const api = fakeApi([{ ...trip, plans: [{ ...ben, monthlyAmount: 10_000 }] }, fund]);
+    renderRoute(`/h/${testHousehold.id}/savings/${trip.id}`);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Summer in Italy' });
+    const plan = within(dialog).getByRole('region', { name: 'Your plan' });
+    expect(within(plan).getByText('No monthly amount planned')).toBeVisible();
+    expect(within(plan).getByText(sentence('Ben puts in 10 000 Ft a month'))).toBeVisible();
+    // Ben's 10 000 a month is short of the 25 715 needed.
+    expect(
+      within(dialog).getByText(sentence('Behind: 10 000 Ft a month planned, 25 715 Ft needed')),
+    ).toBeVisible();
+
+    await userEvent.click(within(plan).getByRole('button', { name: 'Plan a monthly amount' }));
+    await userEvent.type(within(plan).getByLabelText('Each month'), '20000');
+    await userEvent.click(within(plan).getByRole('button', { name: 'Save' }));
+    await waitFor(() => {
+      expect(api.plans).toEqual([{ goalId: trip.id, monthlyAmount: 20_000 }]);
+    });
+    expect(await within(plan).findByText(sentence('You put in 20 000 Ft a month'))).toBeVisible();
+    expect(
+      within(dialog).getByText(sentence('On track with 30 000 Ft a month planned')),
+    ).toBeVisible();
+
+    await userEvent.click(within(plan).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => {
+      expect(api.plans.at(-1)).toEqual({ goalId: trip.id, monthlyAmount: null });
+    });
+    expect(await within(plan).findByText('No monthly amount planned')).toBeVisible();
+  });
+
+  it('asks for an amount before saving a plan', async () => {
+    const api = fakeApi();
+    renderRoute(`/h/${testHousehold.id}/savings/${trip.id}`);
+    const dialog = await screen.findByRole('dialog', { name: 'Summer in Italy' });
+    const plan = within(dialog).getByRole('region', { name: 'Your plan' });
+    await userEvent.click(within(plan).getByRole('button', { name: 'Plan a monthly amount' }));
+    await userEvent.click(within(plan).getByRole('button', { name: 'Save' }));
+    expect(await within(plan).findByText('Enter an amount')).toBeVisible();
+    expect(api.plans).toEqual([]);
+  });
+
+  it('reopens a closed goal for its maker', async () => {
+    const api = fakeApi();
+    renderRoute(`/h/${testHousehold.id}/savings/${old.id}`);
+    const dialog = await screen.findByRole('dialog', { name: 'Old sofa' });
+    expect(within(dialog).queryByRole('region', { name: 'Your plan' })).not.toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reopen goal' }));
+    await waitFor(() => {
+      expect(api.reopened).toEqual([old.id]);
+    });
+    expect(await screen.findByText('Goal reopened')).toBeVisible();
+    expect(await within(dialog).findByRole('button', { name: 'Add money' })).toBeVisible();
   });
 
   it('is not found for a goal the list does not have', async () => {

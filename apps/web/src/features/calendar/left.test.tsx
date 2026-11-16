@@ -502,6 +502,11 @@ describe('left this month, with savings', () => {
     expect(covered.left).toBe(-30_000);
   });
 
+  it('keeps back what the plans still ask for, like a payment to come', () => {
+    const result = leftThisMonth(november({ days: paid, events: [rent, gas] }), 100_000, 30_000);
+    expect(result).toMatchObject({ setAside: 100_000, toSetAside: 30_000, left: 98_700 });
+  });
+
   it('still needs income to measure against', () => {
     expect(leftThisMonth(november(), 100_000)).toBeNull();
   });
@@ -534,11 +539,11 @@ describe('overview: savings', () => {
   const pot = goal('b3', 'Rainy day pot', { targetAmount: null, balance: 90_000 });
   const old = goal('b4', 'Old sofa', { archivedAt: '2026-09-01T10:00:00.000Z' });
 
-  function savingsApi(goals: SavingsGoal[], setAside: number) {
+  function savingsApi(goals: SavingsGoal[], setAside: number, toSetAside = 0) {
     server.use(
       mock.get(`${base}/savings`, () =>
         HttpResponse.json({
-          savings: { currency: 'HUF', goals, setAside, setAsideByDay: [], toSetAside: 0 },
+          savings: { currency: 'HUF', goals, setAside, setAsideByDay: [], toSetAside },
         }),
       ),
     );
@@ -570,6 +575,30 @@ describe('overview: savings', () => {
       .map((term) => `${term.textContent}: ${term.nextElementSibling?.textContent ?? ''}`);
     expect(rows).toContainEqual(
       expect.stringMatching(money('^Set aside in savings: [-−]100 000 Ft$')),
+    );
+  });
+
+  it('keeps back what the savings plans still ask for, with a chip and a row', async () => {
+    const user = userEvent.setup();
+    fakeApi(november({ days: paid, events: [rent, gas] }));
+    savingsApi([trip], 100_000, 30_000);
+    renderRoute(`/h/${testHousehold.id}`);
+
+    const left = await card('Left this month');
+    expect(
+      await within(left).findByText(money('^98 700 Ft$'), { selector: '.sr-only' }),
+    ).toBeDefined();
+    expect(
+      within(left)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toContainEqual(expect.stringMatching(money('^To set aside30 000 Ft$')));
+    await user.click(within(left).getByRole('button', { name: 'How is this calculated' }));
+    const rows = within(left)
+      .getAllByRole('term')
+      .map((term) => `${term.textContent}: ${term.nextElementSibling?.textContent ?? ''}`);
+    expect(rows).toContainEqual(
+      expect.stringMatching(money('^Still to set aside, as planned: [-−]30 000 Ft$')),
     );
   });
 

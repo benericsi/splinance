@@ -2,7 +2,7 @@ import type { SavingsGoal } from '@splinance/shared';
 import { formatDateWith, fromIsoDate } from '@/features/transactions/dates';
 import { formatMoney } from '@/features/transactions/money';
 import { i18n } from '@/i18n';
-import { goalPace, goalProgress } from './view';
+import { goalPace, goalPlanStatus, goalProgress } from './view';
 
 /** "1 Jul 2027" / "2027. júl. 1.": always with the year, a target is often next year. */
 export const formatGoalDate = (value: string) =>
@@ -40,4 +40,30 @@ export function paceText(
     }),
     overdue: false,
   };
+}
+
+/**
+ * The line under a goal: with plans, whether they get it there ("On track with 55 000 Ft a
+ * month planned", or "Behind: ... planned, 80 000 Ft needed" in the warning tone);
+ * without, what it takes (`paceText`). Null when there is nothing to say.
+ */
+export function outlookText(
+  goal: SavingsGoal,
+  today: string,
+): { text: string; tone: 'positive' | 'warning' | 'neutral' } | null {
+  const status = goalPlanStatus(goal, today);
+  if (status) {
+    const planned = formatMoney(status.planned, goal.currency);
+    return status.kind === 'onTrack'
+      ? { text: i18n.t('savings:plan.onTrack', { amount: planned }), tone: 'positive' }
+      : {
+          text: i18n.t('savings:plan.behind', {
+            amount: planned,
+            needed: formatMoney(status.needed, goal.currency),
+          }),
+          tone: 'warning',
+        };
+  }
+  const pace = paceText(goal, today);
+  return pace ? { text: pace.text, tone: pace.overdue ? 'warning' : 'neutral' } : null;
 }

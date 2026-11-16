@@ -44,6 +44,7 @@ export const calendar = {
     chips: {
       spent: 'Spent',
       setAside: 'Set aside',
+      toSetAside: 'To set aside',
       toCome: 'To come',
     },
     how: 'How is this calculated',
@@ -53,6 +54,7 @@ export const calendar = {
       spent: 'Spent so far',
       setAside: 'Set aside in savings',
       takenOut: 'Taken out of savings',
+      toSetAside: 'Still to set aside, as planned',
       toCome_one: 'Recurring still to come · {{count}} payment',
       toCome_other: 'Recurring still to come · {{count}} payments',
     },
