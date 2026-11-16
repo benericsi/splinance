@@ -185,3 +185,6 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# TanStack Router plugin scratch files
+.tanstack/

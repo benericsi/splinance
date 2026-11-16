@@ -1,5 +1,7 @@
 import {
   BUDGET_WARNING_RATIO,
+  daysBetween,
+  HOUR_MS,
   nextDueOn,
   type NotificationType,
   priceChange,
@@ -48,10 +50,6 @@ interface Wanted {
   dueOn: string | null;
   amount: number | null;
   previousAmount: number | null;
-}
-
-function daysBetween(from: string, to: string): number {
-  return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
 }
 
 /**
@@ -253,7 +251,6 @@ export async function drainSyncs(): Promise<void> {
 }
 
 export const NOTIFICATION_SWEEP_LOCK = 'splinance:notification-sweep';
-const HOUR_MS = 3_600_000;
 
 /**
  * Every household with something to remind about (a live series, or a budget), synced one

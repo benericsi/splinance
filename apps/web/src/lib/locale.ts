@@ -1,10 +1,4 @@
-import {
-  DEFAULT_LOCALE,
-  type Locale,
-  LOCALES,
-  matchLocale,
-  setValidationLocale,
-} from '@splinance/shared';
+import { DEFAULT_LOCALE, type Locale, matchLocale, setValidationLocale } from '@splinance/shared';
 import { useSyncExternalStore } from 'react';
 import { z } from 'zod';
 import zodEn from 'zod/v4/locales/en.js';
@@ -128,6 +122,3 @@ export function followUserLocale(auth: AuthStore): Promise<void> {
   });
   return sync() ?? Promise.resolve();
 }
-
-export const isLocale = (value: unknown): value is Locale =>
-  LOCALES.some((locale) => locale === value);

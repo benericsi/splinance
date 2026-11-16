@@ -33,6 +33,7 @@ import {
   type Caller,
   lockUser,
   requireRecentAuth,
+  sessionEnded,
   verifyBeforeLock,
 } from './account.service';
 
@@ -237,9 +238,6 @@ async function erase(
     privateTransactionsDeleted: privateIds.length,
   };
 }
-
-const sessionEnded = () =>
-  new HttpError(401, 'Your session has ended, please log in again', 'UNAUTHENTICATED');
 
 /**
  * Self-service deletion (GDPR Art. 17): step-up, the email typed again, then the plan,

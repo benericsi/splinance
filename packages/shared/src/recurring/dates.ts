@@ -1,29 +1,12 @@
+import { addDays, daysBetween } from '../dates';
 import type { RecurringCadence } from './schemas';
+
+export { daysBetween };
 
 /**
  * Calendar arithmetic for recurring payments, on `YYYY-MM-DD` strings in UTC (dates, not
  * moments: no time zone can move them across midnight).
  */
-
-const DAY_MS = 86_400_000;
-
-function toEpochDay(date: string): number {
-  const [year = 1970, month = 1, day = 1] = date.split('-').map(Number);
-  return Date.UTC(year, month - 1, day) / DAY_MS;
-}
-
-function fromEpochDay(epochDay: number): string {
-  return new Date(epochDay * DAY_MS).toISOString().slice(0, 10);
-}
-
-/** Days from `from` to `to` (negative when `to` comes first). */
-export function daysBetween(from: string, to: string): number {
-  return toEpochDay(to) - toEpochDay(from);
-}
-
-function plusDays(date: string, days: number): string {
-  return fromEpochDay(toEpochDay(date) + days);
-}
 
 const MONTHS_PER_PERIOD: Record<Exclude<RecurringCadence, 'weekly'>, number> = {
   monthly: 1,
@@ -59,13 +42,15 @@ export const COMING_UP_DAYS = 7;
  * gives 30 April, 28 February, then 31 March again, never drifting to the 28th.
  */
 export function occurrence(anchorOn: string, cadence: RecurringCadence, index: number): string {
-  if (cadence === 'weekly') return plusDays(anchorOn, 7 * index);
+  if (cadence === 'weekly') return addDays(anchorOn, 7 * index);
   const [year = 1970, month = 1, day = 1] = anchorOn.split('-').map(Number);
   const total = year * 12 + (month - 1) + index * MONTHS_PER_PERIOD[cadence];
   const targetYear = Math.floor(total / 12);
   const targetMonth = total - targetYear * 12;
   const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-  return fromEpochDay(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)) / DAY_MS);
+  return new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)))
+    .toISOString()
+    .slice(0, 10);
 }
 
 /** The index of the payment date closest to `date` (payments drift by a few days). */

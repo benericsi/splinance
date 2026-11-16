@@ -20,8 +20,7 @@ import {
   transactions,
   users,
 } from '../../db/schema';
-import { requireMembership } from '../households/households.service';
-import type { HouseholdScope } from '../transactions/transactions.service';
+import { requireMembership, type HouseholdScope } from '../households/households.service';
 
 /**
  * Reading the bell: the person's notifications in households they are still an active

@@ -42,7 +42,8 @@ export interface Membership {
   role: HouseholdRole;
 }
 
-interface HouseholdScope {
+/** The caller and the household of a household-scoped request. */
+export interface HouseholdScope {
   userId: string;
   householdId: string;
 }
@@ -105,6 +106,21 @@ export async function lockHousehold(
  */
 export async function lockHouseholdShared(tx: Db, householdId: string): Promise<void> {
   await lockHousehold(tx, householdId, householdNotFound, 'share');
+}
+
+/**
+ * A household-scoped write: one database transaction that takes the shared household lock,
+ * then checks membership, then runs `work`. Both steps stay inside the transaction, in this
+ * order (lock order: user row, households, goals).
+ */
+export async function inHouseholdWrite<T>(
+  scope: HouseholdScope,
+  work: (tx: Db, membership: Membership) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await lockHouseholdShared(tx, scope.householdId);
+    return work(tx, await requireMembership(tx, scope));
+  });
 }
 
 /**

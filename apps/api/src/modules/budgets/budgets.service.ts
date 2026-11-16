@@ -2,13 +2,9 @@ import type { Budget, BudgetInput, BudgetList } from '@splinance/shared';
 import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { budgets, categories, transactions } from '../../db/schema';
-import { HttpError } from '../../lib/http-error';
 import { monthRange } from '../../lib/months';
-import { requireMembership } from '../households/households.service';
-import type { HouseholdScope } from '../transactions/transactions.service';
-
-const invalidCategory = () =>
-  new HttpError(400, 'Choose an active expense category', 'INVALID_CATEGORY');
+import { requireMembership, type HouseholdScope } from '../households/households.service';
+import { usableCategory } from '../categories/categories.service';
 
 /**
  * The household budgets in force in `month`, each with the shared spending against it.
@@ -93,18 +89,7 @@ export async function setBudget(
   input: BudgetInput,
 ): Promise<void> {
   await requireMembership(db, scope);
-  const [category] = await db
-    .select({ id: categories.id })
-    .from(categories)
-    .where(
-      and(
-        eq(categories.id, scope.categoryId),
-        eq(categories.householdId, scope.householdId),
-        eq(categories.kind, 'expense'),
-        isNull(categories.archivedAt),
-      ),
-    );
-  if (!category) throw invalidCategory();
+  const category = await usableCategory(db, scope.householdId, scope.categoryId, 'expense');
 
   const startsOn = `${input.from}-01`;
   await db
