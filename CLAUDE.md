@@ -1,121 +1,21 @@
 # Splinance
 
-Splinance is a household expense web app for tracking personal spending and shared expenses with a partner (also usable by roommates or families). It is a solo full-stack project with a focus on production-quality backend work: auth, data modeling, authorization, background jobs, tests, CI, and deployment. The aim is a finished, deployed app with clear, explainable design decisions.
+Household expense app (personal and shared spending, splits, balances, imports, budgets, savings, recurring payments) with a production-grade backend. Solo project; every design decision should be explainable. What it does and how: `docs/architecture.md` (start with section 1, the repository map, and section 14, "The hard parts"). Stack: same document, section 1.
 
-## Core features
+## Read first, update in the same PR
 
-- Households with invite-link pairing and member roles
-- Transactions with split rules (equal, percentage, fixed) and shared vs private visibility
-- Running balance ("who owes whom") with settle-up
-- Bank CSV import with duplicate detection
-- Categories, auto-categorization rules, monthly budgets
-- Savings goals (shared or private): what members put in or took out, 25% milestones, pace, per-person pins
-- Reports: six-month trend and spending by category (household or your share)
-- Calendar: the month by day with spend tint, recurring payments (paid and expected) and settlements
-- Household map: the overview as a canvas (people, debts, your banks, recurring payments, budgets, pending invites)
-- Recurring payment and subscription detection with renewal reminders
-- Later: multi-currency (HUF/EUR), PWA, Hungarian/English i18n, demo mode
+- `docs/architecture.md` and `docs/data-model.md` before larger changes; update them whenever behavior or schema changes
+- `docs/deploy.md` for a new env variable, service or database role
+- `docs/data-track.md` before touching `data/` or `infra/`
 
-## Stack
+## Commands
 
-- Frontend: React, TypeScript, Vite, TanStack Router, TanStack Query, TanStack Form, shadcn/ui, Tailwind CSS, charts (shadcn charts / Recharts), Zod
-- Backend: Node.js, Express 5, TypeScript, PostgreSQL 18, Drizzle ORM (node-postgres driver), Zod validation, Argon2, pino
-- Jobs: `startPeriodic` + `withAdvisoryLock` for now; a queue (pg-boss first, then BullMQ + Redis) when a trigger in architecture.md section 4 ("Jobs") fires
-- Data track (`data/`, `infra/`): Python 3.13, uv, Polars, httpx, boto3, ruff, mypy (strict), pytest, Terraform, AWS (S3, IAM, Budgets), Airflow 3 (Docker Compose, LocalExecutor); later dbt (DuckDB)
-- Tooling: pnpm monorepo (apps/web, apps/api, packages/shared), Vitest, Supertest, Playwright, Docker Compose, GitHub Actions
+`pnpm check` (the main CI job: format, lint, typecheck, test, build), `pnpm check:data` (the data CI job), `pnpm e2e` (build + Playwright), `pnpm e2e:demo`, `pnpm --filter @splinance/e2e e2e:smoke` (needs `deploy/compose.smoke.yml` up), `pnpm capture:demo`, `pnpm dev`, `pnpm audit:prod`, `pnpm knip` (manual dead-code report). Postgres for tests: `docker compose up -d`.
 
-## Repo conventions
+## Workflow
 
-- Read `docs/architecture.md` (how everything works, including "The hard parts") and `docs/data-model.md` before larger changes; update them in the same PR when behavior changes. Deployment (Railway services, variables, database roles in `deploy/db`, checklist) is in `docs/deploy.md`: a new env variable, service or role goes there too
-
-- `packages/shared` is consumed as TypeScript source (no build step); the api bundles it with tsdown
-- TypeScript pinned to 6.0 until typescript-eslint supports TS 7; `@types/node` matches the Node runtime major
-- Module resolution is `Bundler` everywhere, so no `.js` extensions in relative imports
-- Commands: `pnpm check` (same steps as the main CI job), `pnpm check:data` (same steps as the data CI job), `pnpm e2e` (build + Playwright), `pnpm e2e:demo` (the demo instance's suite), `pnpm --filter @splinance/e2e e2e:smoke` (the images behind Caddy, `deploy/compose.smoke.yml` must be up), `pnpm capture:demo` (re-records the landing page's tour and screenshots), `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format`, `pnpm audit:prod` (separate CI job)
-- Data track: read `docs/data-track.md` (architecture, decisions, lake layout, PR status) before changing `data/` or `infra/`, and update it in the same PR. Python lives only in `data/` (uv project, `src/splinance_data`, tests in `data/tests`), never imports app code and only reads from the app. Commit `pyproject.toml` and `uv.lock` together. Keep DAGs thin (logic in plain, tested functions under `src/`). Every lake object key comes from `splinance_data.lake.paths`; tasks overwrite deterministic keys (idempotent), never append. Money stays integer minor units (`Int64`). Fixtures are synthetic; no credentials in code, logs or Terraform state. The app's database is read only through the `analytics` views; their columns live in `parse/splinance_db.py` (`DATASETS`), checked against the real views by tests marked `postgres`: a view change updates `DATASETS`, the app's contract test and both docs in one PR
-- Airflow (`data/dags`, `data/docker-compose.yml`): DAG tasks import and call `splinance_data` functions inside the task body (no heavy top-level imports); daily DAGs use `CronDataIntervalTimetable`, not `schedule="@daily"` (a point in time in Airflow 3); a task that rewrites a shared partition runs one at a time (`max_active_tis_per_dag=1`); every task has retries. `data/scripts/check_dags.py` (CI job "Airflow DAGs") enforces these; extend it with each new rule. Runtime dependencies must fit Airflow's constraints file (Polars 1.x). Only the scheduler gets `data/.env`
-- Terraform (`infra/`): `bootstrap` (state bucket, local state) and `main` (S3 backend); shared bucket settings in `modules/private-bucket`. Run `plan -out` then apply that saved plan, only with the user's go-ahead; never create access keys or other secrets in Terraform; personal values go in gitignored `terraform.tfvars`. Commit `.terraform.lock.hcl` (locked for windows, linux, darwin)
-- Database: schema in `apps/api/src/db/schema/` (one file per table, shared column helpers in `columns.ts`), migrations generated with `db:generate` into `apps/api/drizzle` and committed; never use `drizzle-kit push`. Do not edit or regenerate a migration once merged
-- Data model and its conventions (uuidv7 ids, money, dates, composite FKs, named constraints) are documented in `docs/data-model.md`; update it in the same PR as any schema change. Create tables only when a feature needs them
-- Backups (`deploy/backup`, docs/deploy.md 3.7): nightly Railway cron, pg_dump as the read-only backup roles (`deploy/db/backup.sql`, `pg_read_all_data`, so new tables need no grant), age-encrypted to `recipients.txt` (public keys only, changed by PR), S3 PutObject-only. A table whose rows must never leave the database goes into `EXCLUDE_DATA` in `backup.sh`. Never give the job a private key or read access
-- API routes are mounted under `/api`; errors use the shared `apiErrorResponseSchema` shape
-- API code is organized by domain in `apps/api/src/modules/<name>/` (`<name>.routes.ts` parses input with shared Zod schemas, `<name>.service.ts` holds business logic and Drizzle queries; services accept `Db` so they run inside or outside a transaction). Multi-row writes use `db.transaction`
-- Protected routes use `requireAuth` and read the user with `getAuth(req)`; authorization checks live in services
-- Scheduled work in the API (demo cleanup, maintenance) uses `startPeriodic` + `withAdvisoryLock` (`src/lib/periodic.ts`): plain functions with a `now` parameter, safe with several instances, started and stopped in `index.ts` (a queue later moves them unchanged; see the jobs decision in architecture.md)
-- Web: file-based TanStack Router routes in `apps/web/src/routes` (`routeTree.gen.ts` is generated, committed, not linted); protected pages live under the `_authenticated` layout route; Vite proxies `/api` to the API in dev
-- Web data layer (service layer + custom hooks), per feature in `src/features/<name>/`:
-  - `api.ts`: service functions, the only place that imports `http` from `src/lib/http.ts`; object params; return parsed data or void
-  - `queries.ts`: `queryOptions` factories with hierarchical keys (`xQueries.all()`, `.list(params)`, `.detail(id)`), usable in route loaders and components
-  - `hooks.ts`: one custom hook per mutation use case; owns cache invalidation; set `meta: { suppressErrorToast: true }` only when the component renders the error itself
-  - No DTO/model/mapper layer: shared Zod schemas are the contract and are validated at runtime
-- `http` is a module-level client (`createHttpClient` factory): attaches the access token from the in-memory `authStore`, refreshes once on 401 (single in-flight refresh, Web Locks across tabs) and retries once. Never store tokens in localStorage
-- Failed mutations show a sonner toast globally (`MutationCache.onError`); toasts use `sonner` directly, not the shadcn wrapper
-- Forms: TanStack Form with the shared Zod schema via `revalidateLogic()` + `onDynamic`; field-specific API errors next to the field, others in `FormError`. `TextField` takes a placeholder; password fields get a show/hide toggle, no other input icons
-- Demo site: web code branches on the `__DEMO_SITE__` define (never an exported constant, so production bundles drop the demo code); tests switch it with `setDemoSite()`. Demo-only UI lives in `features/demo`
-- Demo data comes from one deterministic story (`packages/shared/src/demo`: `buildDemoStory({ seed, today, locale })` plus `renderDemoBankFiles`): the demo seeder imports its bank files through `parseStatement`, and the data track gets the same files (`demo:bank-files` CLI). Change the story there, never with a second generator; dates stay relative to `today`, never in the future. Typed text is translated in `demo/locale.ts` (`DEMO_TEXT`); bank rows never are, so the files are the same in every language (tested)
-- Password policy lives once in `packages/shared/src/password/rules.ts`: required rules (length >= 10, no email/name, not common) block registration and are enforced by the API; composition rules (lower/upper/number) are non-blocking hints (NIST SP 800-63B). The common password list is generated (`pnpm --filter @splinance/shared gen:common-passwords`), do not edit it by hand
-- Theme: `src/lib/theme.ts` store (light/dark/system, localStorage, `.dark` on <html>) plus an inline script in `index.html` that applies it before first paint; keep both in sync. The production CSP allows that script, and the one that makes Zod jitless (no eval), by hash (`deploy/web/Caddyfile`): changing an inline script means updating its hash (`node deploy/scripts/check-csp.mjs` fails and prints the new one). Never add `'unsafe-eval'` Every UI change must look right in light and dark
-- Layouts: `_auth` (split screen with `BrandPanel`, redirects logged-in users), onboarding pages under `_authenticated/welcome*` (same split screen via `OnboardingLayout`, steps in the URL), `_authenticated` (redirects to /login, hosts `?modal=` dialogs) and `_authenticated/h/$householdId` (`HouseholdShell`: sidebar with household switcher and sections, the notification bell and account menu top right; phones get a top bar and bottom tabs). Household pages use `PageHeader` for their h1
-- Modals are URL-driven: app-wide ones via `?modal=<name>` (Zod enum in `_authenticated`), page-bound ones as child routes over their parent. Always render `RouteDialog` (dialog, or drawer on phones), open links with `state={OPEN_MODAL_STATE}`, close with `useCloseModal(fallback)`. Confirmations (remove, leave, archive) are `ConfirmDialog` with local state, never URL-driven
-- PWA (`features/pwa`, architecture 12 "Installable app"): app shell only; never cache `/api` or persist query data (no financial data at rest). Updates wait for a click on the toast. Kill switch in deploy.md 5. E2E blocks service workers except `tests/pwa.spec.ts` and smoke. New icons via `gen:icons`
-- Invite tokens live in the URL fragment (`/invite#token`) and pass through login only via sessionStorage (`features/invites/pending-invite.ts`); never put a token in a query string
-- Every page renders exactly one `<PageTitle title="..." />` (React 19 hoists it); layouts never render a title
-- Boot: `index.html` holds a static splash (with a CSS-only "taking longer" fallback after 8 s); `main.tsx` awaits `router.load()` before rendering, so there is no blank frame or login flash
-- Not found / error states: `NotFoundPage` / `ErrorPage` (full page at the root, inline inside layouts via router defaults); throw `notFound()` for missing resources
-- shadcn/ui on Base UI; components in `src/components/ui` are owned code and may be edited. Icons: lucide only (one exception: sign-in providers' own marks in `components/brand/provider-logos.tsx`, required by their branding rules)
-- Brand: palette, logo pairings and contrast helpers live in `packages/shared/src/brand.ts` (mirrored as `--color-brand-*` in `apps/web/src/index.css`; keep both in sync). Brand colors are fills; text uses role tokens `text-link`, `text-positive`, `text-negative`, `text-warning` (light/dark tuned to >= 4.5:1). UI chrome stays neutral. Every logo pairing must stay >= 3:1 (enforced by a test)
-- Logo: pink-to-orange split S on a softly lit blue tile (`LogoMark` / `Logo`, crisp). `public/favicon.svg` (crisp) and `public/logo.svg` (grainy, for large static uses and the iOS icon) must match the component; PNGs via `pnpm --filter @splinance/web gen:icons`. Keep the S at >= 3:1 against the tile glow
-- Avatars only through wrappers: `UserAvatar` (facehash with brand colors, seeded with user id) and `HouseholdAvatar` (`@outpacelabs/avatars` mesh gradient in brand colors, seeded with household id, rounded square). The auth screen uses the hand-composed `PosterWall` (`components/brand`): curated art, not generated
-- Amounts that change in place (totals, balances) render with `MoneyFlow` (NumberFlow, digits roll; same formatting as `formatMoney`, `aria-hidden` digits plus an sr-only copy); static amounts use `Amount`, and sentences built with `formatMoney` go through `MaskMoney`, so "hide amounts" (`data-amount` blur) reaches them; SVG text gets an `amount-svg` container (charts: `amount-chart`). NumberFlow is mocked in web tests
-- Motion: `m.*` from `motion/react` (never `motion.*`: `LazyMotion strict`), tokens and `COLLAPSE` in `src/lib/motion.ts`, `Collapse` for open/close by height; `AnimatePresence initial={false}` so first renders are static; key lists by what swaps them (month, kind). Short (0.15-0.2 s), no page transitions, reduced motion respected
-- Loading: household pages have a `pendingComponent` skeleton (`PageSkeleton` + blocks from `components/skeletons.tsx`, mirroring the real boxes, real static h1); content that replaces a skeleton comes in with `RevealPage` / `Reveal` and `useRevealRows` (never on cached navigation). A new household page gets a skeleton too
-- Overview (architecture 9 "Overview and settling up"): a bento grid of `OverviewRow` + `Tile` (weights out of 4, flex, no span math; a tile that renders nothing vanishes and its neighbours stretch) and neutral `TileBox`es; "Left this month" is the page's only tinted surface (`--positive-tint` / `--negative-tint`). One shape per meaning (bars = month, `Gauge` = limit, `Ring` = target, number = count or debt); chart geometry and data picks are pure tested helpers, and SVG never holds an amount
-- Savings (`features/savings`, architecture 4 "Savings" and 9 "Savings"): saving is a transfer, never spending, so entries stay out of transactions, budgets, reports and balances; goal balances, milestones and pace are derived (`view.ts`, pure and tested), never stored; private goals go through `goalVisibleTo` in every read and write
-- Household map (`features/household-map`, architecture 9 "Household map"): rules live in the pure `buildMap` (tested there); only `components/household-map.tsx` imports `@xyflow/react`, and it stays lazy-loaded; the map shows nothing the cards could not (no new API reads beyond the viewer's imports and, for owners, invites); nodes are real links (`MapNodeLink`), and anything a drag or drop does (settle up, import) must also be reachable by a click and the keyboard
-- Fonts: Inter (body, 14px base, use `tabular-nums` for amounts) and Bricolage Grotesque (headings, `font-heading`), self-hosted via fontsource (never Google Fonts CDN, GDPR)
-- Web tests mock the API with MSW (`test/msw.ts`, unhandled requests fail the test; `/api/auth/providers` defaults to none)
-- Tests run against a real Postgres (`splinance_test`); migrations are applied in Vitest global setup. API test files run sequentially (`fileParallelism: false`); tests that write data call `resetDatabase()` from `apps/api/test/db.ts` in `beforeEach`
-- E2E (`e2e/`, Playwright, Chromium desktop + Pixel 7): runs against the production builds (API :3100, `vite preview` :4173) and its own `splinance_e2e` database; every test registers its own users (`newUser()`), a second person is a new browser context; `*.mobile.spec.ts` runs only in the mobile project. The API runs with `RATE_LIMIT_DISABLED=true` (refused in production). Add a flow when a feature ships a new user journey
-- Password hashing uses `@node-rs/argon2` (the `argon2` package segfaults on this Windows setup)
-- Work on a branch per change (`chore/...`, `feat/...`, `ci/...`, `docs/...`) and merge via pull request; do not commit to `main` directly
-
-## Key design decisions
-
-- Money stored as integer minor units, never floats
-- Splits use the largest remainder method so shares always sum to the total
-- Balances are derived from transactions, splits, and settlements, not stored
-- Multi-row writes use SQL transactions
-- Soft delete and an audit log for transactions
-- Authorization enforced in the service layer; private data readable only by its creator
-- Auth: short-lived access token plus rotated httpOnly refresh token, rate limiting, Helmet
-
-## Security
-
-Model and pre-deploy checklist: `docs/architecture.md` section 16. Rules for new code:
-
-- Every household-scoped service calls `requireMembership` (404 for non-members, never 403 that reveals the id); owner-only actions pass `role: 'owner'`. Private data goes through `visibleTo` everywhere it can surface (lists, details, history, summaries, matching)
-- Ids from params via `idParam` (malformed means 404), bodies and queries via shared Zod schemas with upper bounds (string lengths, array sizes, amounts)
-- SQL only through Drizzle or parameterized `sql` templates; escape user text in LIKE patterns (`escapeLike`)
-- Demo instance (`DEMO_MODE`, own `_demo` database, own JWT secret): `/api/demo` exists only there, registration and invite accept are closed there. A new table that references households or users must also be deleted in `deleteHouseholdContents` (used by `deleteDemo`; its test checks that nothing is left) and handled in account deletion's `erase` (anonymize what others need, erase what only the person could see)
-- Data track access: only through the `analytics` views (custom migration, contract test `src/db/analytics.test.ts`), never grants on `public` to `splinance_analytics_reader`. Free text only by the provenance rule (`demos.seeded_at`), rows hidden as stubs not filtered out, no credentials or contact data (`docs/data-model.md`, "analytics schema")
-- Changes to how a user signs in (password, providers, later deletion) live in `modules/account`: `lockUser` first, step-up with `requireRecentAuth` (current password, or a sign-in within 10 minutes for accounts without one), other sessions revoked on a password change or disconnect, never removing the last way in (`LAST_SIGN_IN_METHOD`); a wrong current password answers 400 `WRONG_PASSWORD`, never 401 (the web client refreshes on 401). Connect and reauth start only from authenticated POSTs that seal `intent`, `userId` and `sessionId` into the flow cookie; the callback re-checks that session
-- New public or expensive endpoints get a `rateLimiter` (`perUser: true` for work behind `requireAuth`); keep `RATE_LIMIT_DISABLED` for e2e only
-- Never put tokens or personal data in query strings, logs or error messages; extend `redactUrl` for new token-bearing paths (provider callbacks are redacted whole)
-- Sign-in providers (`modules/auth/oauth`, architecture 6): a new provider is a `providersFromEnv` entry, env variables and a button; identities match on `(provider, sub)`, never email; an existing account is linked only after its password (`linkByEmail` false where the email claim is unverified); keep `enableNonRepudiationChecks`; never on the demo; tests use `@splinance/fake-oidc`
-- Web: no `dangerouslySetInnerHTML`; post-login navigation only through `safeRedirect`; nothing sensitive in localStorage
-- New dependencies: check `pnpm audit` first; CI fails on high or critical advisories in production dependencies (`pnpm audit:prod`)
-
-## Roadmap
-
-0. Foundation: monorepo, Docker, CI, config
-1. Auth and households
-2. Transactions and splits
-3. Balances and settle-up
-4. CSV import
-5. Rules and budgets
-6. Recurring detection and background jobs
-7. Polish: PWA, i18n, multi-currency, real-time, demo mode
-8. First deploy (kept deployable all along: e2e runs against production builds)
+- A branch per change (`feat/`, `fix/`, `chore/`, `ci/`, `docs/`, `perf/`, `refactor/`), merged by pull request; never commit to `main`. `main` requires branches to be up to date
+- e2e runs against production builds; add an e2e flow when a feature ships a new user journey
 
 ## Working rules
 
@@ -124,3 +24,46 @@ Model and pre-deploy checklist: `docs/architecture.md` section 16. Rules for new
 - Before a larger change, briefly explain the planned steps and wait for a go-ahead
 - Explain tradeoffs briefly, and point out risks or mistakes you notice
 - Use single hyphens, not em dashes
+
+## Never
+
+- `drizzle-kit push`, or editing/regenerating a migration once merged (generate with `db:generate`; data migrations are hand-written, `--custom`)
+- Commit to `main`, skip hooks, or run Terraform `apply` / anything against production or the demo database without the owner's go-ahead
+- Tokens or personal data in query strings, logs, error messages or localStorage; `dangerouslySetInnerHTML`; `'unsafe-eval'` in the CSP
+- Store money as floats (integer minor units only) or store balances (derived)
+- Give the backup job a private key or read access; credentials in code, logs or Terraform state
+- Add a dependency without checking `pnpm audit` (CI fails on high/critical in production deps)
+
+## Pins
+
+TypeScript 6.0 (until typescript-eslint supports 7); `@types/node` and the Node images follow the runtime major (26); Polars 1.x (Airflow constraints); `@node-rs/argon2`, not `argon2` (segfaults on Windows). Module resolution `Bundler`: no `.js` in relative imports. `packages/shared` ships TS source (bundled by tsdown).
+
+## API rules (architecture 3-6, 16)
+
+- Modules in `apps/api/src/modules/<name>/`: `<name>.routes.ts` parses with shared Zod schemas, `<name>.service.ts` holds logic and Drizzle queries and accepts `Db`. Household writes go through `inHouseholdWrite`; multi-row writes use one `db.transaction`. Keep the lock order: user row, households by id, goals by id
+- Every household-scoped service calls `requireMembership` (404 for non-members); owner-only passes `role: 'owner'`. Private data goes through `visibleTo` / `goalVisibleTo` everywhere it can surface
+- Ids via `idParam`; bodies and queries via shared Zod schemas with upper bounds; SQL only through Drizzle or parameterized `sql`; `escapeLike` for LIKE. Errors use the shared shape and codes (`API_ERROR_CODES`, worded per code in both web locales)
+- Sign-in changes live in `modules/account` (`lockUser`, step-up via `verifyBeforeLock` + `requireRecentAuth`, never remove the last way in; wrong current password is 400, never 401). Providers: architecture 6
+- New public or expensive endpoints get a `rateLimiter`; `RATE_LIMIT_DISABLED` is for e2e only
+- Scheduled work: `startPeriodic` + `withAdvisoryLock`, plain functions with a `now` parameter
+- A new table referencing households or users: delete it in `deleteHouseholdContents`, handle it in account deletion's `erase`, and decide whether it belongs in `EXCLUDE_DATA` (backups). The data track reads only the `analytics` views (contract test `src/db/analytics.test.ts`)
+- Tests hit a real Postgres (`splinance_test`); writing tests call `resetDatabase()` in `beforeEach`
+
+## Web rules (architecture 8-12)
+
+- File routes in `src/routes` (`routeTree.gen.ts` generated and committed); protected pages under `_authenticated`; household pages render `PageHeader`, one `PageTitle`, and a `pendingComponent` skeleton
+- Per feature: `api.ts` (only importer of `http`), `queries.ts` (`queryOptions` factories), `hooks.ts` (one hook per mutation, owns invalidation). Shared Zod schemas are the contract; no DTO layer
+- Forms: TanStack Form + shared schema (`revalidateLogic()` + `onDynamic`). Modals are URL-driven (`RouteDialog`, `OPEN_MODAL_STATE`, `useCloseModal`); confirmations are local `ConfirmDialog`
+- Demo-only code branches on the `__DEMO_SITE__` define and lives in `features/demo`; demo data comes only from `buildDemoStory` in `packages/shared/src/demo`
+- UI: shadcn on Base UI (owned code), lucide icons, brand colors as fills and role tokens for text, amounts through `MoneyFlow` / `Amount` / `MaskMoney`, motion via `m.*` and `src/lib/motion.ts`. Every change must look right in light and dark, EN and HU
+- Changing an inline script in `index.html` means updating its CSP hash (`node deploy/scripts/check-csp.mjs`); keep `theme.ts` and the inline theme script in sync
+- PWA caches the app shell only, never `/api`. Invite tokens stay in the URL fragment. Post-login navigation only via `safeRedirect`
+- Web tests mock the API with MSW (unhandled requests fail)
+
+## Data track (docs/data-track.md)
+
+Python only in `data/` (uv; commit `pyproject.toml` and `uv.lock` together), never imports app code. Thin DAGs (logic in tested functions), lake keys from `splinance_data.lake.paths`, idempotent overwrites. `data/scripts/check_dags.py` enforces the Airflow rules; extend it with new ones. Terraform: `plan -out`, apply that plan only with the go-ahead; commit `.terraform.lock.hcl` for windows, linux, darwin.
+
+## Key design decisions
+
+Integer minor units; largest-remainder splits; balances derived from transactions, splits and settlements; soft delete plus an audit log (snapshots keep ids, names are read live); authorization in the service layer; short-lived access token plus rotated httpOnly refresh token. Details and the reasons: architecture 14.
