@@ -1,0 +1,32 @@
+# Weekly update pull requests. CI (including pnpm audit:prod) runs on each; merge by hand.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # One pull request for every minor and patch update; majors stay separate.
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # The digest-pinned base images.
+  - package-ecosystem: docker
+    directories: [/apps/api, /deploy/web, /deploy/backup]
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: uv
+    directory: /data
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: terraform
+    directories: [/infra/main, /infra/bootstrap]
+    schedule:
+      interval: weekly
