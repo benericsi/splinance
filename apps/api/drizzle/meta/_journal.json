@@ -176,6 +176,13 @@
       "when": 1794568718568,
       "tag": "0024_savings_import",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794783877975,
+      "tag": "0025_audit_log_names",
+      "breakpoints": true
     }
   ]
 }

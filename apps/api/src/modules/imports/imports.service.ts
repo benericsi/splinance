@@ -18,10 +18,10 @@ import {
   savingsEntries,
   savingsGoals,
   transactions,
-  users,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
 import { lockHouseholdShared, requireMembership } from '../households/households.service';
+import { namesOf, personOf } from '../households/people';
 import {
   goalNotFound,
   insertEntry,
@@ -48,11 +48,12 @@ const shiftDays = (date: string, days: number) =>
 
 async function toBatches(executor: Db, rows: ImportBatchRow[]): Promise<ImportBatch[]> {
   if (rows.length === 0) return [];
-  const people = await executor
-    .select({ id: users.id, displayName: users.displayName })
-    .from(users)
-    .where(inArray(users.id, [...new Set(rows.map((row) => row.createdBy))]));
-  const nameOf = new Map(people.map((person) => [person.id, person.displayName]));
+  const person = personOf(
+    await namesOf(
+      executor,
+      rows.map((row) => row.createdBy),
+    ),
+  );
   // Every entry the import created, removed ones too (like `row_count`).
   const savings = await executor
     .select({ batchId: savingsEntries.importBatchId, count: count() })
@@ -71,7 +72,7 @@ async function toBatches(executor: Db, rows: ImportBatchRow[]): Promise<ImportBa
     fileName: row.fileName,
     rowCount: row.rowCount,
     savingsCount: savingsOf.get(row.id) ?? 0,
-    createdBy: { userId: row.createdBy, displayName: nameOf.get(row.createdBy) ?? '' },
+    createdBy: person(row.createdBy),
     createdAt: row.createdAt.toISOString(),
     undoneAt: row.undoneAt?.toISOString() ?? null,
   }));
