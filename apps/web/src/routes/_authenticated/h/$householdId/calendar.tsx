@@ -15,6 +15,7 @@ import { CategorySummary } from '@/features/calendar/components/category-summary
 import { ActivityViewSwitch } from '@/features/calendar/components/activity-view-switch';
 import { CalendarGrid, CalendarLegend } from '@/features/calendar/components/calendar-grid';
 import { CalendarSummary } from '@/features/calendar/components/calendar-summary';
+import { isIncome } from '@/features/calendar/events';
 import { calendarQueries } from '@/features/calendar/queries';
 import type { CalendarView } from '@/features/calendar/view';
 import { CategoryPicker } from '@/features/categories/components/category-picker';
@@ -142,9 +143,8 @@ function CalendarPage() {
           category={category}
         />
         <CalendarLegend
-          income={calendar.events.some(
-            (event) => event.type !== 'settlement' && event.kind === 'income',
-          )}
+          income={calendar.events.some(isIncome)}
+          savings={calendar.events.some((event) => event.type === 'savingsEntry')}
         />
       </Reveal>
 

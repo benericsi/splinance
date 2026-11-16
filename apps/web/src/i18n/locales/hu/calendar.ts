@@ -100,6 +100,10 @@ export const calendar: Messages<typeof en.calendar> = {
     paidYou: '{{name}} fizetett neked',
     youPaid: 'Fizettél neki: {{name}}',
     paidOther: '{{from}} fizetett neki: {{to}}',
+    youPutIn: 'Befizetted',
+    putIn: '{{name}} befizette',
+    youTookOut: 'Kivetted',
+    tookOut: '{{name}} kivette',
   },
   legend: {
     label: 'A jelölések magyarázata',
@@ -107,10 +111,11 @@ export const calendar: Messages<typeof en.calendar> = {
     expected: 'Várható',
     income: 'Rendszeres bevétel',
     settlement: 'Elszámolás',
+    savings: 'Megtakarítás',
     spending: 'Sötétebb nap: több költés',
   },
   dialog: {
-    marked: 'Rendszeres tételek és elszámolások',
+    marked: 'Rendszeres tételek, elszámolások és megtakarítások',
     transactions: 'Tranzakciók',
     spent: 'Elköltve: {{amount}}',
     empty: 'Ezen a napon nincs tétel.',

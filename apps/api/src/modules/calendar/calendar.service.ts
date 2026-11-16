@@ -18,6 +18,7 @@ import { budapestToday } from '../../lib/today';
 import { requireMembership, type HouseholdScope } from '../households/households.service';
 import { seriesWithPayments, sharesOf } from '../recurring/recurring.service';
 import { ownSplit, yourPart } from '../reports/reports.service';
+import { savingsEntriesBetween } from '../savings/savings.service';
 import { settlementsBetween } from '../settlements/settlements.service';
 import { visibleTo } from '../transactions/transactions.service';
 
@@ -133,13 +134,15 @@ const EVENT_ORDER: Record<CalendarEvent['type'], number> = {
   recurringPaid: 0,
   recurringExpected: 1,
   settlement: 2,
+  savingsEntry: 3,
 };
 
 /**
  * One month for the calendar page, as the viewer sees it: totals per day, the payments of
- * their tracked recurring series (found and still expected) and the household's
- * settlements. Other people's private transactions and series never count. With a
- * category, only what is filed under it (an id from elsewhere simply matches nothing).
+ * their tracked recurring series (found and still expected), the household's settlements
+ * and the savings entries in goals they can see. Other people's private transactions,
+ * series and goals never count. With a category, only what is filed under it (an id from
+ * elsewhere simply matches nothing; settlements and savings have no category).
  */
 export async function getCalendar(
   scope: HouseholdScope,
@@ -149,11 +152,12 @@ export async function getCalendar(
   const { household } = await requireMembership(db, scope);
   const [start, end] = monthRange(month);
 
-  const [totals, recurring, settled] = await Promise.all([
+  const [totals, recurring, settled, saved] = await Promise.all([
     dayTotals(scope, start, end, categoryId),
     recurringEvents(scope, month, start, end, today),
-    // Settlements have no category: a category's calendar has none.
+    // Settlements and savings have no category: a category's calendar has none.
     categoryId ? [] : settlementsBetween(db, scope.householdId, start, end),
+    categoryId ? [] : savingsEntriesBetween(scope, start, end),
   ]);
 
   const byDate = new Map(totals.map((row) => [row.date, row]));
@@ -178,6 +182,16 @@ export async function getCalendar(
       from: settlement.from,
       to: settlement.to,
       amount: settlement.amount,
+    })),
+    ...saved.map((entry): CalendarEvent => ({
+      type: 'savingsEntry',
+      date: entry.entryOn,
+      entryId: entry.id,
+      goalId: entry.goalId,
+      name: entry.goalName,
+      user: entry.user,
+      direction: entry.amount > 0 ? 'in' : 'out',
+      amount: Math.abs(entry.amount),
     })),
   ].sort(
     (a, b) =>

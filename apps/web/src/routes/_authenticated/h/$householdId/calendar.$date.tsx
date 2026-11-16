@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { RouteDialog } from '@/components/route-dialog';
-import { eventAmountText, eventName, eventStyle } from '@/features/calendar/events';
+import { eventAmountText, eventName, eventStyle, isIncome } from '@/features/calendar/events';
 import { MaskMoney } from '@/features/transactions/components/amount';
 import { calendarQueries } from '@/features/calendar/queries';
 import { type CalendarView, daySpent } from '@/features/calendar/view';
@@ -18,6 +18,7 @@ import { transactionQueries } from '@/features/transactions/queries';
 import { useAuth } from '@/lib/auth-store';
 import { OPEN_MODAL_STATE, useCloseModal } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
+import { i18n } from '@/i18n';
 
 const dateSchema = z.iso.date();
 
@@ -138,7 +139,20 @@ const KIND_LABEL = {
   settlement: 'event.settlement',
 } as const;
 
-/** An event with its kind and amount; a recurring one opens its series. */
+/** "You put in", "Jane took out": who moved the money, and which way. */
+function savingsLabel(event: Extract<CalendarEvent, { type: 'savingsEntry' }>, viewerId?: string) {
+  const you = event.user.userId === viewerId;
+  if (event.direction === 'in') {
+    return you
+      ? i18n.t('calendar:event.youPutIn')
+      : i18n.t('calendar:event.putIn', { name: event.user.displayName });
+  }
+  return you
+    ? i18n.t('calendar:event.youTookOut')
+    : i18n.t('calendar:event.tookOut', { name: event.user.displayName });
+}
+
+/** An event with its kind and amount; a recurring one opens its series, savings its goal. */
 function EventRow({
   householdId,
   event,
@@ -154,13 +168,17 @@ function EventRow({
 }) {
   const { t } = useTranslation('calendar');
   const { icon: Icon, className } = eventStyle(event);
-  const income = event.type !== 'settlement' && event.kind === 'income';
+  const income = isIncome(event);
   const label =
-    income && event.type === 'recurringPaid'
-      ? 'event.received'
-      : income
-        ? 'event.expectedIncome'
-        : KIND_LABEL[event.type];
+    event.type === 'savingsEntry'
+      ? savingsLabel(event, viewerId)
+      : t(
+          income && event.type === 'recurringPaid'
+            ? 'event.received'
+            : income
+              ? 'event.expectedIncome'
+              : KIND_LABEL[event.type],
+        );
   const row = 'flex items-center gap-3 py-2.5';
   const content = (
     <>
@@ -172,7 +190,7 @@ function EventRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{eventName(event, viewerId)}</span>
-        <span className="text-muted-foreground block text-xs">{t(label)}</span>
+        <span className="text-muted-foreground block text-xs">{label}</span>
       </span>
       <span className={cn('shrink-0 font-medium tabular-nums', income && 'text-positive')}>
         <MaskMoney>{eventAmountText(event, view, currency)}</MaskMoney>
@@ -180,15 +198,28 @@ function EventRow({
     </>
   );
   if (event.type === 'settlement') return <div className={row}>{content}</div>;
+  const linkClass = cn(
+    row,
+    'hover:bg-muted/60 focus-visible:ring-ring/50 -mx-1 rounded-lg px-1 outline-none focus-visible:ring-[3px]',
+  );
+  if (event.type === 'savingsEntry') {
+    return (
+      <Link
+        to="/h/$householdId/savings/$goalId"
+        params={{ householdId, goalId: event.goalId }}
+        state={OPEN_MODAL_STATE}
+        className={linkClass}
+      >
+        {content}
+      </Link>
+    );
+  }
   return (
     <Link
       to="/h/$householdId/recurring/$seriesId"
       params={{ householdId, seriesId: event.seriesId }}
       state={OPEN_MODAL_STATE}
-      className={cn(
-        row,
-        'hover:bg-muted/60 focus-visible:ring-ring/50 -mx-1 rounded-lg px-1 outline-none focus-visible:ring-[3px]',
-      )}
+      className={linkClass}
     >
       {content}
     </Link>
