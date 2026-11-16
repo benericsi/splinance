@@ -21,17 +21,13 @@ import {
   lockHousehold,
   requireMembership,
   toHousehold,
+  type HouseholdScope,
 } from '../households/households.service';
 import { assertLiveUser } from '../account/live-user';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const inviteNotFound = () => new HttpError(404, 'Invite not found', 'INVITE_NOT_FOUND');
-
-interface HouseholdScope {
-  userId: string;
-  householdId: string;
-}
 
 function toInvite(row: HouseholdInviteRow, inviterName: string): Invite {
   return {

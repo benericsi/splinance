@@ -44,6 +44,7 @@ import {
   lockHouseholdShared,
   type Membership,
   requireMembership,
+  type HouseholdScope,
 } from '../households/households.service';
 import { recordTransactionActivity } from '../notifications/activity';
 
@@ -65,11 +66,6 @@ const invalidMember = () =>
 
 const onlyAuthorCanMakePrivate = () =>
   new HttpError(403, 'Only the person who added it can make it private', 'FORBIDDEN');
-
-export interface HouseholdScope {
-  userId: string;
-  householdId: string;
-}
 
 export interface TransactionScope extends HouseholdScope {
   transactionId: string;
@@ -428,14 +424,19 @@ async function assertUsableCategory(
   if (!row) throw invalidCategory();
 }
 
-async function replaceSplits(tx: Db, row: TransactionRow, shares: PreparedSplit['shares']) {
-  await tx.delete(transactionSplits).where(eq(transactionSplits.transactionId, row.id));
+/** A new row's splits: nothing to delete first. */
+async function insertSplits(tx: Db, row: TransactionRow, shares: PreparedSplit['shares']) {
   if (shares.length === 0) return;
   await tx
     .insert(transactionSplits)
     .values(
       shares.map((share) => ({ ...share, transactionId: row.id, householdId: row.householdId })),
     );
+}
+
+async function replaceSplits(tx: Db, row: TransactionRow, shares: PreparedSplit['shares']) {
+  await tx.delete(transactionSplits).where(eq(transactionSplits.transactionId, row.id));
+  await insertSplits(tx, row, shares);
 }
 
 /**
@@ -533,7 +534,7 @@ export async function insertTransaction(
     })
     .returning();
   if (!row) throw new Error('Transaction insert returned no row');
-  await replaceSplits(tx, row, split.shares);
+  await insertSplits(tx, row, split.shares);
 
   const after = await toTransaction(tx, row);
   await recordAudit(tx, scope, 'create', row.id, null, after);

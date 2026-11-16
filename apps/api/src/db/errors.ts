@@ -27,3 +27,17 @@ export function isTimeout(err: unknown): boolean {
       TIMED_OUT.has((candidate as PgError).code ?? ''),
   );
 }
+
+/** Runs `write`, turning a unique violation of `constraint` into `makeError()` (a 409). */
+export async function mapUniqueViolation<T>(
+  write: Promise<T>,
+  constraint: string,
+  makeError: () => Error,
+): Promise<T> {
+  try {
+    return await write;
+  } catch (err) {
+    if (isUniqueViolation(err, constraint)) throw makeError();
+    throw err;
+  }
+}

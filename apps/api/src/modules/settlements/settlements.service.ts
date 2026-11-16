@@ -15,6 +15,7 @@ import {
   lockHouseholdShared,
   type Membership,
   requireMembership,
+  type HouseholdScope,
 } from '../households/households.service';
 import { recordSettlementActivity } from '../notifications/activity';
 
@@ -30,11 +31,6 @@ const notYourPayment = () =>
     'Only the two people involved or an owner can record or remove this payment',
     'FORBIDDEN',
   );
-
-interface HouseholdScope {
-  userId: string;
-  householdId: string;
-}
 
 export interface SettlementScope extends HouseholdScope {
   settlementId: string;

@@ -24,7 +24,7 @@ import {
 } from '@splinance/shared';
 import { and, count, desc, eq, gte, inArray, isNull, or } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
-import { isUniqueViolation } from '../../db/errors';
+import { mapUniqueViolation } from '../../db/errors';
 import {
   categories,
   notifications,
@@ -35,8 +35,8 @@ import {
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
 import { budapestToday } from '../../lib/today';
-import { requireMembership } from '../households/households.service';
-import { type HouseholdScope, visibleTo } from '../transactions/transactions.service';
+import { requireMembership, type HouseholdScope } from '../households/households.service';
+import { visibleTo } from '../transactions/transactions.service';
 
 export const seriesNotFound = () =>
   new HttpError(404, 'Recurring payment not found', 'SERIES_NOT_FOUND');
@@ -83,14 +83,8 @@ function minusDays(date: string, days: number): string {
   return value.toISOString().slice(0, 10);
 }
 
-async function mapPatternTaken<T>(write: Promise<T>): Promise<T> {
-  try {
-    return await write;
-  } catch (err) {
-    if (isUniqueViolation(err, PATTERN_UNIQUE)) throw patternTaken();
-    throw err;
-  }
-}
+const mapPatternTaken = <T>(write: Promise<T>) =>
+  mapUniqueViolation(write, PATTERN_UNIQUE, patternTaken);
 
 /**
  * The transactions (expenses and income) the caller can see from the last `SCAN_DAYS`,

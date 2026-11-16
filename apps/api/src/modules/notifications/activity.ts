@@ -9,7 +9,7 @@ import type {
 import { and, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client';
 import { householdMembers, notifications } from '../../db/schema';
-import type { HouseholdScope } from '../transactions/transactions.service';
+import type { HouseholdScope } from '../households/households.service';
 
 /**
  * Activity notifications: what someone else did to money you are part of. Written in the

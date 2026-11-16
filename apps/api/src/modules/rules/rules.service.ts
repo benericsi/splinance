@@ -7,15 +7,15 @@ import {
 } from '@splinance/shared';
 import { and, asc, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
-import { isUniqueViolation } from '../../db/errors';
+import { mapUniqueViolation } from '../../db/errors';
 import { categories, categoryRules, type CategoryRuleRow, transactions } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
-import { lockHouseholdShared, requireMembership } from '../households/households.service';
 import {
+  lockHouseholdShared,
+  requireMembership,
   type HouseholdScope,
-  setTransactionCategory,
-  visibleTo,
-} from '../transactions/transactions.service';
+} from '../households/households.service';
+import { setTransactionCategory, visibleTo } from '../transactions/transactions.service';
 
 export const ruleNotFound = () => new HttpError(404, 'Rule not found', 'RULE_NOT_FOUND');
 
@@ -42,14 +42,8 @@ function toRule(row: CategoryRuleRow): Rule {
   };
 }
 
-async function mapPatternTaken<T>(write: Promise<T>): Promise<T> {
-  try {
-    return await write;
-  } catch (err) {
-    if (isUniqueViolation(err, PATTERN_UNIQUE)) throw patternTaken();
-    throw err;
-  }
-}
+const mapPatternTaken = <T>(write: Promise<T>) =>
+  mapUniqueViolation(write, PATTERN_UNIQUE, patternTaken);
 
 /** The category a rule may point at: active and in this household. Its kind comes along. */
 async function activeCategory(executor: Db, householdId: string, categoryId: string) {
