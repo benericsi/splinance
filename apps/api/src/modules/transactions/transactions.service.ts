@@ -41,10 +41,10 @@ import { nameless, namesOf, personOf } from '../households/people';
 import { decodeCursor, encodeCursor } from '../../lib/keyset-cursor';
 import { monthRange } from '../../lib/months';
 import {
-  lockHouseholdShared,
+  type HouseholdScope,
+  inHouseholdWrite,
   type Membership,
   requireMembership,
-  type HouseholdScope,
 } from '../households/households.service';
 import { recordTransactionActivity } from '../notifications/activity';
 import { invalidCategory, usableCategory } from '../categories/categories.service';
@@ -456,17 +456,6 @@ async function recordAudit(
   await recordTransactionActivity(tx, scope, action, before, after);
 }
 
-/** Every write: household lock (shared), membership, then the change and its audit entry. */
-async function inWriteTransaction<T>(
-  scope: HouseholdScope,
-  work: (tx: Db, membership: Membership) => Promise<T>,
-): Promise<T> {
-  return db.transaction(async (tx) => {
-    await lockHouseholdShared(tx, scope.householdId);
-    return work(tx, await requireMembership(tx, scope));
-  });
-}
-
 /** Where an imported transaction came from. */
 export interface TransactionOrigin {
   importBatchId: string;
@@ -476,7 +465,7 @@ export interface TransactionOrigin {
 
 /**
  * Creates a transaction inside a write transaction that already holds the household lock
- * and checked membership (`inWriteTransaction`, or the import service's). `allowed` are
+ * and checked membership (`inHouseholdWrite`). `allowed` are
  * the people who may pay or share: the active members.
  */
 export async function insertTransaction(
@@ -636,7 +625,7 @@ export async function createTransaction(
   scope: HouseholdScope,
   input: TransactionInput,
 ): Promise<Transaction> {
-  return inWriteTransaction(scope, async (tx, { household }) =>
+  return inHouseholdWrite(scope, async (tx, { household }) =>
     insertTransaction(tx, scope, household, input, await activeMemberIds(tx, scope.householdId)),
   );
 }
@@ -645,7 +634,7 @@ export async function updateTransaction(
   scope: TransactionScope,
   { version, ...input }: UpdateTransactionInput,
 ): Promise<Transaction> {
-  return inWriteTransaction(scope, async (tx) => {
+  return inHouseholdWrite(scope, async (tx) => {
     const existing = await findVisible(tx, scope, { lock: true });
     if (!existing) throw transactionNotFound();
     if (existing.version !== version) throw versionConflict();
@@ -766,7 +755,7 @@ export async function softDeleteTransactions(
 
 /** Soft delete: gone from lists and balances, kept for history and restore. */
 export async function deleteTransaction(scope: TransactionScope): Promise<void> {
-  await inWriteTransaction(scope, async (tx) => {
+  await inHouseholdWrite(scope, async (tx) => {
     const existing = await findVisible(tx, scope, { lock: true });
     if (!existing) throw transactionNotFound();
     await softDeleteTransaction(tx, scope, existing);
@@ -791,7 +780,7 @@ async function importedAgain(tx: Db, row: TransactionRow): Promise<boolean> {
 
 /** Undo for a delete. Restoring a transaction that is not deleted changes nothing. */
 export async function restoreTransaction(scope: TransactionScope): Promise<Transaction> {
-  return inWriteTransaction(scope, async (tx) => {
+  return inHouseholdWrite(scope, async (tx) => {
     const existing = await findVisible(tx, scope, { deleted: true, lock: true });
     if (!existing) throw transactionNotFound();
     if (!existing.deletedAt) return toTransaction(tx, existing);

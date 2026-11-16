@@ -11,9 +11,9 @@ import { mapUniqueViolation } from '../../db/errors';
 import { categoryRules, type CategoryRuleRow, transactions } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
 import {
-  lockHouseholdShared,
-  requireMembership,
   type HouseholdScope,
+  inHouseholdWrite,
+  requireMembership,
 } from '../households/households.service';
 import { setTransactionCategory, visibleTo } from '../transactions/transactions.service';
 import { usableCategory } from '../categories/categories.service';
@@ -212,9 +212,7 @@ export async function countRuleMatches(scope: RuleScope): Promise<number> {
  * never who it is for: that would move balances behind people's backs.
  */
 export async function applyRule(scope: RuleScope): Promise<number> {
-  return db.transaction(async (tx) => {
-    await lockHouseholdShared(tx, scope.householdId);
-    await requireMembership(tx, scope);
+  return inHouseholdWrite(scope, async (tx) => {
     const rule = await findRule(tx, scope);
     await usableCategory(tx, scope.householdId, rule.categoryId);
 
