@@ -1,12 +1,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { calendarQueries } from '@/features/calendar/queries';
 import { savingsApi } from './api';
 import { savingsQueries } from './queries';
 
-/** Goals, balances, pins and histories of the household all come from the same few rows. */
+/**
+ * Goals, balances, pins and histories of the household all come from the same few rows;
+ * the calendar marks every entry, and closing a goal changes what is planned this month.
+ */
 function useInvalidateSavings() {
   const queryClient = useQueryClient();
   return (_data: unknown, { householdId }: { householdId: string }) =>
-    queryClient.invalidateQueries({ queryKey: savingsQueries.household(householdId) });
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: savingsQueries.household(householdId) }),
+      queryClient.invalidateQueries({ queryKey: calendarQueries.household(householdId) }),
+    ]);
 }
 
 // The dialogs show their errors themselves.

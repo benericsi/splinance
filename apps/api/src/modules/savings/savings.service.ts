@@ -651,3 +651,52 @@ export async function unpinGoal(scope: GoalScope): Promise<void> {
       .where(and(eq(savingsGoalPins.goalId, goal.id), eq(savingsGoalPins.userId, scope.userId)));
   });
 }
+
+/**
+ * Every live entry dated from `start` up to `end` in a goal the viewer can see (shared goals,
+ * and their own private ones), with its goal's name and who made it: the calendar's savings
+ * marks. Oldest first.
+ */
+export async function savingsEntriesBetween(
+  scope: HouseholdScope,
+  start: string,
+  end: string,
+): Promise<
+  {
+    id: string;
+    goalId: string;
+    goalName: string;
+    entryOn: string;
+    amount: number;
+    user: { userId: string; displayName: string };
+  }[]
+> {
+  const rows = await db
+    .select({
+      id: savingsEntries.id,
+      goalId: savingsEntries.goalId,
+      goalName: savingsGoals.name,
+      entryOn: savingsEntries.entryOn,
+      amount: savingsEntries.amount,
+      userId: savingsEntries.userId,
+    })
+    .from(savingsEntries)
+    .innerJoin(savingsGoals, eq(savingsGoals.id, savingsEntries.goalId))
+    .where(
+      and(
+        eq(savingsEntries.householdId, scope.householdId),
+        goalVisibleTo(scope.userId),
+        liveEntry,
+        gte(savingsEntries.entryOn, start),
+        lt(savingsEntries.entryOn, end),
+      ),
+    )
+    .orderBy(savingsEntries.entryOn, savingsEntries.id);
+  const person = personOf(
+    await namesOf(
+      db,
+      rows.map((row) => row.userId),
+    ),
+  );
+  return rows.map(({ userId, ...row }) => ({ ...row, user: person(userId) }));
+}

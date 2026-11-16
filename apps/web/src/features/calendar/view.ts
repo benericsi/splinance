@@ -13,12 +13,14 @@ export const daySpent = (day: CalendarDay, view: CalendarView) =>
   view === 'mine' ? day.yourExpenses : day.expenses;
 
 /**
- * What an event is worth in a view. A settlement is the same for everyone. For "your
+ * What an event is worth in a view. A settlement or a savings entry is the same for everyone. For "your
  * share", an expected payment whose split nothing tells yet counts in full: better to
  * expect too much than too little.
  */
 export function eventAmount(event: CalendarEvent, view: CalendarView): number {
-  if (event.type === 'settlement' || view === 'household') return event.amount;
+  if (event.type === 'settlement' || event.type === 'savingsEntry' || view === 'household') {
+    return event.amount;
+  }
   return event.yourAmount ?? event.amount;
 }
 
