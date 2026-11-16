@@ -182,7 +182,8 @@ export async function updateProfile(userId: string, input: UpdateProfileInput): 
       ...(input.displayName !== undefined && { displayName: input.displayName }),
       ...(input.locale !== undefined && { locale: input.locale }),
     })
-    .where(eq(users.id, userId))
+    // A deleted account's access token stays valid for up to 15 minutes: no row means 401.
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
     .returning();
   if (!user) throw sessionEnded();
   return toUser(user);
@@ -205,7 +206,8 @@ export async function updatePreferences(
       }),
       ...(input.spendingView !== undefined && { spendingView: input.spendingView }),
     })
-    .where(eq(users.id, userId))
+    // A deleted account's access token stays valid for up to 15 minutes: no row means 401.
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
     .returning();
   if (!user) throw sessionEnded();
   return toUser(user);

@@ -438,6 +438,40 @@ describe('state', () => {
     expect(list.find((n) => n.type === 'budget_near')?.resolvedAt).not.toBeNull();
   });
 
+  it('tells again when a resolved fact holds again, and leaves a read one read', async () => {
+    await request(app)
+      .put(base(`/budgets/${groceries.id}`))
+      .set('Authorization', await bearer(anna))
+      .send({ amount: 10_000, from: today.slice(0, 7) })
+      .expect(204);
+    const expense = await addTransaction(
+      ben,
+      sharedInput(ben, 11_000, { categoryId: groceries.id }),
+    );
+    const over = async () => (await bell(anna)).notifications.find((n) => n.type === 'budget_over');
+    await markRead(anna, { all: true });
+    // A sync while it still holds leaves the read row alone.
+    await syncNotifications(householdId);
+    expect((await over())?.readAt).not.toBeNull();
+
+    await request(app)
+      .delete(base(`/transactions/${expense.id}`))
+      .set('Authorization', await bearer(ben))
+      .expect(204);
+    expect((await over())?.resolvedAt).not.toBeNull();
+
+    await request(app)
+      .post(base(`/transactions/${expense.id}/restore`))
+      .set('Authorization', await bearer(ben))
+      .expect(200);
+    const again = await over();
+    expect(again && [again.resolvedAt, again.readAt, again.amount]).toEqual([null, null, 11_000]);
+    // The same row came back, not a second one.
+    expect((await bell(anna)).notifications.filter((n) => n.type === 'budget_over')).toHaveLength(
+      1,
+    );
+  });
+
   it('sweeps households hourly under a lock', async () => {
     await series(anna);
     await db.delete(notifications);

@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { HttpError } from './http-error';
 
 /**
@@ -21,5 +22,10 @@ export function decodeCursor(cursor: string): KeysetPosition {
     Buffer.from(cursor, 'base64url').toString(),
   );
   if (!match?.[1] || !match[2]) throw invalidCursor();
-  return { date: match[1], id: match[2] };
+  // The shape alone lets through days and ids Postgres refuses (`2026-02-30`, 36 dashes),
+  // which would surface as a 500 at `::date` / `::uuid`.
+  const date = z.iso.date().safeParse(match[1]);
+  const id = z.uuid().safeParse(match[2]);
+  if (!date.success || !id.success) throw invalidCursor();
+  return { date: date.data, id: id.data };
 }
