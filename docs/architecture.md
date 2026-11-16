@@ -248,6 +248,7 @@ Write rules (all in `transactions.service.ts`):
 - Payer and split people must be active members, except people who were already on the transaction before this edit, so an old expense with someone who left can still be corrected.
 - New category references must be active, of the transaction's kind, and in this household. Keeping the current category is allowed even if it was archived since.
 - Any member may edit or delete a shared transaction (audited). Only the author may make one private, because the payer becomes the author and the others lose sight of it.
+- The history shows the author every entry. Anyone else sees it from the latest moment the transaction became shared (created shared, or an edit from private), with that entry's `before` left out: what it was while private only its author ever saw.
 - The server computes the shares from the entered split. People are sorted by user id first, so the same input always gives the same shares (and the same person gets a leftover unit).
 - `PUT` replaces the transaction and must name the `version` it was based on. The row is locked (`FOR UPDATE`) before the comparison, so two concurrent edits of the same version produce one 200 and one 409. Delete and restore also bump the version, so a form opened before a delete cannot overwrite the restored row.
 - The summary is `{ month, currency, expenses, income, yourExpenses }` over what the caller can see: `yourExpenses` adds their shares of shared expenses and their private expenses. The list is paged, so the client could not total a month itself.
