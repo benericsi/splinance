@@ -1,6 +1,6 @@
 import type { Category, CreateCategoryInput, UpdateCategoryInput } from '@splinance/shared';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
-import { db } from '../../db/client';
+import { db, type Db } from '../../db/client';
 import { mapUniqueViolation } from '../../db/errors';
 import { categories, type CategoryRow } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
@@ -40,6 +40,36 @@ const activeCategory = ({ householdId, categoryId }: CategoryScope) =>
   );
 
 /** Every member can manage categories. Archived ones are included: old transactions show them. */
+/** 400 for a category another record may not point at (the web words it by the code). */
+export const invalidCategory = () =>
+  new HttpError(400, 'Choose an active category of the same kind', 'INVALID_CATEGORY');
+
+/**
+ * The category a transaction, rule, recurring payment or budget may point at: in this
+ * household, not archived, and of `kind` when one is given. Its id and kind, else 400
+ * `INVALID_CATEGORY`.
+ */
+export async function usableCategory(
+  executor: Db,
+  householdId: string,
+  categoryId: string,
+  kind?: CategoryRow['kind'],
+): Promise<{ id: string; kind: CategoryRow['kind'] }> {
+  const [row] = await executor
+    .select({ id: categories.id, kind: categories.kind })
+    .from(categories)
+    .where(
+      and(
+        eq(categories.id, categoryId),
+        eq(categories.householdId, householdId),
+        isNull(categories.archivedAt),
+        kind === undefined ? undefined : eq(categories.kind, kind),
+      ),
+    );
+  if (!row) throw invalidCategory();
+  return row;
+}
+
 export async function listCategories(scope: HouseholdScope): Promise<Category[]> {
   await requireMembership(db, scope);
   const rows = await db

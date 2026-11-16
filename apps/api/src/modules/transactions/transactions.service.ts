@@ -47,6 +47,7 @@ import {
   type HouseholdScope,
 } from '../households/households.service';
 import { recordTransactionActivity } from '../notifications/activity';
+import { invalidCategory, usableCategory } from '../categories/categories.service';
 
 export const transactionNotFound = () =>
   new HttpError(404, 'Transaction not found', 'TRANSACTION_NOT_FOUND');
@@ -57,9 +58,6 @@ const versionConflict = () =>
     'Someone else changed this transaction. Reload it and try again',
     'VERSION_CONFLICT',
   );
-
-const invalidCategory = () =>
-  new HttpError(400, 'Choose an active category of the same kind', 'INVALID_CATEGORY');
 
 const invalidMember = () =>
   new HttpError(400, 'Only members of this household can pay or share', 'INVALID_MEMBER');
@@ -403,27 +401,6 @@ export async function activeMemberIds(tx: Db, householdId: string): Promise<Set<
   return new Set(rows.map((row) => row.userId));
 }
 
-/** New category references must be active and of the transaction's kind. */
-async function assertUsableCategory(
-  tx: Db,
-  householdId: string,
-  categoryId: string,
-  kind: TransactionInput['kind'],
-): Promise<void> {
-  const [row] = await tx
-    .select({ id: categories.id })
-    .from(categories)
-    .where(
-      and(
-        eq(categories.id, categoryId),
-        eq(categories.householdId, householdId),
-        eq(categories.kind, kind),
-        isNull(categories.archivedAt),
-      ),
-    );
-  if (!row) throw invalidCategory();
-}
-
 /** A new row's splits: nothing to delete first. */
 async function insertSplits(tx: Db, row: TransactionRow, shares: PreparedSplit['shares']) {
   if (shares.length === 0) return;
@@ -511,7 +488,8 @@ export async function insertTransaction(
   origin?: TransactionOrigin,
 ): Promise<Transaction> {
   if (input.categoryId) {
-    await assertUsableCategory(tx, scope.householdId, input.categoryId, input.kind);
+    // New category references must be active and of the transaction's kind.
+    await usableCategory(tx, scope.householdId, input.categoryId, input.kind);
   }
   const split = prepareSplit(input, scope.userId, allowed);
 
@@ -678,7 +656,8 @@ export async function updateTransaction(
     // Keeping the current category is fine even if it was archived since.
     const sameCategory = input.categoryId === existing.categoryId && input.kind === existing.kind;
     if (input.categoryId && !sameCategory) {
-      await assertUsableCategory(tx, scope.householdId, input.categoryId, input.kind);
+      // New category references must be active and of the transaction's kind.
+      await usableCategory(tx, scope.householdId, input.categoryId, input.kind);
     }
 
     const before = await toTransaction(tx, existing);
