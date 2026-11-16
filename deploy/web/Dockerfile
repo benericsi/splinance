@@ -26,7 +26,7 @@ COPY deploy/web/Caddyfile deploy/web/
 COPY deploy/scripts/check-csp.mjs deploy/scripts/
 RUN node deploy/scripts/check-csp.mjs
 
-FROM caddy:2.11-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+FROM caddy:2.11-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
 COPY deploy/web/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/web/dist /srv/web
 COPY --from=build /repo/apps/web/dist-demo /srv/web-demo
