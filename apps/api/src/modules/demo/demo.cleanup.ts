@@ -1,3 +1,4 @@
+import { HOUR_MS } from '@splinance/shared';
 import { asc, lte } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { demos } from '../../db/schema';
@@ -7,7 +8,6 @@ import { deleteDemo } from './demo.service';
 
 /** Held for the duration of a cleanup run, so two API instances never run one together. */
 export const CLEANUP_LOCK = 'splinance:demo-cleanup';
-const HOUR_MS = 3_600_000;
 /** Sandboxes deleted per run at most; the next run takes the rest. */
 const BATCH = 100;
 

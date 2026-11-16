@@ -6,6 +6,7 @@ import { allocate, PERCENT_SCALE } from '../splits';
 import type { TransactionKind, TransactionVisibility } from '../transactions';
 import { localizeDemoStory } from './locale';
 import { createRandom, type Random } from './random';
+import { addDays } from '../dates';
 
 /**
  * The demo household's year, as data: what a couple in Budapest spent and earned over the
@@ -261,12 +262,6 @@ const pad = (value: number, width = 2) => String(value).padStart(width, '0');
 export function daysInMonth(month: string): number {
   const [year = 1970, index = 1] = month.split('-').map(Number);
   return new Date(Date.UTC(year, index, 0)).getUTCDate();
-}
-
-export function addDays(date: string, days: number): string {
-  const value = new Date(`${date}T00:00:00Z`);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value.toISOString().slice(0, 10);
 }
 
 /** Each person's part of a shared transaction (null when private); always sums to the amount. */

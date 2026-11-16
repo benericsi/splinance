@@ -1,4 +1,6 @@
 import {
+  addDays,
+  dayNumber,
   type ImportBatch,
   type ImportCheckInput,
   type ImportCheckResult,
@@ -43,11 +45,6 @@ export const importNotFound = () => new HttpError(404, 'Import not found', 'IMPO
 
 /** Hand-entered records this many days apart still count as possible duplicates. */
 const DUPLICATE_WINDOW_DAYS = 2;
-const DAY_MS = 86_400_000;
-
-const dayNumber = (date: string) => Date.parse(`${date}T00:00:00Z`) / DAY_MS;
-const shiftDays = (date: string, days: number) =>
-  new Date((dayNumber(date) + days) * DAY_MS).toISOString().slice(0, 10);
 
 async function toBatches(executor: Db, rows: ImportBatchRow[]): Promise<ImportBatch[]> {
   if (rows.length === 0) return [];
@@ -179,8 +176,8 @@ export async function checkImport(
   // savings entries they recorded by hand, around the rows' dates and with their amounts.
   const dates = input.rows.map((row) => row.occurredOn).sort();
   const firstDate = dates[0] ?? '2000-01-01';
-  const from = shiftDays(firstDate, -DUPLICATE_WINDOW_DAYS);
-  const to = shiftDays(dates.at(-1) ?? firstDate, DUPLICATE_WINDOW_DAYS);
+  const from = addDays(firstDate, -DUPLICATE_WINDOW_DAYS);
+  const to = addDays(dates.at(-1) ?? firstDate, DUPLICATE_WINDOW_DAYS);
   const amounts = [...new Set(input.rows.map((row) => row.amount))];
   const handTransactions = await db
     .select({
