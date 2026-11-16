@@ -9,6 +9,13 @@ updates:
       # One pull request for every minor and patch update; majors stay separate.
       npm-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Pinned on purpose (CLAUDE.md): TypeScript stays on 6 until typescript-eslint supports
+      # 7, and @types/node follows the Node runtime's major.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
@@ -20,11 +27,19 @@ updates:
     directories: [/apps/api, /deploy/web, /deploy/backup]
     schedule:
       interval: weekly
+    ignore:
+      # The Node major is a decision (.nvmrc, engines), not an update.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: uv
     directory: /data
     schedule:
       interval: weekly
+    ignore:
+      # Runtime dependencies must fit Airflow's constraints file, which pins Polars 1.x.
+      - dependency-name: polars
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: terraform
     directories: [/infra/main, /infra/bootstrap]
