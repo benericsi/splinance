@@ -8,6 +8,10 @@ export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
   max: 10,
   connectionTimeoutMillis: 5_000,
+  // Session settings sent when each connection opens (docs/deploy.md, API variables).
+  statement_timeout: env.DB_STATEMENT_TIMEOUT_MS,
+  lock_timeout: env.DB_LOCK_TIMEOUT_MS,
+  idle_in_transaction_session_timeout: env.DB_IDLE_IN_TRANSACTION_TIMEOUT_MS,
 });
 
 // Without a listener, an error on an idle client (e.g. DB restart) crashes the process.

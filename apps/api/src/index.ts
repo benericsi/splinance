@@ -4,7 +4,7 @@ import { pool } from './db/client';
 import { logger } from './lib/logger';
 import { startDemoCleanup } from './modules/demo/demo.cleanup';
 import { startMaintenance } from './modules/maintenance/maintenance.service';
-import { startNotificationSweep } from './modules/notifications/sync';
+import { drainSyncs, startNotificationSweep } from './modules/notifications/sync';
 
 const server = createApp().listen(env.PORT, () => {
   logger.info(`API listening on http://localhost:${String(env.PORT)}`);
@@ -23,8 +23,9 @@ function shutdown(signal: NodeJS.Signals) {
   stopNotificationSweep();
   // Stop accepting requests first, then release DB connections.
   server.close((serverErr) => {
-    pool
-      .end()
+    // Notification syncs started by the last writes finish before the pool closes.
+    drainSyncs()
+      .then(() => pool.end())
       .catch((err: unknown) => {
         logger.error({ err }, 'Error closing Postgres pool');
       })

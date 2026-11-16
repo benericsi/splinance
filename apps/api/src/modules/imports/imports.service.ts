@@ -59,9 +59,13 @@ async function toBatches(executor: Db, rows: ImportBatchRow[]): Promise<ImportBa
     .select({ batchId: savingsEntries.importBatchId, count: count() })
     .from(savingsEntries)
     .where(
-      inArray(
-        savingsEntries.importBatchId,
-        rows.map((row) => row.id),
+      and(
+        // Both columns, so the (household, batch) index serves it.
+        inArray(savingsEntries.householdId, [...new Set(rows.map((row) => row.householdId))]),
+        inArray(
+          savingsEntries.importBatchId,
+          rows.map((row) => row.id),
+        ),
       ),
     )
     .groupBy(savingsEntries.importBatchId);
@@ -491,7 +495,13 @@ export async function undoImport(scope: HouseholdScope & { importId: string }): 
     const rows = await tx
       .select()
       .from(transactions)
-      .where(and(eq(transactions.importBatchId, batch.id), isNull(transactions.deletedAt)))
+      .where(
+        and(
+          eq(transactions.householdId, scope.householdId),
+          eq(transactions.importBatchId, batch.id),
+          isNull(transactions.deletedAt),
+        ),
+      )
       .orderBy(transactions.id)
       .for('update');
     // One timestamp for the rows, the entries and the batch: a row whose deletion matches the

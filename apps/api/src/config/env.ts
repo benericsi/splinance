@@ -24,6 +24,13 @@ const envSchema = z
     // The same database as the schema owner, for migrations only; the API connects with
     // DATABASE_URL, a role that cannot change the schema. Defaults to DATABASE_URL.
     MIGRATE_DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }).optional(),
+    // Bounds on every API connection (milliseconds, 0 turns one off): one slow statement,
+    // a long lock wait or a transaction left open cannot hold a household's writers forever.
+    // A statement or lock wait that runs out answers 503 BUSY. Migrations use their own
+    // connection and are not bounded.
+    DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(0).max(600_000).default(30_000),
+    DB_LOCK_TIMEOUT_MS: z.coerce.number().int().min(0).max(600_000).default(10_000),
+    DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: z.coerce.number().int().min(0).max(600_000).default(60_000),
     // Reverse proxies in front of the API whose X-Forwarded-For is trusted (0: none, the
     // client connects directly). Behind Caddy on Railway: 1 (Caddy sets it from the edge's
     // X-Real-IP). Rate limits key on the IP this yields, so never more than are really there.

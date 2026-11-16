@@ -19,7 +19,12 @@ import { db, pool } from '../../db/client';
 import { notifications } from '../../db/schema';
 import { budapestToday } from '../../lib/today';
 import { recordTransactionActivity } from './activity';
-import { NOTIFICATION_SWEEP_LOCK, runNotificationSweep, syncNotifications } from './sync';
+import {
+  drainSyncs,
+  NOTIFICATION_SWEEP_LOCK,
+  runNotificationSweep,
+  syncNotifications,
+} from './sync';
 
 let app: App;
 let anna: TestUser;
@@ -55,6 +60,8 @@ beforeEach(async () => {
 });
 
 async function bell(user: TestUser) {
+  // State notifications come from the sync a write starts without awaiting it.
+  await drainSyncs();
   const res = await request(app)
     .get('/api/notifications')
     .set('Authorization', await bearer(user))
@@ -105,6 +112,8 @@ async function editTransaction(
 }
 
 async function markRead(user: TestUser, body: object) {
+  // What is read is what the bell shows: the syncs of earlier writes have run.
+  await drainSyncs();
   await request(app)
     .post('/api/notifications/read')
     .set('Authorization', await bearer(user))
@@ -522,5 +531,32 @@ describe('the bell', () => {
     await leave(app, householdId, ben);
     expect(await bell(ben)).toEqual({ notifications: [], unread: 0 });
     expect(await db.$count(notifications, eq(notifications.userId, ben.id))).toBe(0);
+  });
+});
+
+describe('sync after a write', () => {
+  it('answers the write without waiting for the notification sync', async () => {
+    const holder = await pool.connect();
+    try {
+      await holder.query('begin');
+      // The sync's writes wait behind this; reads (and the write itself) do not.
+      await holder.query('lock table notifications in share mode');
+      const res = await request(app)
+        .post(base('/transactions'))
+        .set('Authorization', await bearer(anna))
+        .send({
+          visibility: 'private',
+          kind: 'expense',
+          amount: 1_000,
+          occurredOn: today,
+          description: 'Coffee',
+          categoryId: null,
+        });
+      expect(res.status).toBe(201);
+    } finally {
+      await holder.query('rollback');
+      holder.release();
+    }
+    await drainSyncs();
   });
 });
