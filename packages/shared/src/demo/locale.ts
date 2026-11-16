@@ -75,6 +75,7 @@ export function localizeDemoStory(story: DemoStory, locale: Locale): DemoStory {
     savings: {
       goals: story.savings.goals.map((g) => ({ ...g, name: text(g.name) })),
       rules: story.savings.rules,
+      plans: story.savings.plans,
       entries: story.savings.entries.map((e) => ({
         ...e,
         note: e.note === null ? null : text(e.note),

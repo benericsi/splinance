@@ -19,7 +19,7 @@ import { acceptInvite, createInvite } from '../invites/invites.service';
 import { confirmSuggestion, createSeries } from '../recurring/recurring.service';
 import { createRule } from '../rules/rules.service';
 import { createSavingsRule } from '../savings/savings-rules.service';
-import { addEntry, createGoal, pinGoal } from '../savings/savings.service';
+import { addEntry, createGoal, pinGoal, setPlan } from '../savings/savings.service';
 import { createSettlement } from '../settlements/settlements.service';
 import { createTransaction } from '../transactions/transactions.service';
 
@@ -137,6 +137,12 @@ export async function seedDemo(story: DemoStory, people: DemoPeople): Promise<st
       pattern: rule.pattern,
       goalId: goalIdOf(rule.goal),
     });
+  }
+  for (const plan of story.savings.plans) {
+    await setPlan(
+      { ...scopeOf(plan.person), goalId: goalIdOf(plan.goal) },
+      { monthlyAmount: plan.monthlyAmount },
+    );
   }
 
   const transactionsById = new Map(story.transactions.map((t) => [t.id, t]));

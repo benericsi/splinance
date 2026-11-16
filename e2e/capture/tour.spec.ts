@@ -137,15 +137,22 @@ async function recordTour(browser: Browser, scheme: (typeof SCHEMES)[number]) {
   await page.mouse.wheel(0, -500);
   await pause(page, 500);
 
+  // Reports: the household's months, then your share, where Left over says what you set aside.
   await glideAndClick(page, sections.getByRole('link', { name: 'Reports' }));
   await expect(page.getByRole('heading', { name: 'Reports', level: 1 })).toBeVisible();
+  await pause(page, 2500);
+  await glideAndClick(
+    page,
+    page.getByRole('group', { name: 'Whose spending' }).getByRole('button', { name: 'Your share' }),
+  );
+  await expect(page.getByRole('region', { name: 'Left over' })).toContainText(/Set aside/);
   await pause(page, 2500);
 
   await glideAndClick(page, sections.getByRole('link', { name: 'Budgets' }));
   await expect(page.getByRole('heading', { name: 'Budgets', level: 1 })).toBeVisible();
   await pause(page, 2000);
 
-  // Savings: the pinned goals with their milestones, then one goal with its history.
+  // Savings: the pinned goals with their milestones and plans, then one goal with its plan and history.
   await glideAndClick(page, sections.getByRole('link', { name: 'Savings' }));
   await expect(page.getByRole('heading', { name: 'Savings', level: 1 })).toBeVisible();
   await pause(page, 3000);

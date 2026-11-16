@@ -174,6 +174,14 @@ export interface DemoSavingsEntry {
   source: 'bank' | 'manual';
 }
 
+/** What one person plans to put into a goal each month. */
+export interface DemoSavingsPlan {
+  /** A `DemoSavingsGoal` id. */
+  goal: string;
+  person: DemoPerson;
+  monthlyAmount: number;
+}
+
 /** "A bank row naming this pocket moved money to or from this goal", for one person. */
 export interface DemoSavingsRule {
   person: DemoPerson;
@@ -200,7 +208,13 @@ export interface DemoStory {
   budgets: DemoBudget[];
   recurring: { confirmed: DemoRecurringConfirmed[]; added: DemoRecurringAdded[] };
   /** Entries sorted by date, so a goal never goes below zero on the way. */
-  savings: { goals: DemoSavingsGoal[]; entries: DemoSavingsEntry[]; rules: DemoSavingsRule[] };
+  savings: {
+    goals: DemoSavingsGoal[];
+    entries: DemoSavingsEntry[];
+    rules: DemoSavingsRule[];
+    /** Monthly plans: each matches what that person puts in every month, so goals read on track. */
+    plans: DemoSavingsPlan[];
+  };
 }
 
 const RENT = 320_000;
@@ -856,6 +870,11 @@ function demoSavings(months: string[], today: string): DemoStory['savings'] {
     entries: entries
       .sort((a, b) => a.entryOn.localeCompare(b.entryOn))
       .map((entry, index) => ({ id: `saving-${pad(index + 1, 3)}`, ...entry })),
+    plans: [
+      { goal: 'holiday', person: 'you', monthlyAmount: 30_000 },
+      { goal: 'holiday', person: 'partner', monthlyAmount: 25_000 },
+      { goal: 'emergency', person: 'you', monthlyAmount: 50_000 },
+    ],
     rules: Object.entries(DEMO_POCKETS).map(([goal, pocket]) => ({
       person: 'you' as const,
       pattern: demoPocketRule(pocket ?? ''),
