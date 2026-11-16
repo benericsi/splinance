@@ -1,7 +1,7 @@
 import { monthsBetween, type Report, type ReportQuery } from '@splinance/shared';
 import { and, eq, gte, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { transactions, transactionSplits } from '../../db/schema';
+import { savingsEntries, transactions, transactionSplits } from '../../db/schema';
 import { monthRange } from '../../lib/months';
 import { requireMembership, type HouseholdScope } from '../households/households.service';
 import { visibleTo } from '../transactions/transactions.service';
@@ -19,8 +19,9 @@ export const ownSplit = (userId: string) =>
 /**
  * Month totals and spending per category over a range of months, as the viewer sees them:
  * shared transactions and their own private ones (like the month summary), plus their own
- * part of each (the whole of a private one, their share of a shared one). Months without
- * transactions come back as zeros, so charts need no gap handling.
+ * part of each (the whole of a private one, their share of a shared one), and what they
+ * set aside in savings (their own entries, which are always in goals they can see). Months
+ * without anything come back as zeros, so charts need no gap handling.
  */
 export async function getReport(scope: HouseholdScope, query: ReportQuery): Promise<Report> {
   const { household } = await requireMembership(db, scope);
@@ -57,12 +58,31 @@ export async function getReport(scope: HouseholdScope, query: ReportQuery): Prom
     .groupBy(month, transactions.categoryId)
     .orderBy(month, transactions.categoryId);
 
+  const entryMonth = sql<string>`to_char(${savingsEntries.entryOn}, 'YYYY-MM')`;
+  const saved = await db
+    .select({ month: entryMonth, amount: sql<string>`coalesce(sum(${savingsEntries.amount}), 0)` })
+    .from(savingsEntries)
+    .where(
+      and(
+        eq(savingsEntries.householdId, scope.householdId),
+        eq(savingsEntries.userId, scope.userId),
+        isNull(savingsEntries.deletedAt),
+        gte(savingsEntries.entryOn, start),
+        lt(savingsEntries.entryOn, end),
+      ),
+    )
+    .groupBy(entryMonth);
+
   const byMonth = new Map(
     monthsBetween(query.from, query.to).map((m) => [
       m,
-      { month: m, expenses: 0, income: 0, yourExpenses: 0, yourIncome: 0 },
+      { month: m, expenses: 0, income: 0, yourExpenses: 0, yourIncome: 0, yourSetAside: 0 },
     ]),
   );
+  for (const row of saved) {
+    const totals = byMonth.get(row.month);
+    if (totals) totals.yourSetAside = Number(row.amount);
+  }
   for (const row of rows) {
     const totals = byMonth.get(row.month);
     if (!totals) continue;

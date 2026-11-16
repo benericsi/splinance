@@ -8,7 +8,10 @@ const housing = '01a12509-0f61-75bc-b406-130108780602';
 
 /** A report from 2025-01 to 2026-12 with the given months filled in. */
 function reportWith(
-  months: Record<string, [spent: number, income: number, yourSpent?: number, yourIncome?: number]>,
+  months: Record<
+    string,
+    [spent: number, income: number, yourSpent?: number, yourIncome?: number, setAside?: number]
+  >,
   categories: Report['categories'] = [],
 ): Report {
   return {
@@ -16,9 +19,14 @@ function reportWith(
     to: '2026-12',
     currency: 'HUF',
     months: monthsBetween('2025-01', '2026-12').map((month) => {
-      const [expenses = 0, income = 0, yourExpenses = expenses, yourIncome = income] =
-        months[month] ?? [];
-      return { month, expenses, income, yourExpenses, yourIncome };
+      const [
+        expenses = 0,
+        income = 0,
+        yourExpenses = expenses,
+        yourIncome = income,
+        yourSetAside = 0,
+      ] = months[month] ?? [];
+      return { month, expenses, income, yourExpenses, yourIncome, yourSetAside };
     }),
     categories,
   };
@@ -98,6 +106,31 @@ describe('summarize', () => {
     expect(summary.spent).toBe(5000);
     expect(summary.trend.spent).toHaveLength(12);
     expect(summary.top).toBeNull();
+  });
+});
+
+describe('what the viewer set aside', () => {
+  const report = reportWith({
+    '2026-09': [0, 600_000, 0, 600_000, 150_000],
+    '2026-10': [0, 600_000, 0, 600_000, -20_000],
+  });
+
+  it('is the viewer’s net saving in the period, as a share of their income', () => {
+    const month = (m: string) =>
+      summarize(report, reportRange({ month: m }, '2026-10'), 'mine', '2026-10');
+    expect(month('2026-09')).toMatchObject({ setAside: 150_000, setAsidePercent: 25 });
+    // More taken out than put in: no share of income.
+    expect(month('2026-10')).toMatchObject({ setAside: -20_000, setAsidePercent: null });
+    const year = summarize(report, reportRange({ period: 'year' }, '2026-10'), 'mine', '2026-10');
+    expect(year).toMatchObject({ setAside: 130_000, setAsidePercent: 11 });
+  });
+
+  it('has no household figure: savings are personal', () => {
+    const range = reportRange({ month: '2026-09' }, '2026-10');
+    expect(summarize(report, range, 'household', '2026-10')).toMatchObject({
+      setAside: null,
+      setAsidePercent: null,
+    });
   });
 });
 

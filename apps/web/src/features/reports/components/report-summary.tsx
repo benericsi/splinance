@@ -77,13 +77,7 @@ export function ReportSummaryCards({
           />
         }
         badge={<ChangeBadge value={summary.left} before={previous?.left} upIsGood />}
-        detail={
-          summary.savedPercent === null
-            ? t('summary.noIncome')
-            : summary.savedPercent < 0
-              ? t('summary.overIncome', { percent: -summary.savedPercent })
-              : t('summary.saved', { percent: summary.savedPercent })
-        }
+        detail={leftDetail(summary, currency, t)}
         sparkline={
           <Sparkline
             values={summary.trend.left}
@@ -119,6 +113,31 @@ export function ReportSummaryCards({
       />
     </div>
   );
+}
+
+/**
+ * The line under "Left over": in your share, what went into savings ("Set aside 160 000 Ft ·
+ * 23% of income", or what came out of them); in the household view, the share of income
+ * left over (savings are personal, there is no household figure).
+ */
+function leftDetail(
+  summary: ReportSummary,
+  currency: Currency,
+  t: ReturnType<typeof useTranslation<'reports'>>['t'],
+): string {
+  const { setAside, setAsidePercent, savedPercent } = summary;
+  if (setAside !== null) {
+    const amount = formatMoney(Math.abs(setAside), currency);
+    if (setAside < 0) return t('summary.takenOut', { amount });
+    if (setAside === 0) return t('summary.nothingSetAside');
+    return setAsidePercent === null
+      ? t('summary.setAside', { amount })
+      : t('summary.setAsideShare', { amount, percent: setAsidePercent });
+  }
+  if (savedPercent === null) return t('summary.noIncome');
+  return savedPercent < 0
+    ? t('summary.overIncome', { percent: -savedPercent })
+    : t('summary.saved', { percent: savedPercent });
 }
 
 function KpiCard({
