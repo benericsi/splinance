@@ -82,8 +82,6 @@ export const pendingLinkSchema = z.object({
   email: z.email(),
 });
 
-export type PendingLink = z.infer<typeof pendingLinkSchema>;
-
 const SCHEMAS = { flow: flowStateSchema, link: pendingLinkSchema } as const;
 
 type Payload<P extends Purpose> = z.infer<(typeof SCHEMAS)[P]>;
