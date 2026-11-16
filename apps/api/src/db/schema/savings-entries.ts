@@ -56,6 +56,10 @@ export const savingsEntries = pgTable(
       columns: [t.householdId, t.importBatchId],
       foreignColumns: [importBatches.householdId, importBatches.id],
     }),
+    // An import's entries (undo, the batch list) and the foreign key's lookups.
+    index('savings_entries_import_batch_idx')
+      .on(t.householdId, t.importBatchId)
+      .where(sql`${t.importBatchId} is not null`),
     // A bank row is imported once per person; deleted ones may come back (undo, re-import).
     uniqueIndex('savings_entries_import_fingerprint_unique')
       .on(t.householdId, t.userId, t.importFingerprint)

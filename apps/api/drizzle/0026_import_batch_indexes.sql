@@ -1,0 +1,2 @@
+CREATE INDEX "savings_entries_import_batch_idx" ON "savings_entries" USING btree ("household_id","import_batch_id") WHERE "savings_entries"."import_batch_id" is not null;--> statement-breakpoint
+CREATE INDEX "transactions_import_batch_idx" ON "transactions" USING btree ("household_id","import_batch_id") WHERE "transactions"."import_batch_id" is not null;
