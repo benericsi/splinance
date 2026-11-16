@@ -30,5 +30,11 @@ FROM caddy:2.11-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9
 COPY deploy/web/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/web/dist /srv/web
 COPY --from=build /repo/apps/web/dist-demo /srv/web-demo
+# Not root. Caddy listens on 8080, so the binary's cap_net_bind_service (set by the base
+# image) is dropped: under no-new-privileges a non-root user cannot run a binary with file
+# capabilities. With auto_https and admin off it writes nothing, but its config and data
+# folders stay writable for it.
+RUN setcap -r /usr/bin/caddy   && addgroup -S -g 10001 caddy   && adduser -S -D -H -u 10001 -G caddy caddy   && mkdir -p /config/caddy /data/caddy   && chown -R caddy:caddy /config /data
+USER caddy
 # Caddy validates the config at start; a broken Caddyfile fails the deploy's healthcheck.
 EXPOSE 8080
