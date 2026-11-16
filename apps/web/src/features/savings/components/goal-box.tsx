@@ -10,7 +10,7 @@ import { today } from '@/features/transactions/dates';
 import { formatMoney } from '@/features/transactions/money';
 import { OPEN_MODAL_STATE } from '@/lib/route-modal';
 import { cn } from '@/lib/utils';
-import { formatGoalDate, paceText, stepText } from '../describe';
+import { formatGoalDate, outlookText, stepText } from '../describe';
 import { goalProgress } from '../view';
 import { GoalBar } from './goal-bar';
 import { PinButton } from './pin-button';
@@ -25,6 +25,20 @@ export function GoalMeta({ goal }: { goal: SavingsGoal }) {
         {t(goal.visibility)}
         {goal.targetDate && ` · ${t('by', { date: formatGoalDate(goal.targetDate) })}`}
       </span>
+    </p>
+  );
+}
+
+/** Whether the plans get there (positive or warning tone), or what it takes. */
+export function OutlookLine({ outlook }: { outlook: NonNullable<ReturnType<typeof outlookText>> }) {
+  return (
+    <p
+      className={cn(
+        outlook.tone === 'positive' && 'text-positive',
+        outlook.tone === 'warning' && 'text-warning',
+      )}
+    >
+      <MaskMoney>{outlook.text}</MaskMoney>
     </p>
   );
 }
@@ -80,7 +94,7 @@ export function GoalBox({
   const { t } = useTranslation('savings');
   const progress = goalProgress(goal);
   const step = stepText(goal);
-  const pace = paceText(goal, today());
+  const outlook = outlookText(goal, today());
 
   return (
     <Card>
@@ -141,7 +155,7 @@ export function GoalBox({
           </div>
         )}
 
-        {(step ?? pace) && (
+        {(step ?? outlook) && (
           <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
             {step && (
               <p
@@ -150,11 +164,7 @@ export function GoalBox({
                 <MaskMoney>{step}</MaskMoney>
               </p>
             )}
-            {pace && (
-              <p className={pace.overdue ? 'text-warning' : undefined}>
-                <MaskMoney>{pace.text}</MaskMoney>
-              </p>
-            )}
+            {outlook && <OutlookLine outlook={outlook} />}
           </div>
         )}
       </CardContent>

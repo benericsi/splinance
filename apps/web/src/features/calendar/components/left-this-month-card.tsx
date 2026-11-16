@@ -28,6 +28,7 @@ export function LeftThisMonthCard({
   householdId,
   calendar,
   setAside = 0,
+  toSetAside = 0,
   setAsideByDay = [],
   tracksIncome,
 }: {
@@ -35,6 +36,8 @@ export function LeftThisMonthCard({
   calendar: Calendar;
   /** The viewer's net savings entries this month (0 until they are known). */
   setAside?: number;
+  /** What the viewer's savings plans still ask them to put in this month. */
+  toSetAside?: number;
   /** The same per day, for the day bars. */
   setAsideByDay?: readonly DaySetAside[];
   /** The viewer follows a recurring income: the empty state stops offering to add one. */
@@ -46,7 +49,7 @@ export function LeftThisMonthCard({
   const [hidden, setHidden] = useState(() => isLeftNudgeHidden(userId, householdId));
   const headingId = useId();
   const detailsId = useId();
-  const month = leftThisMonth(calendar, setAside);
+  const month = leftThisMonth(calendar, setAside, toSetAside);
   const { currency } = calendar;
   const money = (minor: number) => formatMoney(minor, currency);
 
@@ -104,6 +107,7 @@ export function LeftThisMonthCard({
   const chips = [
     { key: 'spent', amount: month.spent },
     { key: 'setAside', amount: month.setAside },
+    { key: 'toSetAside', amount: month.toSetAside },
     { key: 'toCome', amount: month.toCome },
   ] as const;
   const note = over
@@ -227,6 +231,11 @@ export function LeftThisMonthCard({
                       currency={currency}
                       signed={month.setAside < 0}
                     />
+                  </Row>
+                )}
+                {month.toSetAside > 0 && (
+                  <Row label={t('left.rows.toSetAside')}>
+                    <Amount minor={-month.toSetAside} currency={currency} />
                   </Row>
                 )}
                 {month.toCome > 0 && (

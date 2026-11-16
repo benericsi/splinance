@@ -28,13 +28,20 @@ import { formatMoney } from '@/features/transactions/money';
 import { COLLAPSE } from '@/lib/motion';
 import { errorMessage } from '@/lib/query-client';
 import { cn } from '@/lib/utils';
-import { formatGoalDate, paceText, stepText } from '../describe';
+import { formatGoalDate, outlookText, stepText } from '../describe';
 import { entryFormSchema, newEntryValues, parseEntryInput } from '../form';
-import { useAddEntry, useArchiveGoal, useRemoveEntry, useUpdateGoal } from '../hooks';
+import {
+  useAddEntry,
+  useArchiveGoal,
+  useRemoveEntry,
+  useReopenGoal,
+  useUpdateGoal,
+} from '../hooks';
 import { savingsQueries } from '../queries';
 import { GoalBar } from './goal-bar';
 import { GoalForm } from './goal-form';
-import { GoalLegend } from './goal-box';
+import { GoalLegend, OutlookLine } from './goal-box';
+import { PlanSection } from './plan-section';
 
 /**
  * A goal over the savings page: what it holds, the form to put money in or take it out,
@@ -59,13 +66,14 @@ export function GoalDialog({
   const [closing, setClosing] = useState(false);
   const update = useUpdateGoal();
   const archive = useArchiveGoal();
+  const reopen = useReopenGoal();
   const ref = { householdId: household.id, goalId: goal.id };
   const open = goal.archivedAt === null;
   // Mirrors the API rule: the goal's maker, or an owner.
-  const mayManage = open && (household.role === 'owner' || goal.createdBy.userId === viewerId);
+  const mayManage = household.role === 'owner' || goal.createdBy.userId === viewerId;
   const money = (minor: number) => formatMoney(minor, goal.currency);
   const step = stepText(goal);
-  const pace = open ? paceText(goal, today()) : null;
+  const outlook = open ? outlookText(goal, today()) : null;
 
   if (editing) {
     return (
@@ -118,18 +126,14 @@ export function GoalDialog({
           {goal.contributions.length > 0 && goal.visibility === 'shared' && (
             <GoalLegend goal={goal} fills={fills} viewerId={viewerId} />
           )}
-          {(step ?? pace) && (
+          {(step ?? outlook) && (
             <div className="text-sm">
               {step && (
                 <p className="text-muted-foreground">
                   <MaskMoney>{step}</MaskMoney>
                 </p>
               )}
-              {pace && (
-                <p className={pace.overdue ? 'text-warning' : undefined}>
-                  <MaskMoney>{pace.text}</MaskMoney>
-                </p>
-              )}
+              {outlook && <OutlookLine outlook={outlook} />}
             </div>
           )}
           {goal.archivedAt && (
@@ -141,11 +145,32 @@ export function GoalDialog({
           )}
         </section>
 
+        {open && <PlanSection householdId={household.id} goal={goal} viewerId={viewerId} />}
+
         {open && <EntryForm householdId={household.id} goal={goal} />}
 
         <EntryHistory householdId={household.id} goal={goal} viewerId={viewerId} />
 
-        {mayManage && (
+        {mayManage && !open && (
+          <div className="space-y-2 border-t pt-4">
+            <FormError message={reopen.error ? errorMessage(reopen.error) : undefined} />
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-muted-foreground text-sm">{t('goal.reopenHint')}</p>
+              <Button
+                variant="outline"
+                className="shrink-0"
+                disabled={reopen.isPending}
+                onClick={() => {
+                  reopen.mutate(ref, { onSuccess: () => toast.success(t('goal.reopened')) });
+                }}
+              >
+                {reopen.isPending ? t('goal.reopening') : t('goal.reopen')}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {mayManage && open && (
           <div className="flex justify-between gap-2 border-t pt-4">
             <Button
               variant="outline"

@@ -34,6 +34,23 @@ export function useArchiveGoal() {
   });
 }
 
+export function useReopenGoal() {
+  return useMutation({
+    mutationFn: savingsApi.reopenGoal,
+    onSuccess: useInvalidateSavings(),
+    meta: { suppressErrorToast: true },
+  });
+}
+
+// The plan form shows its error itself.
+export function useSetPlan() {
+  return useMutation({
+    mutationFn: savingsApi.setPlan,
+    onSuccess: useInvalidateSavings(),
+    meta: { suppressErrorToast: true },
+  });
+}
+
 export function useAddEntry() {
   return useMutation({
     mutationFn: savingsApi.addEntry,

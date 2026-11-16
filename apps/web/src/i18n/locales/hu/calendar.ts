@@ -42,6 +42,7 @@ export const calendar: Messages<typeof en.calendar> = {
     chips: {
       spent: 'Elköltve',
       setAside: 'Félretéve',
+      toSetAside: 'Félreteendő',
       toCome: 'Még várható',
     },
     how: 'Hogyan számoljuk?',
@@ -51,6 +52,7 @@ export const calendar: Messages<typeof en.calendar> = {
       spent: 'Eddig elköltve',
       setAside: 'Megtakarításba félretéve',
       takenOut: 'Megtakarításból kivéve',
+      toSetAside: 'Még félreteendő, a terv szerint',
       toCome_one: 'Még várható rendszeres fizetés · {{count}} db',
       toCome_other: 'Még várható rendszeres fizetés · {{count}} db',
     },

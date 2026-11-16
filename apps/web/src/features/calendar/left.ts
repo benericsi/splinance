@@ -22,8 +22,13 @@ export interface LeftThisMonth {
    */
   setAside: number;
   /**
-   * Income minus spent, still to come and set aside; negative when the month is over its
-   * income.
+   * What the viewer's savings plans still ask them to put in this month (the plans less what
+   * they put into those goals so far): kept back like a payment still to come.
+   */
+  toSetAside: number;
+  /**
+   * Income minus spent, still to come, set aside and still to set aside; negative when the
+   * month is over its income.
    */
   left: number;
   /** Days of the month still ahead, today included (at least 1). */
@@ -42,9 +47,14 @@ export interface LeftThisMonth {
  * nothing counts twice. Saving is not spending, so it is not in the day totals either:
  * `setAside` comes from the savings goals. Money taken out of a goal and then spent stays
  * neutral: it lowers `setAside` and raises `spent`. The app knows no bank balance: this is
- * the month, not the account.
+ * the month, not the account. `toSetAside` (from the savings plans) is kept back too: money
+ * the viewer means to save is no more spendable than a bill still to come.
  */
-export function leftThisMonth(calendar: Calendar, setAside = 0): LeftThisMonth | null {
+export function leftThisMonth(
+  calendar: Calendar,
+  setAside = 0,
+  toSetAside = 0,
+): LeftThisMonth | null {
   const { spent, income: received, toCome } = summarize(calendar, 'mine');
   const expected = calendar.events.filter((event) => event.type === 'recurringExpected');
   const payments = expected.filter((event) => event.kind === 'expense');
@@ -54,7 +64,7 @@ export function leftThisMonth(calendar: Calendar, setAside = 0): LeftThisMonth |
 
   // Events come sorted by date: the first is the soonest.
   const [next] = incomes;
-  const left = received + expectedIncome - spent - toCome - setAside;
+  const left = received + expectedIncome - spent - toCome - setAside - toSetAside;
   const daysLeft = daysLeftIn(calendar.month, calendar.today, calendar.days.length);
   return {
     received,
@@ -67,6 +77,7 @@ export function leftThisMonth(calendar: Calendar, setAside = 0): LeftThisMonth |
     toComeCount: payments.length,
     toComeVaries: payments.some((event) => event.amountVaries),
     setAside,
+    toSetAside,
     left,
     daysLeft,
     // The last day has the whole of it; before that it is an estimate, and reads like one.

@@ -3,6 +3,7 @@ import {
   savingsEntryListResponseSchema,
   savingsEntryResponseSchema,
   type SavingsGoalInput,
+  type SavingsPlanInput,
   savingsRuleListResponseSchema,
   type SavingsRuleInput,
   savingsRuleResponseSchema,
@@ -45,6 +46,19 @@ export const savingsApi = {
   updateGoal: async ({ input, ...ref }: GoalRef & { input: UpdateSavingsGoalInput }) =>
     (await http.patch(goalPath(ref), savingsGoalResponseSchema, input)).goal,
   archiveGoal: (ref: GoalRef) => http.post(`${goalPath(ref)}/archive`, noContent),
+  reopenGoal: async (ref: GoalRef) =>
+    (await http.post(`${goalPath(ref)}/reopen`, savingsGoalResponseSchema)).goal,
+  /** The viewer's own monthly plan for the goal; null removes it. */
+  setPlan: async ({
+    monthlyAmount,
+    ...ref
+  }: GoalRef & { monthlyAmount: SavingsPlanInput['monthlyAmount'] | null }) => {
+    if (monthlyAmount === null) {
+      await http.delete(`${goalPath(ref)}/plan`, noContent);
+      return;
+    }
+    await http.put(`${goalPath(ref)}/plan`, savingsGoalResponseSchema, { monthlyAmount });
+  },
   setPinned: ({ pinned, ...ref }: GoalRef & { pinned: boolean }) =>
     pinned
       ? http.put(`${goalPath(ref)}/pin`, noContent)

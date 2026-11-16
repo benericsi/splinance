@@ -221,6 +221,7 @@ function LeftThisMonth({
       householdId={householdId}
       calendar={calendar}
       setAside={savings?.setAside ?? 0}
+      toSetAside={savings?.toSetAside ?? 0}
       setAsideByDay={savings?.setAsideByDay ?? []}
       tracksIncome={tracksIncome}
     />

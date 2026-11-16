@@ -45,7 +45,7 @@ export type GoalPace =
 /**
  * What it takes to get there in time: the rest spread over the whole months left (at least
  * one), rounded up so the last month is never short. Null without a target and a date, or
- * once reached. The app does not judge the past ("on track"): it has no plan to compare to.
+ * once reached. Whether the members' plans get there is `goalPlanStatus`.
  */
 export function goalPace(
   goal: GoalMoney & Pick<SavingsGoal, 'targetDate'>,
@@ -54,16 +54,46 @@ export function goalPace(
   const { toGo } = goalProgress(goal);
   if (goal.targetDate === null || toGo === 0) return null;
   if (goal.targetDate < today) return { kind: 'overdue' };
-  const [year, month, day] = today.split('-').map(Number) as [number, number, number];
-  const [toYear, toMonth, toDay] = goal.targetDate.split('-').map(Number) as [
-    number,
-    number,
-    number,
-  ];
-  const whole = (toYear - year) * 12 + (toMonth - month) - (toDay < day ? 1 : 0);
-  const months = Math.max(1, whole);
+  const months = monthsUntil(today, goal.targetDate);
   return { kind: 'monthly', perMonth: Math.ceil(toGo / months), months };
 }
+
+/** Whole months from `today` to `date` (a day short of a month counts as none), at least one. */
+function monthsUntil(today: string, date: string): number {
+  const [year, month, day] = today.split('-').map(Number) as [number, number, number];
+  const [toYear, toMonth, toDay] = date.split('-').map(Number) as [number, number, number];
+  return Math.max(1, (toYear - year) * 12 + (toMonth - month) - (toDay < day ? 1 : 0));
+}
+
+export type GoalPlanStatus =
+  /** What the members plan each month gets the goal to its target by its date. */
+  | { kind: 'onTrack'; planned: number }
+  /** It does not: `needed` a month would (the pace). */
+  | { kind: 'behind'; planned: number; needed: number };
+
+/**
+ * Whether the members' monthly plans get the goal there in time: the balance plus the
+ * plans for each whole month left (as the pace counts them) against the target. Null
+ * without plans, a target or a date, once reached, or past the date (the pace says so).
+ * Derived on every render, like everything here.
+ */
+export function goalPlanStatus(
+  goal: GoalMoney & Pick<SavingsGoal, 'targetDate' | 'plans'>,
+  today: string,
+): GoalPlanStatus | null {
+  const pace = goalPace(goal, today);
+  if (pace?.kind !== 'monthly' || goal.targetAmount === null || goal.plans.length === 0) {
+    return null;
+  }
+  const planned = goal.plans.reduce((sum, plan) => sum + plan.monthlyAmount, 0);
+  return goal.balance + planned * pace.months >= goal.targetAmount
+    ? { kind: 'onTrack', planned }
+    : { kind: 'behind', planned, needed: pace.perMonth };
+}
+
+/** The viewer's own monthly plan for the goal, or null. */
+export const ownPlan = (goal: Pick<SavingsGoal, 'plans'>, viewerId: string): number | null =>
+  goal.plans.find((plan) => plan.userId === viewerId)?.monthlyAmount ?? null;
 
 export interface ArrangedGoals {
   /** Shown large: the viewer's pins, or one picked for them while they have none. */

@@ -5,6 +5,8 @@ import {
   type SavingsGoal,
   type SavingsGoalInput,
   savingsGoalInputSchema,
+  type SavingsPlanInput,
+  savingsPlanInputSchema,
   type TransactionVisibility,
 } from '@splinance/shared';
 import { z } from 'zod';
@@ -169,4 +171,39 @@ export function parseEntryInput(
   currency: Currency,
 ): SavingsEntryInput {
   return savingsEntryInputSchema.parse(toEntryInput(values, balance, currency).input);
+}
+
+/** The plan form: the monthly amount as typed. */
+export interface PlanFormValues {
+  amount: string;
+}
+
+export const planFormValues = (
+  monthlyAmount: number | null,
+  currency: Currency,
+): PlanFormValues => ({
+  amount: monthlyAmount === null ? '' : formatAmountInput(monthlyAmount, currency),
+});
+
+function toPlanInput(values: PlanFormValues, currency: Currency) {
+  const amount = readAmount(values.amount, currency);
+  return {
+    input: { monthlyAmount: amount.minor },
+    problem: amount.problem ? amountProblemMessage(amount.problem, currency) : undefined,
+  };
+}
+
+/** Validator for the plan form: the shared input schema, its issue on the amount field. */
+export function planFormSchema(currency: Currency) {
+  return z.custom<PlanFormValues>().superRefine((values, ctx) => {
+    const { input, problem } = toPlanInput(values, currency);
+    const result = savingsPlanInputSchema.safeParse(input);
+    const message = problem ?? result.error?.issues[0]?.message;
+    if (message) ctx.addIssue({ code: 'custom', path: ['amount'], message });
+  });
+}
+
+/** For submit, after the validator passed. */
+export function parsePlanInput(values: PlanFormValues, currency: Currency): SavingsPlanInput {
+  return savingsPlanInputSchema.parse(toPlanInput(values, currency).input);
 }
