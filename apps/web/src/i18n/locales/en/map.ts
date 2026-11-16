@@ -44,6 +44,14 @@ export const map = {
     more_other: '{{count}} more payments',
     moreHint: 'On the Recurring page',
   },
+  goal: {
+    saved: '{{amount}} saved',
+    of: '{{percent}}% · {{amount}} of {{target}}',
+    private: 'Only you see this',
+    more_one: '{{count}} more goal',
+    more_other: '{{count}} more goals',
+    moreHint: 'On the Savings page',
+  },
   budget: {
     title: '{{category}} budget',
     unknown: 'Budget',

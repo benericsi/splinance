@@ -8,6 +8,7 @@ import type {
   ImportBatch,
   Invite,
   RecurringList,
+  SavingsGoal,
   StatementSource,
 } from '@splinance/shared';
 import { type BudgetStatus, budgetStatus, byUsage } from '@/features/budgets/status';
@@ -21,6 +22,8 @@ export const RECURRING_CAP = 3;
 export const BUDGET_CAP = 3;
 /** Pending invites shown (there is rarely more than one). */
 export const INVITE_CAP = 2;
+/** Savings goals shown per side (yours, the household's); the rest fold into one node. */
+export const GOAL_CAP = 2;
 
 const COLUMN_GAP = 270;
 const ROW_GAP = 92;
@@ -68,7 +71,17 @@ export type MapNodeData =
       budget: Pick<Budget, 'amount' | 'spent'>;
       status: BudgetStatus;
     }
-  | { kind: 'invite'; inviteId: string; expiresAt: string };
+  | { kind: 'invite'; inviteId: string; expiresAt: string }
+  | {
+      kind: 'goal';
+      goalId: string;
+      name: string;
+      /** Only its maker (the viewer) sees it. */
+      private: boolean;
+      balance: number;
+      targetAmount: number | null;
+    }
+  | { kind: 'moreGoals'; count: number };
 
 export type MapNode = MapNodeData & { id: string; x: number; y: number };
 
@@ -104,6 +117,8 @@ export interface MapInput {
   imports: ImportBatch[];
   /** Pending invites; empty for members who are not owners (they cannot list them). */
   invites: Invite[];
+  /** The goals the viewer can see (shared ones and their own private ones); empty until known. */
+  goals: SavingsGoal[];
   /** The viewer's date, as the recurring page computes it. */
   today: string;
   now: Date;
@@ -137,8 +152,8 @@ function place(
 }
 
 /**
- * The household as a graph, from what the overview already knows plus the viewer's imports
- * and (for owners) pending invites. Pure and text free: components turn it into labels.
+ * The household as a graph, from what the overview already knows (savings goals included)
+ * plus the viewer's imports and (for owners) pending invites. Pure and text free: components turn it into labels.
  * It only arranges what the API returned, so private data stays as visible as it was.
  */
 export function buildMap({
@@ -150,6 +165,7 @@ export function buildMap({
   recurring,
   imports,
   invites,
+  goals,
   today,
   now,
 }: MapInput): HouseholdMap {
@@ -265,8 +281,36 @@ export function buildMap({
     expiresAt: invite.expiresAt,
   }));
 
-  const personal = [...bankNodes, ...recurringNodes(true)];
-  const shared = [...recurringNodes(false), ...budgetNodes, ...inviteNodes];
+  // Open savings goals, the viewer's pins first: private ones are yours, shared ones the
+  // household's. Closed goals take no money and stay on the savings page.
+  const goalNodes = (isPrivate: boolean) => {
+    const side = goals
+      .filter((goal) => goal.archivedAt === null && (goal.visibility === 'private') === isPrivate)
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.name.localeCompare(b.name));
+    const shown = side.slice(0, GOAL_CAP).map((goal) => ({
+      id: `goal:${goal.id}`,
+      kind: 'goal' as const,
+      goalId: goal.id,
+      name: goal.name,
+      private: isPrivate,
+      balance: goal.balance,
+      targetAmount: goal.targetAmount,
+    }));
+    const hidden = side.length - shown.length;
+    return hidden > 0
+      ? [
+          ...shown,
+          {
+            id: `more-goals:${isPrivate ? 'private' : 'shared'}`,
+            kind: 'moreGoals' as const,
+            count: hidden,
+          },
+        ]
+      : shown;
+  };
+
+  const personal = [...bankNodes, ...recurringNodes(true), ...goalNodes(true)];
+  const shared = [...recurringNodes(false), ...budgetNodes, ...goalNodes(false), ...inviteNodes];
   for (const node of personal) link(node.id, memberId(viewerId));
   for (const node of shared) {
     link(HOUSEHOLD_ID, node.id, node.kind === 'invite' ? 'pending' : 'link');

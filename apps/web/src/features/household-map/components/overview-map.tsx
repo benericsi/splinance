@@ -13,7 +13,8 @@ import { useTranslation } from 'react-i18next';
 import { stashImportFile } from '@/features/imports/pending-file';
 import { importQueries } from '@/features/imports/queries';
 import { inviteQueries } from '@/features/invites/queries';
-import { today } from '@/features/transactions/dates';
+import { savingsQueries } from '@/features/savings/queries';
+import { currentMonth, today } from '@/features/transactions/dates';
 import { cn } from '@/lib/utils';
 import { buildMap } from '../build-map';
 
@@ -35,8 +36,9 @@ export function MapSkeleton() {
 
 /**
  * The overview as a map. Takes what the overview already loaded and adds the viewer's
- * imports and, for owners, pending invites (they arrive when they arrive: the invite
- * node is the only thing waiting on them).
+ * imports, for owners pending invites, and the savings goals (the same query the cards'
+ * Savings tile reads). Invites and goals arrive when they arrive: only their nodes wait on
+ * them.
  */
 export function OverviewMap({
   household,
@@ -58,6 +60,7 @@ export function OverviewMap({
     ...inviteQueries.list(household.id),
     enabled: household.role === 'owner',
   });
+  const { data: savings } = useQuery(savingsQueries.month(household.id, currentMonth()));
 
   const map = useMemo(
     () =>
@@ -70,10 +73,11 @@ export function OverviewMap({
         recurring,
         imports,
         invites: invites ?? [],
+        goals: savings?.goals ?? [],
         today: today(),
         now: new Date(),
       }),
-    [household, viewerId, balances, budgets, categories, recurring, imports, invites],
+    [household, viewerId, balances, budgets, categories, recurring, imports, invites, savings],
   );
 
   const { t } = useTranslation('map');
