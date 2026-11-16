@@ -1,0 +1,32 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["deploy/scripts/*.mjs"]
+    },
+    "apps/api": {
+      "entry": ["src/modules/**/*.cli.ts", "test/**/*.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"],
+      "ignoreDependencies": ["pino-pretty"]
+    },
+    "apps/web": {
+      "entry": ["src/routes/**/*.tsx", "scripts/*.mjs", "test/**/*.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
+      "ignore": ["src/components/ui/**"],
+      "ignoreDependencies": ["@tanstack/history"]
+    },
+    "packages/shared": {
+      "entry": ["scripts/*.mjs"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/fake-oidc": {
+      "project": ["src/**/*.ts"]
+    },
+    "e2e": {
+      "entry": ["tests/**/*.ts", "smoke/**/*.ts", "demo/**/*.ts", "capture/**/*.ts"],
+      "project": ["**/*.ts"],
+      "ignoreDependencies": ["@splinance/fake-oidc"]
+    }
+  },
+  "ignoreBinaries": ["uv"]
+}
