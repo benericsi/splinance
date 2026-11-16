@@ -1,3 +1,4 @@
+import { DAY_MS } from '@splinance/shared';
 import { and, inArray, isNull, lt, or } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { householdInvites, notifications, sessions } from '../../db/schema';
@@ -6,7 +7,6 @@ import { startPeriodic, withAdvisoryLock } from '../../lib/periodic';
 
 /** Held for the duration of a run, so two API instances never run one together. */
 export const MAINTENANCE_LOCK = 'splinance:maintenance';
-const DAY_MS = 86_400_000;
 /** Revoked sessions are kept this long (who was signed out, and when), then deleted. */
 export const REVOKED_SESSION_DAYS = 7;
 /** Unused invites are kept this long after they expired or were revoked. */

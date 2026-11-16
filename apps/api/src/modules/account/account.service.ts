@@ -28,7 +28,7 @@ export interface Caller {
   sessionId: string;
 }
 
-const sessionEnded = () =>
+export const sessionEnded = () =>
   new HttpError(401, 'Your session has ended, please log in again', 'UNAUTHENTICATED');
 
 // 400, not 401: the web client treats every 401 as an expired access token and retries.

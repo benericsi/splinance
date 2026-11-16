@@ -12,7 +12,8 @@ import { HttpError } from '../../lib/http-error';
 import { nameless, namesOf, personOf } from '../households/people';
 import { decodeCursor, encodeCursor } from '../../lib/keyset-cursor';
 import {
-  lockHouseholdShared,
+  type HouseholdScope,
+  inHouseholdWrite,
   type Membership,
   requireMembership,
 } from '../households/households.service';
@@ -30,11 +31,6 @@ const notYourPayment = () =>
     'Only the two people involved or an owner can record or remove this payment',
     'FORBIDDEN',
   );
-
-interface HouseholdScope {
-  userId: string;
-  householdId: string;
-}
 
 export interface SettlementScope extends HouseholdScope {
   settlementId: string;
@@ -167,20 +163,6 @@ async function recordAudit(
   if (settlement) await recordSettlementActivity(tx, scope, action, settlement);
 }
 
-/**
- * Every write: household lock (shared, like transaction writes, so leaving cannot slip in
- * between), membership, then the change and its audit entry.
- */
-async function inWriteTransaction<T>(
-  scope: HouseholdScope,
-  work: (tx: Db, membership: Membership) => Promise<T>,
-): Promise<T> {
-  return db.transaction(async (tx) => {
-    await lockHouseholdShared(tx, scope.householdId);
-    return work(tx, await requireMembership(tx, scope));
-  });
-}
-
 async function findSettlement(
   tx: Db,
   { householdId, settlementId }: SettlementScope,
@@ -208,7 +190,7 @@ export async function createSettlement(
   scope: HouseholdScope,
   input: SettlementInput,
 ): Promise<Settlement> {
-  return inWriteTransaction(scope, async (tx, membership) => {
+  return inHouseholdWrite(scope, async (tx, membership) => {
     assertMayManage(scope, membership, input);
 
     const people = await tx
@@ -246,7 +228,7 @@ export async function createSettlement(
 
 /** Soft delete: the debt it paid off is open again. */
 export async function deleteSettlement(scope: SettlementScope): Promise<void> {
-  await inWriteTransaction(scope, async (tx, membership) => {
+  await inHouseholdWrite(scope, async (tx, membership) => {
     const existing = await findSettlement(tx, scope);
     if (!existing) throw settlementNotFound();
     assertMayManage(scope, membership, existing);
@@ -262,7 +244,7 @@ export async function deleteSettlement(scope: SettlementScope): Promise<void> {
 
 /** Undo for a delete. Restoring a settlement that is not deleted changes nothing. */
 export async function restoreSettlement(scope: SettlementScope): Promise<Settlement> {
-  return inWriteTransaction(scope, async (tx, membership) => {
+  return inHouseholdWrite(scope, async (tx, membership) => {
     const existing = await findSettlement(tx, scope, { deleted: true });
     if (!existing) throw settlementNotFound();
     assertMayManage(scope, membership, existing);

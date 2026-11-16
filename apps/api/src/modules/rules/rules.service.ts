@@ -7,22 +7,21 @@ import {
 } from '@splinance/shared';
 import { and, asc, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
-import { isUniqueViolation } from '../../db/errors';
-import { categories, categoryRules, type CategoryRuleRow, transactions } from '../../db/schema';
+import { mapUniqueViolation } from '../../db/errors';
+import { categoryRules, type CategoryRuleRow, transactions } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
-import { lockHouseholdShared, requireMembership } from '../households/households.service';
 import {
   type HouseholdScope,
-  setTransactionCategory,
-  visibleTo,
-} from '../transactions/transactions.service';
+  inHouseholdWrite,
+  requireMembership,
+} from '../households/households.service';
+import { setTransactionCategory, visibleTo } from '../transactions/transactions.service';
+import { usableCategory } from '../categories/categories.service';
 
 export const ruleNotFound = () => new HttpError(404, 'Rule not found', 'RULE_NOT_FOUND');
 
 const patternTaken = () =>
   new HttpError(409, 'There is a rule for this text already', 'RULE_PATTERN_TAKEN');
-
-const invalidCategory = () => new HttpError(400, 'Choose an active category', 'INVALID_CATEGORY');
 
 const PATTERN_UNIQUE = 'category_rules_household_kind_pattern_unique';
 const CREATE_RULE_LOCK = 'splinance:create-rule';
@@ -42,30 +41,8 @@ function toRule(row: CategoryRuleRow): Rule {
   };
 }
 
-async function mapPatternTaken<T>(write: Promise<T>): Promise<T> {
-  try {
-    return await write;
-  } catch (err) {
-    if (isUniqueViolation(err, PATTERN_UNIQUE)) throw patternTaken();
-    throw err;
-  }
-}
-
-/** The category a rule may point at: active and in this household. Its kind comes along. */
-async function activeCategory(executor: Db, householdId: string, categoryId: string) {
-  const [row] = await executor
-    .select({ id: categories.id, kind: categories.kind })
-    .from(categories)
-    .where(
-      and(
-        eq(categories.id, categoryId),
-        eq(categories.householdId, householdId),
-        isNull(categories.archivedAt),
-      ),
-    );
-  if (!row) throw invalidCategory();
-  return row;
-}
+const mapPatternTaken = <T>(write: Promise<T>) =>
+  mapUniqueViolation(write, PATTERN_UNIQUE, patternTaken);
 
 async function findRule(executor: Db, { householdId, ruleId }: RuleScope) {
   const [row] = await executor
@@ -95,7 +72,7 @@ export async function listRules(scope: HouseholdScope): Promise<Rule[]> {
 export async function createRule(scope: HouseholdScope, input: RuleInput): Promise<Rule> {
   return db.transaction(async (tx) => {
     await requireMembership(tx, scope);
-    const category = await activeCategory(tx, scope.householdId, input.categoryId);
+    const category = await usableCategory(tx, scope.householdId, input.categoryId);
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${`${CREATE_RULE_LOCK}:${scope.householdId}`}))`,
     );
@@ -130,7 +107,7 @@ export async function updateRule(scope: RuleScope, input: UpdateRuleInput): Prom
   const category =
     input.categoryId === undefined
       ? undefined
-      : await activeCategory(db, scope.householdId, input.categoryId);
+      : await usableCategory(db, scope.householdId, input.categoryId);
 
   const [row] = await mapPatternTaken(
     db
@@ -235,11 +212,9 @@ export async function countRuleMatches(scope: RuleScope): Promise<number> {
  * never who it is for: that would move balances behind people's backs.
  */
 export async function applyRule(scope: RuleScope): Promise<number> {
-  return db.transaction(async (tx) => {
-    await lockHouseholdShared(tx, scope.householdId);
-    await requireMembership(tx, scope);
+  return inHouseholdWrite(scope, async (tx) => {
     const rule = await findRule(tx, scope);
-    await activeCategory(tx, scope.householdId, rule.categoryId);
+    await usableCategory(tx, scope.householdId, rule.categoryId);
 
     // Then only the matches are locked (in id order), and checked again under the lock: one
     // edited or categorized in between is left alone.

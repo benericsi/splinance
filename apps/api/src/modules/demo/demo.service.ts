@@ -1,5 +1,5 @@
 import { randomBytes, randomInt, randomUUID } from 'node:crypto';
-import { buildDemoStory, DEMO_PEOPLE, type Locale } from '@splinance/shared';
+import { buildDemoStory, DAY_MS, DEMO_PEOPLE, type Locale } from '@splinance/shared';
 import { count, eq, gt, inArray, sql } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
 import { demos, householdMembers, households, type UserRow, users } from '../../db/schema';
@@ -37,7 +37,6 @@ export interface DemoCreated extends AuthResult {
 /** A reserved top-level domain (RFC 2606): these addresses can never receive mail. */
 export const DEMO_EMAIL_DOMAIN = 'demo.invalid';
 
-const DAY_MS = 86_400_000;
 /** Serializes "count the active demos, then add one", so parallel requests cannot overshoot the cap. */
 const CREATE_LOCK = 'splinance:demo-create';
 

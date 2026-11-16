@@ -1,10 +1,10 @@
 import type { Category, CreateCategoryInput, UpdateCategoryInput } from '@splinance/shared';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
-import { db } from '../../db/client';
-import { isUniqueViolation } from '../../db/errors';
+import { db, type Db } from '../../db/client';
+import { mapUniqueViolation } from '../../db/errors';
 import { categories, type CategoryRow } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
-import { requireMembership } from '../households/households.service';
+import { requireMembership, type HouseholdScope } from '../households/households.service';
 
 export const categoryNotFound = () =>
   new HttpError(404, 'Category not found', 'CATEGORY_NOT_FOUND');
@@ -13,11 +13,6 @@ const nameTaken = () =>
   new HttpError(409, 'A category with this name already exists', 'CATEGORY_NAME_TAKEN');
 
 const NAME_UNIQUE = 'categories_household_kind_name_unique';
-
-interface HouseholdScope {
-  userId: string;
-  householdId: string;
-}
 
 interface CategoryScope extends HouseholdScope {
   categoryId: string;
@@ -35,14 +30,7 @@ function toCategory(row: CategoryRow): Category {
 }
 
 /** Turns the partial unique index violation into a 409 the form can show next to the name. */
-async function mapNameTaken<T>(write: Promise<T>): Promise<T> {
-  try {
-    return await write;
-  } catch (err) {
-    if (isUniqueViolation(err, NAME_UNIQUE)) throw nameTaken();
-    throw err;
-  }
-}
+const mapNameTaken = <T>(write: Promise<T>) => mapUniqueViolation(write, NAME_UNIQUE, nameTaken);
 
 const activeCategory = ({ householdId, categoryId }: CategoryScope) =>
   and(
@@ -52,6 +40,36 @@ const activeCategory = ({ householdId, categoryId }: CategoryScope) =>
   );
 
 /** Every member can manage categories. Archived ones are included: old transactions show them. */
+/** 400 for a category another record may not point at (the web words it by the code). */
+export const invalidCategory = () =>
+  new HttpError(400, 'Choose an active category of the same kind', 'INVALID_CATEGORY');
+
+/**
+ * The category a transaction, rule, recurring payment or budget may point at: in this
+ * household, not archived, and of `kind` when one is given. Its id and kind, else 400
+ * `INVALID_CATEGORY`.
+ */
+export async function usableCategory(
+  executor: Db,
+  householdId: string,
+  categoryId: string,
+  kind?: CategoryRow['kind'],
+): Promise<{ id: string; kind: CategoryRow['kind'] }> {
+  const [row] = await executor
+    .select({ id: categories.id, kind: categories.kind })
+    .from(categories)
+    .where(
+      and(
+        eq(categories.id, categoryId),
+        eq(categories.householdId, householdId),
+        isNull(categories.archivedAt),
+        kind === undefined ? undefined : eq(categories.kind, kind),
+      ),
+    );
+  if (!row) throw invalidCategory();
+  return row;
+}
+
 export async function listCategories(scope: HouseholdScope): Promise<Category[]> {
   await requireMembership(db, scope);
   const rows = await db

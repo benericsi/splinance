@@ -1,4 +1,6 @@
 import {
+  addDays,
+  dayNumber,
   type ImportBatch,
   type ImportCheckInput,
   type ImportCheckResult,
@@ -20,7 +22,11 @@ import {
   transactions,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
-import { lockHouseholdShared, requireMembership } from '../households/households.service';
+import {
+  type HouseholdScope,
+  inHouseholdWrite,
+  requireMembership,
+} from '../households/households.service';
 import { namesOf, personOf } from '../households/people';
 import {
   goalNotFound,
@@ -30,7 +36,6 @@ import {
 } from '../savings/savings.service';
 import {
   activeMemberIds,
-  type HouseholdScope,
   insertTransactions,
   softDeleteTransactions,
 } from '../transactions/transactions.service';
@@ -40,11 +45,6 @@ export const importNotFound = () => new HttpError(404, 'Import not found', 'IMPO
 
 /** Hand-entered records this many days apart still count as possible duplicates. */
 const DUPLICATE_WINDOW_DAYS = 2;
-const DAY_MS = 86_400_000;
-
-const dayNumber = (date: string) => Date.parse(`${date}T00:00:00Z`) / DAY_MS;
-const shiftDays = (date: string, days: number) =>
-  new Date((dayNumber(date) + days) * DAY_MS).toISOString().slice(0, 10);
 
 async function toBatches(executor: Db, rows: ImportBatchRow[]): Promise<ImportBatch[]> {
   if (rows.length === 0) return [];
@@ -176,8 +176,8 @@ export async function checkImport(
   // savings entries they recorded by hand, around the rows' dates and with their amounts.
   const dates = input.rows.map((row) => row.occurredOn).sort();
   const firstDate = dates[0] ?? '2000-01-01';
-  const from = shiftDays(firstDate, -DUPLICATE_WINDOW_DAYS);
-  const to = shiftDays(dates.at(-1) ?? firstDate, DUPLICATE_WINDOW_DAYS);
+  const from = addDays(firstDate, -DUPLICATE_WINDOW_DAYS);
+  const to = addDays(dates.at(-1) ?? firstDate, DUPLICATE_WINDOW_DAYS);
   const amounts = [...new Set(input.rows.map((row) => row.amount))];
   const handTransactions = await db
     .select({
@@ -339,9 +339,7 @@ export async function createImport(
   input: ImportInput,
 ): Promise<ImportResponse> {
   try {
-    return await db.transaction(async (tx) => {
-      await lockHouseholdShared(tx, scope.householdId);
-      const { household } = await requireMembership(tx, scope);
+    return await inHouseholdWrite(scope, async (tx, { household }) => {
       // One import at a time per person and household: a bank row can become a transaction
       // or a savings entry, two tables no unique index spans, so two imports of the same
       // row at once could otherwise make one of each. `FOR NO KEY UPDATE` does not wait on
@@ -480,10 +478,7 @@ export async function listImports(scope: HouseholdScope): Promise<ImportBatch[]>
  * changes nothing.
  */
 export async function undoImport(scope: HouseholdScope & { importId: string }): Promise<void> {
-  await db.transaction(async (tx) => {
-    await lockHouseholdShared(tx, scope.householdId);
-    await requireMembership(tx, scope);
-
+  await inHouseholdWrite(scope, async (tx) => {
     const [batch] = await tx
       .select()
       .from(importBatches)

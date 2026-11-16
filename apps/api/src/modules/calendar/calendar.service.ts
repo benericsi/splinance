@@ -15,11 +15,11 @@ import { db } from '../../db/client';
 import { transactions, transactionSplits } from '../../db/schema';
 import { monthRange } from '../../lib/months';
 import { budapestToday } from '../../lib/today';
-import { requireMembership } from '../households/households.service';
+import { requireMembership, type HouseholdScope } from '../households/households.service';
 import { seriesWithPayments, sharesOf } from '../recurring/recurring.service';
 import { ownSplit, yourPart } from '../reports/reports.service';
 import { settlementsBetween } from '../settlements/settlements.service';
-import { type HouseholdScope, visibleTo } from '../transactions/transactions.service';
+import { visibleTo } from '../transactions/transactions.service';
 
 interface Options {
   /** `YYYY-MM-DD`; Budapest today by default (tests pin it). */
