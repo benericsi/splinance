@@ -77,22 +77,53 @@ function isRecent(session: SessionRow, now: Date): boolean {
   return now.getTime() - session.createdAt.getTime() <= RECENT_SIGN_IN_MS;
 }
 
+function stepUpFailed(userId: string): HttpError {
+  logger.warn({ event: 'account.step_up_failed', userId }, 'Wrong current password');
+  return wrongPassword();
+}
+
 /**
- * Step-up for changes that add or remove a way into the account. An account with a
- * password confirms with it every time; one without (it signs in only with a provider)
- * must have signed in within RECENT_SIGN_IN_MS. A stolen access token alone is then not
- * enough to set a password or connect another provider and keep the account.
+ * The password half of the step-up, before any lock: Argon2 takes 100-300 ms and must not
+ * hold the user row (every sign-in change of the person queues behind it). The session is
+ * checked first, so a token that outlived its logout cannot test passwords. Returns the
+ * hash the password matched, or null for an account without a password;
+ * `requireRecentAuth` then checks under the lock that the row still holds it.
  */
-export async function requireRecentAuth(
-  user: UserRow,
-  session: SessionRow,
+export async function verifyBeforeLock(
+  caller: Caller,
   currentPassword: string | undefined,
   now: Date,
-): Promise<void> {
+): Promise<string | null> {
+  await activeSession(db, caller, now);
+  const [user] = await db
+    .select({ passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, caller.userId));
+  if (!user) throw sessionEnded();
+  if (!user.passwordHash) return null;
+  if (currentPassword && (await verifyPassword(user.passwordHash, currentPassword))) {
+    return user.passwordHash;
+  }
+  throw stepUpFailed(caller.userId);
+}
+
+/**
+ * Step-up for changes that add or remove a way into the account, under `lockUser`. An
+ * account with a password confirms with it every time (verified by `verifyBeforeLock`
+ * against the hash the locked row still holds: a password changed in between does not
+ * count); one without (it signs in only with a provider) must have signed in within
+ * RECENT_SIGN_IN_MS. A stolen access token alone is then not enough to set a password or
+ * connect another provider and keep the account.
+ */
+export function requireRecentAuth(
+  user: UserRow,
+  session: SessionRow,
+  verifiedHash: string | null,
+  now: Date,
+): void {
   if (user.passwordHash) {
-    if (currentPassword && (await verifyPassword(user.passwordHash, currentPassword))) return;
-    logger.warn({ event: 'account.step_up_failed', userId: user.id }, 'Wrong current password');
-    throw wrongPassword();
+    if (verifiedHash !== null && verifiedHash === user.passwordHash) return;
+    throw stepUpFailed(user.id);
   }
   if (!isRecent(session, now)) throw reauthRequired();
 }
@@ -151,7 +182,8 @@ export async function updateProfile(userId: string, input: UpdateProfileInput): 
       ...(input.displayName !== undefined && { displayName: input.displayName }),
       ...(input.locale !== undefined && { locale: input.locale }),
     })
-    .where(eq(users.id, userId))
+    // A deleted account's access token stays valid for up to 15 minutes: no row means 401.
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
     .returning();
   if (!user) throw sessionEnded();
   return toUser(user);
@@ -174,7 +206,8 @@ export async function updatePreferences(
       }),
       ...(input.spendingView !== undefined && { spendingView: input.spendingView }),
     })
-    .where(eq(users.id, userId))
+    // A deleted account's access token stays valid for up to 15 minutes: no row means 401.
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
     .returning();
   if (!user) throw sessionEnded();
   return toUser(user);
@@ -197,27 +230,35 @@ export async function changePassword(
   input: ChangePasswordInput,
   now = new Date(),
 ): Promise<PasswordChange> {
+  // Both Argon2 steps (verify, hash) run before the lock; see verifyBeforeLock.
+  const verifiedHash = await verifyBeforeLock(caller, input.currentPassword, now);
+  const [current] = await db.select().from(users).where(eq(users.id, caller.userId));
+  if (!current) throw sessionEnded();
+  weakPasswordCheck(input.newPassword, current);
+  const newHash = await hashPassword(input.newPassword);
+
   return db.transaction(async (tx) => {
     const user = await lockUser(tx, caller.userId);
     const session = await activeSession(tx, caller, now);
-    await requireRecentAuth(user, session, input.currentPassword, now);
+    requireRecentAuth(user, session, verifiedHash, now);
+    // Again on the locked row: the email or name may have changed meanwhile.
+    weakPasswordCheck(input.newPassword, user);
 
-    // The rules need the account's own email and name, not what a client claims.
-    const [issue] = requiredPasswordIssues(input.newPassword, {
-      email: user.email,
-      displayName: user.displayName,
-    });
-    if (issue) throw new HttpError(400, issue, 'WEAK_PASSWORD');
-
-    await tx
-      .update(users)
-      .set({ passwordHash: await hashPassword(input.newPassword) })
-      .where(eq(users.id, user.id));
+    await tx.update(users).set({ passwordHash: newHash }).where(eq(users.id, user.id));
     return {
       firstPassword: user.passwordHash === null,
       revoked: await revokeOthers(tx, caller, now),
     };
   });
+}
+
+/** The rules need the account's own email and name, not what a client claims. */
+function weakPasswordCheck(password: string, user: Pick<UserRow, 'email' | 'displayName'>) {
+  const [issue] = requiredPasswordIssues(password, {
+    email: user.email,
+    displayName: user.displayName,
+  });
+  if (issue) throw new HttpError(400, issue, 'WEAK_PASSWORD');
 }
 
 /** "Sign out of other devices". */
@@ -248,6 +289,7 @@ export async function prepareConnect(
   currentPassword: string | undefined,
   now = new Date(),
 ): Promise<void> {
+  const verifiedHash = await verifyBeforeLock(caller, currentPassword, now);
   await db.transaction(async (tx) => {
     const user = await lockUser(tx, caller.userId);
     const session = await activeSession(tx, caller, now);
@@ -255,7 +297,7 @@ export async function prepareConnect(
     if (existing) {
       throw new HttpError(409, 'That provider is already connected', 'ALREADY_CONNECTED');
     }
-    await requireRecentAuth(user, session, currentPassword, now);
+    requireRecentAuth(user, session, verifiedHash, now);
   });
 }
 
@@ -366,6 +408,7 @@ export async function disconnectIdentity(
   currentPassword: string | undefined,
   now = new Date(),
 ): Promise<{ revoked: number }> {
+  const verifiedHash = await verifyBeforeLock(caller, currentPassword, now);
   return db.transaction(async (tx) => {
     const user = await lockUser(tx, caller.userId);
     const session = await activeSession(tx, caller, now);
@@ -382,7 +425,7 @@ export async function disconnectIdentity(
         'LAST_SIGN_IN_METHOD',
       );
     }
-    await requireRecentAuth(user, session, currentPassword, now);
+    requireRecentAuth(user, session, verifiedHash, now);
     await tx.delete(userIdentities).where(eq(userIdentities.id, target.id));
     return { revoked: await revokeOthers(tx, caller, now) };
   });

@@ -20,7 +20,7 @@ import {
 } from '../../../test/households';
 import { bearer, createTestUser, pgErrorOf, type TestUser } from '../../../test/users';
 import { createApp } from '../../app';
-import { db } from '../../db/client';
+import { db, pool } from '../../db/client';
 import { transactions, transactionSplits } from '../../db/schema';
 
 let app: App;
@@ -279,6 +279,50 @@ describe('visibility', () => {
       .expect(404);
   });
 
+  it('shows the others a history that starts when the transaction became shared', async () => {
+    const created = await create(anna, privateInput({ description: 'Haircut' }));
+    const edit = async (version: number, body: object) => {
+      const res = await put(anna, created.id, { ...body, version });
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+    };
+    await edit(1, privateInput({ description: 'Secret salon', amount: 9_900 }));
+    await edit(2, sharedInput({ description: 'Shared at last' }));
+    await edit(3, sharedInput({ description: 'Shared and edited' }));
+
+    const all = await history(anna, created.id);
+    expect(all.map((e) => e.action)).toEqual(['create', 'update', 'update', 'update']);
+
+    const seen = await history(ben, created.id);
+    expect(seen.map((e) => e.id)).toEqual(all.slice(2).map((e) => e.id));
+    expect(seen[0]?.before).toBeNull();
+    expect(seen[0]?.after?.description).toBe('Shared at last');
+    const text = JSON.stringify(seen);
+    for (const secret of ['Haircut', 'Secret salon', '9900']) expect(text).not.toContain(secret);
+
+    // Private again and shared again: only the latest shared stretch shows.
+    await edit(4, privateInput({ description: 'Mine again' }));
+    await edit(5, sharedInput({ description: 'Shared once more' }));
+    const again = await history(ben, created.id);
+    expect(again.map((e) => e.after?.description)).toEqual(['Shared once more']);
+    expect(again[0]?.before).toBeNull();
+
+    // A delete and its restore (whose before is empty too) do not cut the history again.
+    await request(app)
+      .delete(base(`/${created.id}`))
+      .set('Authorization', await bearer(ben))
+      .expect(204);
+    await request(app)
+      .post(base(`/${created.id}/restore`))
+      .set('Authorization', await bearer(ben))
+      .expect(200);
+    expect((await history(ben, created.id)).map((e) => e.action)).toEqual([
+      'update',
+      'delete',
+      'restore',
+    ]);
+    expect(await history(anna, created.id)).toHaveLength(8);
+  });
+
   it('hides everything from outsiders, former members and anonymous requests', async () => {
     const transaction = await create(anna, sharedInput());
     const outsider = await createTestUser('Eve');
@@ -339,6 +383,16 @@ describe('listing', () => {
     } while (cursor);
     expect(seen).toEqual(expected);
     expect(pages).toBe(3);
+  });
+
+  it('answers a crafted cursor with 400, not 500', async () => {
+    const cursor = Buffer.from(`2026-99-99|${'-'.repeat(36)}`).toString('base64url');
+    const res = await request(app)
+      .get(base())
+      .query({ cursor })
+      .set('Authorization', await bearer(anna))
+      .expect(400);
+    expect(errorCode(res)).toBe('VALIDATION_ERROR');
   });
 
   it('filters by month, kind, visibility, category, member and text', async () => {
@@ -678,5 +732,23 @@ describe('database guarantees', () => {
         }),
       ),
     ).toMatchObject({ code: '23503', constraint: 'transactions_category_fk' });
+  });
+});
+
+describe('a household that stays locked', () => {
+  it('answers a write with 503 BUSY once the lock wait runs out, not by hanging', async () => {
+    const holder = await pool.connect();
+    try {
+      await holder.query('begin');
+      await holder.query('select id from households where id = $1 for update', [householdId]);
+      const res = await post(anna, sharedInput());
+      expect(res.status).toBe(503);
+      expect(errorCode(res)).toBe('BUSY');
+    } finally {
+      await holder.query('rollback');
+      holder.release();
+    }
+    // Free again: the same write goes through.
+    expect((await post(anna, sharedInput())).status).toBe(201);
   });
 });

@@ -505,6 +505,37 @@ describe('delete', () => {
     }
   });
 
+  it('keeps a still-valid access token from writing over the anonymized row', async () => {
+    const ben = await person('Ben');
+    await remove(ben).expect(204);
+
+    expect(
+      errorCode(
+        await request(app)
+          .patch('/api/account')
+          .set('Authorization', ben.auth)
+          .send({ displayName: 'Ben again' })
+          .expect(401),
+      ),
+    ).toBe('UNAUTHENTICATED');
+    expect(
+      errorCode(
+        await request(app)
+          .patch('/api/account/preferences')
+          .set('Authorization', ben.auth)
+          .send({ overviewView: 'map' })
+          .expect(401),
+      ),
+    ).toBe('UNAUTHENTICATED');
+
+    const [row] = await db
+      .select({ displayName: users.displayName, overviewView: users.overviewView })
+      .from(users)
+      .where(eq(users.id, ben.id));
+    expect(row?.displayName).toBe(FORMER_MEMBER_NAME);
+    expect(row?.overviewView).not.toBe('map');
+  });
+
   it('cannot race a new expense that names the person', async () => {
     const [anna, ben] = [await person('Anna'), await person('Ben')];
     const home = await createHousehold(app, anna, 'Home');
