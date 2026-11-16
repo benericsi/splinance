@@ -11,6 +11,7 @@ export const errors: Messages<typeof en.errors> = {
     NOT_FOUND: 'Nem található. Lehet, hogy törölték.',
     FORBIDDEN: 'Ehhez nincs jogosultságod.',
     RATE_LIMITED: 'Túl sok próbálkozás, próbáld később',
+    BUSY: 'Ez túl sokáig tartott. Próbáld újra.',
     INTERNAL_ERROR: 'Hiba történt nálunk. Próbáld újra egy kicsit később.',
     HTTP_ERROR: 'Valami hiba történt. Próbáld újra.',
     DEMO_MODE: 'Ez a demóban nem érhető el',

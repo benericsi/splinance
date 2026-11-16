@@ -10,6 +10,7 @@ const codes: Record<ApiErrorCode, string> = {
   NOT_FOUND: 'That was not found. It may have been removed.',
   FORBIDDEN: "You don't have permission to do this.",
   RATE_LIMITED: 'Too many attempts, please try again later',
+  BUSY: 'That took too long. Please try again.',
   INTERNAL_ERROR: 'Something went wrong on our side. Try again in a moment.',
   HTTP_ERROR: 'Something went wrong. Please try again.',
   DEMO_MODE: 'This is not available in the demo',

@@ -15,6 +15,7 @@ export const API_ERROR_CODES = [
   'NOT_FOUND',
   'FORBIDDEN',
   'RATE_LIMITED',
+  'BUSY',
   'INTERNAL_ERROR',
   'HTTP_ERROR',
   'DEMO_MODE',

@@ -20,7 +20,7 @@ import {
 } from '../../../test/households';
 import { bearer, createTestUser, pgErrorOf, type TestUser } from '../../../test/users';
 import { createApp } from '../../app';
-import { db } from '../../db/client';
+import { db, pool } from '../../db/client';
 import { transactions, transactionSplits } from '../../db/schema';
 
 let app: App;
@@ -732,5 +732,23 @@ describe('database guarantees', () => {
         }),
       ),
     ).toMatchObject({ code: '23503', constraint: 'transactions_category_fk' });
+  });
+});
+
+describe('a household that stays locked', () => {
+  it('answers a write with 503 BUSY once the lock wait runs out, not by hanging', async () => {
+    const holder = await pool.connect();
+    try {
+      await holder.query('begin');
+      await holder.query('select id from households where id = $1 for update', [householdId]);
+      const res = await post(anna, sharedInput());
+      expect(res.status).toBe(503);
+      expect(errorCode(res)).toBe('BUSY');
+    } finally {
+      await holder.query('rollback');
+      holder.release();
+    }
+    // Free again: the same write goes through.
+    expect((await post(anna, sharedInput())).status).toBe(201);
   });
 });
