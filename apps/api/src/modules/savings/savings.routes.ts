@@ -4,6 +4,7 @@ import {
   savingsEntryListQuerySchema,
   type SavingsEntryResponse,
   savingsGoalInputSchema,
+  savingsPlanInputSchema,
   type SavingsGoalResponse,
   savingsQuerySchema,
   type SavingsResponse,
@@ -23,7 +24,10 @@ import {
   getSavings,
   goalNotFound,
   listEntries,
+  deletePlan,
   pinGoal,
+  reopenGoal,
+  setPlan,
   unpinGoal,
   updateGoal,
 } from './savings.service';
@@ -70,6 +74,23 @@ export function createSavingsRouter() {
 
   router.post('/:goalId/archive', writes, async (req, res) => {
     await archiveGoal(goalScope(req));
+    res.status(204).end();
+  });
+
+  router.post('/:goalId/reopen', writes, async (req, res) => {
+    const body: SavingsGoalResponse = { goal: await reopenGoal(goalScope(req)) };
+    res.json(body);
+  });
+
+  router.put('/:goalId/plan', writes, async (req, res) => {
+    const scope = goalScope(req);
+    const input = savingsPlanInputSchema.parse(req.body);
+    const body: SavingsGoalResponse = { goal: await setPlan(scope, input) };
+    res.json(body);
+  });
+
+  router.delete('/:goalId/plan', writes, async (req, res) => {
+    await deletePlan(goalScope(req));
     res.status(204).end();
   });
 

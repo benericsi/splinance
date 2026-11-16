@@ -15,6 +15,7 @@ import {
   recurringSeries,
   savingsEntries,
   savingsGoalPins,
+  savingsGoalPlans,
   savingsGoals,
   savingsRules,
   sessions,
@@ -207,6 +208,7 @@ async function erase(
   // Their pins and rules first: only they could point those at their private goals. Rules
   // also name their pockets.
   await tx.delete(savingsGoalPins).where(eq(savingsGoalPins.userId, user.id));
+  await tx.delete(savingsGoalPlans).where(eq(savingsGoalPlans.userId, user.id));
   await tx.delete(savingsRules).where(eq(savingsRules.userId, user.id));
   await tx.delete(savingsEntries).where(inArray(savingsEntries.goalId, privateGoals));
   await tx

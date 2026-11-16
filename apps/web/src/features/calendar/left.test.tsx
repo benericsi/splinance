@@ -521,6 +521,7 @@ describe('overview: savings', () => {
     balance: 0,
     contributions: [],
     pinned: false,
+    plans: [],
     createdAt: '2026-10-09T16:06:43.129Z',
     ...fields,
   });
@@ -536,7 +537,9 @@ describe('overview: savings', () => {
   function savingsApi(goals: SavingsGoal[], setAside: number) {
     server.use(
       mock.get(`${base}/savings`, () =>
-        HttpResponse.json({ savings: { currency: 'HUF', goals, setAside, setAsideByDay: [] } }),
+        HttpResponse.json({
+          savings: { currency: 'HUF', goals, setAside, setAsideByDay: [], toSetAside: 0 },
+        }),
       ),
     );
   }

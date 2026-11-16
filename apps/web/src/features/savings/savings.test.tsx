@@ -45,6 +45,7 @@ function goal(name: string, overrides: Partial<SavingsGoal> = {}): SavingsGoal {
     balance: 0,
     contributions: [],
     pinned: false,
+    plans: [],
     createdAt: '2026-10-09T16:06:43.129Z',
     ...overrides,
   };
@@ -122,7 +123,13 @@ function fakeApi(goals: SavingsGoal[] = [trip, fund, pot, old], setAside = 100_0
       }),
     ),
     mock.get(`${base}/savings`, () => {
-      const savings: Savings = { currency: 'HUF', goals: state.goals, setAside, setAsideByDay: [] };
+      const savings: Savings = {
+        currency: 'HUF',
+        goals: state.goals,
+        setAside,
+        setAsideByDay: [],
+        toSetAside: 0,
+      };
       return HttpResponse.json({ savings });
     }),
     mock.post(`${base}/savings`, async ({ request }) => {

@@ -8,6 +8,7 @@ import {
   type SavingsGoal,
   type SavingsGoalInput,
   SAVINGS_PIN_MAX,
+  type SavingsPlanInput,
   type SavingsQuery,
   type UpdateSavingsGoalInput,
 } from '@splinance/shared';
@@ -18,6 +19,7 @@ import {
   savingsEntries,
   type SavingsEntryRow,
   savingsGoalPins,
+  savingsGoalPlans,
   type SavingsGoalRow,
   savingsGoals,
 } from '../../db/schema';
@@ -102,11 +104,30 @@ async function toGoals(
       ),
     )
     .groupBy(savingsEntries.goalId, savingsEntries.userId);
+  // Plans of current members only: one who left plans nothing any more.
+  const plans = await executor
+    .select({
+      goalId: savingsGoalPlans.goalId,
+      userId: savingsGoalPlans.userId,
+      monthlyAmount: savingsGoalPlans.monthlyAmount,
+    })
+    .from(savingsGoalPlans)
+    .innerJoin(
+      householdMembers,
+      and(
+        eq(householdMembers.householdId, savingsGoalPlans.householdId),
+        eq(householdMembers.userId, savingsGoalPlans.userId),
+        isNull(householdMembers.leftAt),
+      ),
+    )
+    .where(inArray(savingsGoalPlans.goalId, goalIds))
+    .orderBy(desc(savingsGoalPlans.monthlyAmount), savingsGoalPlans.userId);
 
   const person = personOf(
     await namesOf(executor, [
       ...rows.map((row) => row.createdBy),
       ...sums.map((sum) => sum.userId),
+      ...plans.map((plan) => plan.userId),
     ]),
   );
 
@@ -127,6 +148,9 @@ async function toGoals(
         .sort((a, b) => b.amount - a.amount || (a.userId < b.userId ? -1 : 1))
         .map((sum) => ({ ...person(sum.userId), amount: sum.amount })),
       pinned: pinned.has(row.id),
+      plans: plans
+        .filter((plan) => plan.goalId === row.id)
+        .map((plan) => ({ ...person(plan.userId), monthlyAmount: plan.monthlyAmount })),
       createdAt: row.createdAt.toISOString(),
     };
   });
@@ -171,6 +195,7 @@ export async function getSavings(scope: HouseholdScope, query: SavingsQuery): Pr
 
   let setAside: number | null = null;
   let setAsideByDay: DaySetAside[] | null = null;
+  let toSetAside: number | null = null;
   if (query.month) {
     const [start, end] = monthRange(query.month);
     const days = await db
@@ -190,6 +215,7 @@ export async function getSavings(scope: HouseholdScope, query: SavingsQuery): Pr
     // A day whose entries cancel out is no day of saving.
     setAsideByDay = days.filter((day) => day.amount !== 0);
     setAside = days.reduce((sum, day) => sum + day.amount, 0);
+    toSetAside = await stillToSetAside(scope, start, end);
   }
 
   return {
@@ -197,7 +223,40 @@ export async function getSavings(scope: HouseholdScope, query: SavingsQuery): Pr
     goals: await toGoals(db, rows, scope.userId),
     setAside,
     setAsideByDay,
+    toSetAside,
   };
+}
+
+/**
+ * What the viewer still means to put in between `start` and `end`: per plan of theirs on an
+ * open goal, the plan less their deposits into it then (withdrawals are in `setAside`
+ * already), never below zero. Their plans are only on goals they can see.
+ */
+async function stillToSetAside(scope: HouseholdScope, start: string, end: string): Promise<number> {
+  const deposited =
+    sql<number>`coalesce(sum(${savingsEntries.amount}) filter (where ${savingsEntries.amount} > 0 and ${savingsEntries.deletedAt} is null and ${savingsEntries.entryOn} >= ${start} and ${savingsEntries.entryOn} < ${end}), 0)::bigint`.mapWith(
+      Number,
+    );
+  const rows = await db
+    .select({ planned: savingsGoalPlans.monthlyAmount, deposited })
+    .from(savingsGoalPlans)
+    .innerJoin(savingsGoals, eq(savingsGoals.id, savingsGoalPlans.goalId))
+    .leftJoin(
+      savingsEntries,
+      and(
+        eq(savingsEntries.goalId, savingsGoalPlans.goalId),
+        eq(savingsEntries.userId, savingsGoalPlans.userId),
+      ),
+    )
+    .where(
+      and(
+        eq(savingsGoalPlans.householdId, scope.householdId),
+        eq(savingsGoalPlans.userId, scope.userId),
+        isNull(savingsGoals.archivedAt),
+      ),
+    )
+    .groupBy(savingsGoalPlans.goalId, savingsGoalPlans.monthlyAmount);
+  return rows.reduce((sum, row) => sum + Math.max(0, row.planned - row.deposited), 0);
 }
 
 /** The goal if the viewer can see it. `lock` serializes writes that depend on its balance. */
@@ -278,8 +337,9 @@ export async function updateGoal(
 }
 
 /**
- * Closes the goal: it stays with its history and takes no new entries. Everyone's pins on
- * it go, so a closed goal holds no place on anyone's page. Idempotent.
+ * Closes the goal: it stays with its history and takes no new entries. Everyone's pins and
+ * plans on it go, so a closed goal holds no place on anyone's page and asks nobody to set
+ * money aside; reopening restores neither. Idempotent.
  */
 export async function archiveGoal(scope: GoalScope, now = new Date()): Promise<void> {
   await inHouseholdWrite(scope, async (tx, membership) => {
@@ -287,6 +347,60 @@ export async function archiveGoal(scope: GoalScope, now = new Date()): Promise<v
     if (goal.archivedAt) return;
     await tx.update(savingsGoals).set({ archivedAt: now }).where(eq(savingsGoals.id, goal.id));
     await tx.delete(savingsGoalPins).where(eq(savingsGoalPins.goalId, goal.id));
+    await tx.delete(savingsGoalPlans).where(eq(savingsGoalPlans.goalId, goal.id));
+  });
+}
+
+/**
+ * Opens a closed goal again, for its maker or an owner: it takes entries and edits again.
+ * Pins and plans removed by closing stay removed. Reopening an open goal changes nothing.
+ */
+export async function reopenGoal(scope: GoalScope): Promise<SavingsGoal> {
+  return inHouseholdWrite(scope, async (tx, membership) => {
+    const goal = await findGoalToManage(tx, scope, membership);
+    if (!goal.archivedAt) return toGoal(tx, goal, scope.userId);
+    const [row] = await tx
+      .update(savingsGoals)
+      .set({ archivedAt: null })
+      .where(eq(savingsGoals.id, goal.id))
+      .returning();
+    if (!row) throw goalNotFound();
+    return toGoal(tx, row, scope.userId);
+  });
+}
+
+/**
+ * Sets the caller's monthly plan for a goal they can see, while it is open. The goal row is
+ * locked, so closing it (which removes its plans) cannot slip in between the check and the
+ * write.
+ */
+export async function setPlan(scope: GoalScope, input: SavingsPlanInput): Promise<SavingsGoal> {
+  return inHouseholdWrite(scope, async (tx) => {
+    const goal = await findGoal(tx, scope, { lock: true });
+    if (goal.archivedAt) throw goalArchived();
+    await tx
+      .insert(savingsGoalPlans)
+      .values({
+        householdId: scope.householdId,
+        goalId: goal.id,
+        userId: scope.userId,
+        monthlyAmount: input.monthlyAmount,
+      })
+      .onConflictDoUpdate({
+        target: [savingsGoalPlans.goalId, savingsGoalPlans.userId],
+        set: { monthlyAmount: input.monthlyAmount, updatedAt: sql`now()` },
+      });
+    return toGoal(tx, goal, scope.userId);
+  });
+}
+
+/** Removes the caller's plan for the goal; removing none changes nothing. */
+export async function deletePlan(scope: GoalScope): Promise<void> {
+  await inHouseholdWrite(scope, async (tx) => {
+    const goal = await findGoal(tx, scope);
+    await tx
+      .delete(savingsGoalPlans)
+      .where(and(eq(savingsGoalPlans.goalId, goal.id), eq(savingsGoalPlans.userId, scope.userId)));
   });
 }
 

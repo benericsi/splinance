@@ -507,3 +507,108 @@ describe('pins', () => {
     expect(errorCode(late)).toBe('SAVINGS_GOAL_ARCHIVED');
   });
 });
+
+describe('plans', () => {
+  const plan = async (user: TestUser, goal: SavingsGoal, monthlyAmount: number) => {
+    const res = await send(user, 'put', `/${goal.id}/plan`, { monthlyAmount });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    return savingsGoalResponseSchema.parse(res.body).goal;
+  };
+
+  it('keeps one plan per person, largest first, changed and removed by its owner', async () => {
+    const goal = await createGoal(ben);
+    await plan(ben, goal, 20_000);
+    await plan(cara, goal, 30_000);
+    const changed = await plan(ben, goal, 40_000);
+    expect(changed.plans.map((p) => [p.displayName, p.monthlyAmount])).toEqual([
+      ['Ben', 40_000],
+      ['Cara', 30_000],
+    ]);
+
+    expect((await send(cara, 'delete', `/${goal.id}/plan`)).status).toBe(204);
+    // Removing none changes nothing.
+    expect((await send(cara, 'delete', `/${goal.id}/plan`)).status).toBe(204);
+    const [listed] = (await savings(anna)).goals;
+    expect(listed?.plans.map((p) => p.displayName)).toEqual(['Ben']);
+  });
+
+  it('plans only open goals the person can see, within bounds', async () => {
+    const own = await createGoal(ben, { visibility: 'private' });
+    const hidden = await send(cara, 'put', `/${own.id}/plan`, { monthlyAmount: 1_000 });
+    expect(hidden.status).toBe(404);
+    expect(errorCode(hidden)).toBe('SAVINGS_GOAL_NOT_FOUND');
+    expect((await send(cara, 'delete', `/${own.id}/plan`)).status).toBe(404);
+    expect((await send(ben, 'put', `/${own.id}/plan`, { monthlyAmount: 0 })).status).toBe(400);
+    expect((await send(ben, 'put', `/${own.id}/plan`, { monthlyAmount: 1.5 })).status).toBe(400);
+
+    await send(ben, 'post', `/${own.id}/archive`);
+    const closed = await send(ben, 'put', `/${own.id}/plan`, { monthlyAmount: 1_000 });
+    expect(closed.status).toBe(409);
+    expect(errorCode(closed)).toBe('SAVINGS_GOAL_ARCHIVED');
+  });
+
+  it('leaves out the plans of members who left', async () => {
+    const goal = await createGoal(ben);
+    await plan(cara, goal, 30_000);
+    await leave(app, householdId, cara);
+    const [listed] = (await savings(ben)).goals;
+    expect(listed?.plans).toEqual([]);
+  });
+
+  it('counts what the viewer still means to put in this month', async () => {
+    const trip = await createGoal(ben, { name: 'Trip' });
+    const car = await createGoal(ben, { name: 'Car', visibility: 'private' });
+    await plan(ben, trip, 50_000);
+    await plan(ben, car, 10_000);
+    await plan(cara, trip, 25_000);
+    // Ben: 20 000 in and 5 000 out of the trip this month (a withdrawal is in setAside, not
+    // here), 15 000 into the car (more than planned: nothing left, never below zero),
+    // October's money does not count, and Cara's deposit is hers.
+    await add(ben, trip, 20_000, { entryOn: '2026-11-02' });
+    await add(ben, trip, -5_000, { entryOn: '2026-11-03' });
+    await add(ben, car, 15_000, { entryOn: '2026-11-04' });
+    await add(ben, trip, 40_000, { entryOn: '2026-10-20' });
+    await add(cara, trip, 25_000, { entryOn: '2026-11-05' });
+
+    const november = await savings(ben, '2026-11');
+    expect(november.toSetAside).toBe(30_000);
+    expect(november.setAside).toBe(30_000);
+    expect((await savings(cara, '2026-11')).toSetAside).toBe(0);
+    expect((await savings(ben, '2026-12')).toSetAside).toBe(60_000);
+    expect((await savings(ben)).toSetAside).toBeNull();
+  });
+});
+
+describe('reopening', () => {
+  it('opens a closed goal for its maker or an owner, without its pins and plans', async () => {
+    const goal = await createGoal(ben);
+    await send(ben, 'put', `/${goal.id}/pin`);
+    await send(ben, 'put', `/${goal.id}/plan`, { monthlyAmount: 10_000 });
+    expect((await send(ben, 'post', `/${goal.id}/archive`)).status).toBe(204);
+    expect((await savings(ben, '2026-11')).toSetAside).toBe(0);
+
+    const refused = await send(cara, 'post', `/${goal.id}/reopen`);
+    expect(refused.status).toBe(403);
+    // The owner may, like closing.
+    const res = await send(anna, 'post', `/${goal.id}/reopen`);
+    expect(res.status).toBe(200);
+    expect(savingsGoalResponseSchema.parse(res.body).goal).toMatchObject({
+      archivedAt: null,
+      plans: [],
+    });
+    const [listed] = (await savings(ben)).goals;
+    expect(listed).toMatchObject({ archivedAt: null, pinned: false, plans: [] });
+
+    // Entries and edits work again; reopening an open goal changes nothing.
+    await add(cara, goal, 5_000);
+    expect((await send(ben, 'post', `/${goal.id}/reopen`)).status).toBe(200);
+  });
+
+  it('hides another person’s private goal', async () => {
+    const own = await createGoal(ben, { visibility: 'private' });
+    await send(ben, 'post', `/${own.id}/archive`);
+    const res = await send(anna, 'post', `/${own.id}/reopen`);
+    expect(res.status).toBe(404);
+    expect(errorCode(res)).toBe('SAVINGS_GOAL_NOT_FOUND');
+  });
+});

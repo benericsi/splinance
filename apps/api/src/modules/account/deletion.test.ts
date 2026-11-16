@@ -25,6 +25,7 @@ import {
   savingsEntries,
   savingsGoalPins,
   savingsGoals,
+  savingsGoalPlans,
   savingsRules,
   sessions,
   transactions,
@@ -185,6 +186,14 @@ async function annasWorld() {
       { goalId: goalId('New sofa'), userId: ben.id, pattern: 'Sofa pocket' },
     ].map((rule) => ({ ...rule, householdId: home, patternKey: rule.pattern.toLowerCase() })),
   );
+  // Both plan their part of the sofa, she her own trip too.
+  await db.insert(savingsGoalPlans).values(
+    [
+      { goalId: goalId('Surprise trip'), userId: anna.id, monthlyAmount: 10_000 },
+      { goalId: goalId('New sofa'), userId: anna.id, monthlyAmount: 5_000 },
+      { goalId: goalId('New sofa'), userId: ben.id, monthlyAmount: 5_000 },
+    ].map((plan) => ({ ...plan, householdId: home })),
+  );
   // Both keep the sofa pinned, she her own trip too.
   await db.insert(savingsGoalPins).values(
     [
@@ -225,6 +234,12 @@ async function annasWorld() {
     userId: anna.id,
     pattern: 'Deposit pocket',
     patternKey: 'deposit pocket',
+  });
+  await db.insert(savingsGoalPlans).values({
+    householdId: flat,
+    goalId: flatGoal?.id ?? '',
+    userId: anna.id,
+    monthlyAmount: 1_000,
   });
   await addTransaction(flat, anna, { visibility: 'private', description: 'Rent' });
 
@@ -379,6 +394,8 @@ describe('delete', () => {
       (await db.select().from(savingsGoals).orderBy(savingsGoals.name)).map((g) => g.name),
     ).toEqual(['Bike', 'New sofa']);
     expect(await db.select().from(savingsEntries)).toHaveLength(3);
+    // Her plans are gone (also in the flat), Ben's stays.
+    expect((await db.select().from(savingsGoalPlans)).map((plan) => plan.userId)).toEqual([ben.id]);
     // Her rules are gone (also in the flat, deleted whole), Ben's stays.
     expect((await db.select().from(savingsRules)).map((rule) => rule.userId)).toEqual([ben.id]);
     // Her pins are gone, Ben's stays.
