@@ -25,6 +25,7 @@ const empty = (month: string) => ({
   income: 0,
   yourExpenses: 0,
   yourIncome: 0,
+  yourSetAside: 0,
 });
 
 const report: Report = {
@@ -36,13 +37,21 @@ const report: Report = {
     empty('2026-06'),
     empty('2026-07'),
     empty('2026-08'),
-    { month: '2026-09', expenses: 2000, income: 0, yourExpenses: 1000, yourIncome: 0 },
+    {
+      month: '2026-09',
+      expenses: 2000,
+      income: 0,
+      yourExpenses: 1000,
+      yourIncome: 0,
+      yourSetAside: 0,
+    },
     {
       month: '2026-10',
       expenses: 20_000,
       income: 40_000,
       yourExpenses: 11_500,
       yourIncome: 20_000,
+      yourSetAside: 5_000,
     },
   ],
   categories: [
@@ -151,6 +160,9 @@ describe('reports page', () => {
     const table = screen.getByRole('table', { name: 'Spent and income per month' });
     expect(within(table).getByRole('row', { name: /October 2026/ })).toHaveTextContent(
       money('11 500 Ft'),
+    ); // What the viewer set aside, against their own income; the household view never says.
+    expect(screen.getByRole('region', { name: 'Left over' })).toHaveTextContent(
+      money('Set aside 5000 Ft · 25% of income'),
     );
   });
 

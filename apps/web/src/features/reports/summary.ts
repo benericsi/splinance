@@ -16,6 +16,13 @@ export interface ReportSummary {
   comparePeriod: string;
   /** Share of income left over, in whole percent; null without income. */
   savedPercent: number | null;
+  /**
+   * Your share only: what the viewer put into savings in the period, net of what they took
+   * out (negative when more came out). Null in the household view: savings are personal.
+   */
+  setAside: number | null;
+  /** `setAside` as a share of income, in whole percent; null without income or set aside. */
+  setAsidePercent: number | null;
   top: { categoryId: string | null; amount: number; percent: number } | null;
   /**
    * Month by month for the sparklines: the six months of the chart, or the year so far.
@@ -75,6 +82,9 @@ export function summarize(
   const compareLabel = i18n.t('reports:summary.compare', { period: comparePeriod });
 
   const shown = totals(current);
+  const setAside = mine
+    ? current.reduce((sum, month) => sum + (byMonth.get(month)?.yourSetAside ?? 0), 0)
+    : null;
   const before = totals(previous);
   const hadBefore = before.spent !== 0 || before.income !== 0;
 
@@ -100,6 +110,11 @@ export function summarize(
     compareLabel,
     comparePeriod,
     savedPercent: shown.income > 0 ? Math.round((shown.left / shown.income) * 100) : null,
+    setAside,
+    setAsidePercent:
+      setAside !== null && setAside > 0 && shown.income > 0
+        ? Math.round((setAside / shown.income) * 100)
+        : null,
     top,
     trend: {
       spent: series.map((s) => s.spent),

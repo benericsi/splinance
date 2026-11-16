@@ -92,6 +92,7 @@ describe('GET /reports', () => {
         income: 0,
         yourExpenses: 0,
         yourIncome: 0,
+        yourSetAside: 0,
       })),
       categories: [],
     });
@@ -115,8 +116,15 @@ describe('GET /reports', () => {
 
     const forAnna = await report(anna, '2026-08', '2026-10');
     expect(forAnna.months).toEqual([
-      { month: '2026-08', expenses: 0, income: 0, yourExpenses: 0, yourIncome: 0 },
-      { month: '2026-09', expenses: 2000, income: 0, yourExpenses: 1000, yourIncome: 0 },
+      { month: '2026-08', expenses: 0, income: 0, yourExpenses: 0, yourIncome: 0, yourSetAside: 0 },
+      {
+        month: '2026-09',
+        expenses: 2000,
+        income: 0,
+        yourExpenses: 1000,
+        yourIncome: 0,
+        yourSetAside: 0,
+      },
       // Ben's private 4000 is not Anna's to see.
       {
         month: '2026-10',
@@ -124,6 +132,7 @@ describe('GET /reports', () => {
         income: 20_000,
         yourExpenses: 11_500,
         yourIncome: 10_000,
+        yourSetAside: 0,
       },
     ]);
     const byKey = (r: Report) =>
@@ -148,8 +157,51 @@ describe('GET /reports', () => {
         income: 20_000,
         yourExpenses: 12_500,
         yourIncome: 10_000,
+        yourSetAside: 0,
       },
     ]);
+  });
+
+  it('adds up what the viewer set aside per month, net, their own entries only', async () => {
+    const goal = async (user: TestUser, visibility: 'shared' | 'private') => {
+      const res = await request(app)
+        .post(base('/savings'))
+        .set('Authorization', await bearer(user))
+        .send({ name: 'Goal', targetAmount: null, targetDate: null, visibility })
+        .expect(201);
+      return (res.body as { goal: { id: string } }).goal.id;
+    };
+    const entry = async (user: TestUser, goalId: string, amount: number, entryOn: string) => {
+      const res = await request(app)
+        .post(base(`/savings/${goalId}/entries`))
+        .set('Authorization', await bearer(user))
+        .send({ amount, entryOn, note: null })
+        .expect(201);
+      return (res.body as { entry: { id: string } }).entry.id;
+    };
+    const trip = await goal(anna, 'shared');
+    const own = await goal(anna, 'private');
+    await entry(anna, trip, 30_000, '2026-09-05');
+    await entry(anna, own, 20_000, '2026-09-20');
+    await entry(anna, trip, 50_000, '2026-10-02');
+    await entry(anna, trip, -60_000, '2026-10-15');
+    // A removed entry and Ben's money are not Anna's saving.
+    const removed = await entry(anna, trip, 5_000, '2026-10-20');
+    await request(app)
+      .delete(base(`/savings/${trip}/entries/${removed}`))
+      .set('Authorization', await bearer(anna))
+      .expect(204);
+    await entry(ben, trip, 7_000, '2026-10-03');
+    // Outside the range.
+    await entry(anna, trip, 1_000, '2026-08-31');
+
+    const months = (await report(anna, '2026-09', '2026-11')).months;
+    expect(months.map((m) => [m.month, m.yourSetAside])).toEqual([
+      ['2026-09', 50_000],
+      ['2026-10', -10_000],
+      ['2026-11', 0],
+    ]);
+    expect((await report(ben, '2026-10', '2026-10')).months[0]?.yourSetAside).toBe(7_000);
   });
 
   it('refuses a backwards or too long range', async () => {

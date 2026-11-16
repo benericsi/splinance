@@ -42,6 +42,11 @@ export const reportMonthSchema = z.object({
   income: z.number().int().nonnegative(),
   yourExpenses: z.number().int().nonnegative(),
   yourIncome: z.number().int().nonnegative(),
+  /**
+   * What the viewer put into savings goals that month, net of what they took out (negative
+   * when more came out). Savings are personal: there is no household figure.
+   */
+  yourSetAside: z.number().int(),
 });
 
 export type ReportMonth = z.infer<typeof reportMonthSchema>;
