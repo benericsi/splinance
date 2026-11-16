@@ -8,6 +8,7 @@ import { resetSessionRestore } from '@/features/auth/session';
 import '@/i18n';
 import { resetAuthStore } from '@/lib/auth-store';
 import { LOCALE_STORAGE_KEY, localeStore } from '@/lib/locale';
+import type * as MotionTokens from '@/lib/motion';
 import { server } from './msw';
 
 // jsdom has no matchMedia; tests run as a light-mode OS by default.
@@ -48,6 +49,18 @@ globalThis.ResizeObserver = class {
 
 // Motion animations finish instantly, so exits (a deleted row) leave the DOM right away.
 MotionGlobalConfig.skipAnimations = true;
+
+// Entrances start at opacity 0 and, even skipped, finish on the next animation frame: on a
+// busy CI runner an assertion (findBy..., then toBeVisible) could land in between. Tests
+// mount them at their end state instead; exits still run (instantly, as above).
+vi.mock('@/lib/motion', async (importOriginal) => {
+  const actual = await importOriginal<typeof MotionTokens>();
+  return {
+    ...actual,
+    COLLAPSE: { ...actual.COLLAPSE, initial: false },
+    REVEAL: { ...actual.REVEAL, initial: false },
+  };
+});
 
 // Rolling numbers are a browser-only custom element; see test/number-flow-mock.tsx.
 vi.mock('@number-flow/react', () => import('./number-flow-mock'));
