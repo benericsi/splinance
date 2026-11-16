@@ -23,9 +23,9 @@ import {
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
 import {
-  lockHouseholdShared,
-  requireMembership,
   type HouseholdScope,
+  inHouseholdWrite,
+  requireMembership,
 } from '../households/households.service';
 import { namesOf, personOf } from '../households/people';
 import {
@@ -339,9 +339,7 @@ export async function createImport(
   input: ImportInput,
 ): Promise<ImportResponse> {
   try {
-    return await db.transaction(async (tx) => {
-      await lockHouseholdShared(tx, scope.householdId);
-      const { household } = await requireMembership(tx, scope);
+    return await inHouseholdWrite(scope, async (tx, { household }) => {
       // One import at a time per person and household: a bank row can become a transaction
       // or a savings entry, two tables no unique index spans, so two imports of the same
       // row at once could otherwise make one of each. `FOR NO KEY UPDATE` does not wait on
@@ -480,10 +478,7 @@ export async function listImports(scope: HouseholdScope): Promise<ImportBatch[]>
  * changes nothing.
  */
 export async function undoImport(scope: HouseholdScope & { importId: string }): Promise<void> {
-  await db.transaction(async (tx) => {
-    await lockHouseholdShared(tx, scope.householdId);
-    await requireMembership(tx, scope);
-
+  await inHouseholdWrite(scope, async (tx) => {
     const [batch] = await tx
       .select()
       .from(importBatches)
