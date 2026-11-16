@@ -45,6 +45,7 @@ const defaultDeps: AppDeps = {
   oauth: oauthFromEnv(),
 };
 
+/** The two import routes that take a big body; parsed in the imports router instead. */
 const IMPORT_PATH = /^\/api\/households\/[^/]+\/imports(\/check)?$/;
 
 export function createApp(overrides: Partial<AppDeps> = {}) {
@@ -70,12 +71,13 @@ export function createApp(overrides: Partial<AppDeps> = {}) {
       },
     }),
   );
-  // Small bodies everywhere, except bank imports: up to a thousand rows of about 500 bytes.
+  // Small bodies everywhere. Bank imports (up to 1 MB) are parsed by their own router, after
+  // requireAuth and the import limit, so nobody unknown can make the API read a big body.
   // No compressed bodies (the web never sends them): the limit then bounds memory directly.
   const smallJson = express.json({ limit: '100kb', inflate: false });
-  const importJson = express.json({ limit: '1mb', inflate: false });
   app.use((req, res, next) => {
-    (IMPORT_PATH.test(req.path) ? importJson : smallJson)(req, res, next);
+    if (IMPORT_PATH.test(req.path)) next();
+    else smallJson(req, res, next);
   });
   app.use(cookieParser());
 

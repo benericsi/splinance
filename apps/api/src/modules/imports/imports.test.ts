@@ -14,7 +14,7 @@ import { resetDatabase } from '../../../test/db';
 import { type App, createHousehold, errorCode, join } from '../../../test/households';
 import { bearer, createTestUser, pgErrorOf, type TestUser } from '../../../test/users';
 import { createApp } from '../../app';
-import { db } from '../../db/client';
+import { db, pool } from '../../db/client';
 import { auditLog, importBatches, transactions } from '../../db/schema';
 
 let app: App;
@@ -411,5 +411,28 @@ describe('database-level protection', () => {
       code: '23505',
       constraint: 'transactions_import_fingerprint_unique',
     });
+  });
+});
+
+describe('import batch indexes', () => {
+  // Undo, the batch list and the batch foreign key look rows up by household and batch.
+  it.each([
+    ['transactions', 'transactions_import_batch_idx'],
+    ['savings_entries', 'savings_entries_import_batch_idx'],
+  ])('finds the rows of one batch in %s through an index', async (table, index) => {
+    const client = await pool.connect();
+    try {
+      await client.query('begin');
+      // An empty table never needs an index; turning scans off asks whether one could serve.
+      await client.query('set local enable_seqscan = off');
+      const { rows } = await client.query<{ 'QUERY PLAN': string }>(
+        `explain select id from ${table} where household_id = $1 and import_batch_id = $2`,
+        ['019a0000-0000-7000-8000-000000000001', '019a0000-0000-7000-8000-000000000002'],
+      );
+      expect(rows.map((row) => row['QUERY PLAN']).join(' ')).toContain(index);
+    } finally {
+      await client.query('rollback');
+      client.release();
+    }
   });
 });

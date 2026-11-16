@@ -14,7 +14,7 @@ import { resetDatabase } from '../../../test/db';
 import { type App, createHousehold, errorCode, join } from '../../../test/households';
 import { bearer, createTestUser, pgErrorOf, type TestUser } from '../../../test/users';
 import { createApp } from '../../app';
-import { db } from '../../db/client';
+import { db, pool } from '../../db/client';
 import { auditLog, categoryRules } from '../../db/schema';
 
 let app: App;
@@ -290,6 +290,40 @@ describe('applying a rule to earlier transactions', () => {
       .post(base(`/rules/${pizzaRule.id}/apply`))
       .set('Authorization', await bearer(anna));
     expect(errorCode(res)).toBe('INVALID_CATEGORY');
+  });
+});
+
+describe('concurrency', () => {
+  it('locks only the matches when applying, not every uncategorized transaction', async () => {
+    const other = await transaction(anna, { description: 'Bakery' });
+    await transaction(anna, { description: 'Tesco weekly' });
+    const tesco = await rule('tesco');
+
+    const holder = await pool.connect();
+    try {
+      await holder.query('begin');
+      // Someone is editing the bakery expense, which the rule does not match.
+      await holder.query('select id from transactions where id = $1 for update', [other?.id]);
+      const applied = await request(app)
+        .post(base(`/rules/${tesco.id}/apply`))
+        .set('Authorization', await bearer(anna));
+      expect(applied.status).toBe(200);
+      expect(ruleApplyResponseSchema.parse(applied.body).updated).toBe(1);
+    } finally {
+      await holder.query('rollback');
+      holder.release();
+    }
+  });
+
+  it('gives rules created together different positions', async () => {
+    const created = await Promise.all(
+      ['aldi', 'lidl', 'spar', 'penny', 'auchan'].map((pattern) =>
+        create(anna, { pattern, categoryId: groceries.id, markShared: false }),
+      ),
+    );
+    expect(created.map((res) => res.status)).toEqual([201, 201, 201, 201, 201]);
+    const positions = (await list()).map((item) => item.position);
+    expect(new Set(positions).size).toBe(5);
   });
 });
 

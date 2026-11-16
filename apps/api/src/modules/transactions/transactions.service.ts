@@ -298,10 +298,25 @@ export async function getTransactionHistory(
   const snapshots = (entry: (typeof entries)[number]) =>
     [entry.before, entry.after] as [Transaction | null, Transaction | null];
 
+  // What a transaction was while private only its author ever saw. Anyone else gets the
+  // history from the latest moment it became shared (created shared, or an edit from
+  // private), and that first entry without its private "before".
+  let from = 0;
+  if (row.createdBy !== scope.userId) {
+    entries.forEach((entry, index) => {
+      const [before, after] = snapshots(entry);
+      const becameShared =
+        after?.visibility === 'shared' &&
+        (entry.action === 'create' || before?.visibility === 'private');
+      if (becameShared) from = index;
+    });
+  }
+  const shown = entries.slice(from);
+
   // Snapshots hold ids only (`toStored`); names are today's, so a rename shows everywhere
   // and an erased account reads "Former member".
-  const ids = new Set(entries.map((entry) => entry.actorId));
-  for (const snapshot of entries.flatMap(snapshots)) {
+  const ids = new Set(shown.map((entry) => entry.actorId));
+  for (const snapshot of shown.flatMap(snapshots)) {
     if (!snapshot) continue;
     ids.add(snapshot.paidBy.userId).add(snapshot.createdBy.userId);
     for (const share of snapshot.split?.shares ?? []) ids.add(share.userId);
@@ -318,14 +333,14 @@ export async function getTransactionHistory(
       },
     };
 
-  return entries.map((entry) => {
+  return shown.map((entry, index) => {
     const [before, after] = snapshots(entry);
     return {
       id: entry.id,
       action: entry.action,
       actor: person(entry.actorId),
       createdAt: entry.createdAt.toISOString(),
-      before: named(before),
+      before: from > 0 && index === 0 ? null : named(before),
       after: named(after),
     };
   });

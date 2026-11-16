@@ -163,7 +163,12 @@ interface Computed {
  * then take from what is left. Suggestions come from what no series covers, minus the
  * dismissed ones (same scope, kind and key).
  */
-async function compute(executor: Db, scope: HouseholdScope, today: string): Promise<Computed> {
+async function compute(
+  executor: Db,
+  scope: HouseholdScope,
+  today: string,
+  { suggest = true }: { suggest?: boolean } = {},
+): Promise<Computed> {
   const [seriesRows, visible] = await Promise.all([
     visibleSeriesRows(executor, scope),
     visibleRows(executor, scope, today),
@@ -184,9 +189,12 @@ async function compute(executor: Db, scope: HouseholdScope, today: string): Prom
       .filter((row) => row.status === 'dismissed')
       .map((row) => `${scopeOf(row)}:${row.kind}:${row.patternKey}`),
   );
-  const suggestions = detectRecurring(own.unowned, { today })
-    .filter((found) => !dismissed.has(`${found.scope}:${found.kind}:${found.key}`))
-    .slice(0, MAX_SUGGESTIONS);
+  // The detection is the expensive part; the sync and the calendar never show suggestions.
+  const suggestions = suggest
+    ? detectRecurring(own.unowned, { today })
+        .filter((found) => !dismissed.has(`${found.scope}:${found.kind}:${found.key}`))
+        .slice(0, MAX_SUGGESTIONS)
+    : [];
   return { rows: seriesRows, payments, suggestions };
 }
 
@@ -296,7 +304,12 @@ export async function seriesForMember(
   scope: HouseholdScope,
   today: string,
 ): Promise<RecurringSeries[]> {
-  return buildSeriesList(executor, scope, await compute(executor, scope, today), today);
+  return buildSeriesList(
+    executor,
+    scope,
+    await compute(executor, scope, today, { suggest: false }),
+    today,
+  );
 }
 
 /**
@@ -304,7 +317,7 @@ export async function seriesForMember(
  * the latest few), for the calendar. No membership check, like `seriesForMember`.
  */
 export async function seriesWithPayments(executor: Db, scope: HouseholdScope, today: string) {
-  const computed = await compute(executor, scope, today);
+  const computed = await compute(executor, scope, today, { suggest: false });
   const series = await buildSeriesList(executor, scope, computed, today);
   return series.map((item) => ({ series: item, payments: computed.payments.get(item.id) ?? [] }));
 }

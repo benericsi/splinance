@@ -5,7 +5,7 @@ import {
   ruleMatches,
   type UpdateRuleInput,
 } from '@splinance/shared';
-import { and, asc, eq, isNull, max } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
 import { isUniqueViolation } from '../../db/errors';
 import { categories, categoryRules, type CategoryRuleRow, transactions } from '../../db/schema';
@@ -25,6 +25,7 @@ const patternTaken = () =>
 const invalidCategory = () => new HttpError(400, 'Choose an active category', 'INVALID_CATEGORY');
 
 const PATTERN_UNIQUE = 'category_rules_household_kind_pattern_unique';
+const CREATE_RULE_LOCK = 'splinance:create-rule';
 
 export interface RuleScope extends HouseholdScope {
   ruleId: string;
@@ -86,32 +87,41 @@ export async function listRules(scope: HouseholdScope): Promise<Rule[]> {
   return rows.map(toRule);
 }
 
-/** New rules go last, so they never override what was there. */
+/**
+ * New rules go last, so they never override what was there. The position is read and used
+ * under a per-household advisory lock: locking the existing rules would not do, since with
+ * none there is nothing to lock, and two rules created together would share a position.
+ */
 export async function createRule(scope: HouseholdScope, input: RuleInput): Promise<Rule> {
-  await requireMembership(db, scope);
-  const category = await activeCategory(db, scope.householdId, input.categoryId);
-  const [last] = await db
-    .select({ position: max(categoryRules.position) })
-    .from(categoryRules)
-    .where(eq(categoryRules.householdId, scope.householdId));
+  return db.transaction(async (tx) => {
+    await requireMembership(tx, scope);
+    const category = await activeCategory(tx, scope.householdId, input.categoryId);
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${`${CREATE_RULE_LOCK}:${scope.householdId}`}))`,
+    );
+    const [last] = await tx
+      .select({ position: max(categoryRules.position) })
+      .from(categoryRules)
+      .where(eq(categoryRules.householdId, scope.householdId));
 
-  const [row] = await mapPatternTaken(
-    db
-      .insert(categoryRules)
-      .values({
-        householdId: scope.householdId,
-        pattern: input.pattern,
-        patternKey: matchKey(input.pattern),
-        categoryId: category.id,
-        kind: category.kind,
-        markShared: input.markShared,
-        position: last?.position === null || last === undefined ? 0 : last.position + 1,
-        createdBy: scope.userId,
-      })
-      .returning(),
-  );
-  if (!row) throw new Error('Rule insert returned no row');
-  return toRule(row);
+    const [row] = await mapPatternTaken(
+      tx
+        .insert(categoryRules)
+        .values({
+          householdId: scope.householdId,
+          pattern: input.pattern,
+          patternKey: matchKey(input.pattern),
+          categoryId: category.id,
+          kind: category.kind,
+          markShared: input.markShared,
+          position: last?.position === null || last === undefined ? 0 : last.position + 1,
+          createdBy: scope.userId,
+        })
+        .returning(),
+    );
+    if (!row) throw new Error('Rule insert returned no row');
+    return toRule(row);
+  });
 }
 
 export async function updateRule(scope: RuleScope, input: UpdateRuleInput): Promise<Rule> {
@@ -176,37 +186,48 @@ export async function reorderRules(scope: HouseholdScope, ruleIds: string[]): Pr
   });
 }
 
+/** The newest uncategorized transactions a rule looks at: plenty for a person, bounded work. */
+export const RULE_SCAN_LIMIT = 5_000;
+
+/** What the rule may categorize: visible to the caller, not deleted, no category, its kind. */
+const candidates = (scope: HouseholdScope, rule: CategoryRuleRow) =>
+  and(
+    eq(transactions.householdId, scope.householdId),
+    isNull(transactions.deletedAt),
+    isNull(transactions.categoryId),
+    eq(transactions.kind, rule.kind),
+    visibleTo(scope.userId),
+  );
+
 /**
- * Earlier transactions the rule would categorize: visible to the caller, not deleted,
- * without a category, of the rule's kind, matching its text.
+ * Ids of the earlier transactions the rule would categorize: candidates matching its text,
+ * among the newest RULE_SCAN_LIMIT. Matching normalizes text in JS (`matchKey`: NFD,
+ * diacritics stripped), which SQL cannot repeat exactly, so only the text columns are read,
+ * without a lock.
  */
-async function uncategorizedMatches(
+async function uncategorizedMatchIds(
   executor: Db,
   scope: HouseholdScope,
   rule: CategoryRuleRow,
-  { lock = false } = {},
-) {
-  const query = executor
-    .select()
+): Promise<string[]> {
+  const rows = await executor
+    .select({
+      id: transactions.id,
+      kind: transactions.kind,
+      description: transactions.description,
+      counterparty: transactions.counterparty,
+    })
     .from(transactions)
-    .where(
-      and(
-        eq(transactions.householdId, scope.householdId),
-        isNull(transactions.deletedAt),
-        isNull(transactions.categoryId),
-        eq(transactions.kind, rule.kind),
-        visibleTo(scope.userId),
-      ),
-    )
-    .orderBy(asc(transactions.id));
-  const rows = lock ? await query.for('update') : await query;
-  return rows.filter((row) => ruleMatches(rule, row));
+    .where(candidates(scope, rule))
+    .orderBy(desc(transactions.occurredOn), desc(transactions.id))
+    .limit(RULE_SCAN_LIMIT);
+  return rows.filter((row) => ruleMatches(rule, row)).map((row) => row.id);
 }
 
 export async function countRuleMatches(scope: RuleScope): Promise<number> {
   await requireMembership(db, scope);
   const rule = await findRule(db, scope);
-  return (await uncategorizedMatches(db, scope, rule)).length;
+  return (await uncategorizedMatchIds(db, scope, rule)).length;
 }
 
 /**
@@ -220,7 +241,17 @@ export async function applyRule(scope: RuleScope): Promise<number> {
     const rule = await findRule(tx, scope);
     await activeCategory(tx, scope.householdId, rule.categoryId);
 
-    const matches = await uncategorizedMatches(tx, scope, rule, { lock: true });
+    // Then only the matches are locked (in id order), and checked again under the lock: one
+    // edited or categorized in between is left alone.
+    const ids = await uncategorizedMatchIds(tx, scope, rule);
+    if (ids.length === 0) return 0;
+    const locked = await tx
+      .select()
+      .from(transactions)
+      .where(and(inArray(transactions.id, ids), candidates(scope, rule)))
+      .orderBy(asc(transactions.id))
+      .for('update');
+    const matches = locked.filter((row) => ruleMatches(rule, row));
     for (const row of matches) await setTransactionCategory(tx, scope, row, rule.categoryId);
     return matches.length;
   });
