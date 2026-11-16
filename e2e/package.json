@@ -13,7 +13,7 @@
     "typecheck": "tsc"
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.65.0",
     "@splinance/fake-oidc": "workspace:*",
     "@types/pg": "^8.23.1",
     "pg": "^8.23.1"

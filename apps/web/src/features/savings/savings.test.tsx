@@ -399,7 +399,8 @@ describe('savings page', () => {
     // Closed goals wait behind a toggle.
     expect(screen.queryByText('Old sofa')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Closed goals (1)' }));
-    expect(await screen.findByText('Old sofa')).toBeVisible();
+    // Revealed by a Collapse animation: visible once it has opened, not as soon as it exists.
+    await waitFor(() => expect(screen.getByText('Old sofa')).toBeVisible());
     expect(screen.queryByRole('button', { name: 'Pin Old sofa' })).not.toBeInTheDocument();
   });
 

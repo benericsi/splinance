@@ -20,10 +20,8 @@ Object.defineProperty(window, 'matchMedia', {
       onchange: null,
       addEventListener: () => undefined,
       removeEventListener: () => undefined,
-      addListener: () => undefined,
-      removeListener: () => undefined,
       dispatchEvent: () => false,
-    }) as MediaQueryList,
+    }) as unknown as MediaQueryList,
 });
 
 // The first route test in a file loads route chunks cold; on shared CI runners that can

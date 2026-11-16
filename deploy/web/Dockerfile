@@ -4,7 +4,7 @@
 #   docker build -f deploy/web/Dockerfile --build-arg VITE_DEMO_URL=https://demo.splinance.com .
 # Railway: RAILWAY_DOCKERFILE_PATH=deploy/web/Dockerfile, VITE_DEMO_URL as a service variable.
 
-FROM node:26.13.0-trixie-slim@sha256:e4db4c914bf8ad241bd24804fc25d272d89bad97e68cdc8a1414862790a02c39 AS build
+FROM node:26.13.1-trixie-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS build
 RUN npm install --global pnpm@10.30.0
 WORKDIR /repo
 
@@ -26,7 +26,7 @@ COPY deploy/web/Caddyfile deploy/web/
 COPY deploy/scripts/check-csp.mjs deploy/scripts/
 RUN node deploy/scripts/check-csp.mjs
 
-FROM caddy:2.11-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+FROM caddy:2.11-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
 COPY deploy/web/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /repo/apps/web/dist /srv/web
 COPY --from=build /repo/apps/web/dist-demo /srv/web-demo
