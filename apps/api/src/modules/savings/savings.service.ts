@@ -24,10 +24,10 @@ import {
 import { HttpError } from '../../lib/http-error';
 import { decodeCursor, encodeCursor } from '../../lib/keyset-cursor';
 import {
-  lockHouseholdShared,
+  type HouseholdScope,
+  inHouseholdWrite,
   type Membership,
   requireMembership,
-  type HouseholdScope,
 } from '../households/households.service';
 import { namesOf, personOf } from '../households/people';
 import { monthRange } from '../../lib/months';
@@ -226,25 +226,11 @@ export async function getGoal(scope: GoalScope): Promise<SavingsGoal> {
   return toGoal(db, await findGoal(db, scope), scope.userId);
 }
 
-/**
- * Every write: household lock (shared, like transaction writes, so leaving cannot slip in
- * between), then membership.
- */
-async function inWriteTransaction<T>(
-  scope: HouseholdScope,
-  work: (tx: Db, membership: Membership) => Promise<T>,
-): Promise<T> {
-  return db.transaction(async (tx) => {
-    await lockHouseholdShared(tx, scope.householdId);
-    return work(tx, await requireMembership(tx, scope));
-  });
-}
-
 export async function createGoal(
   scope: HouseholdScope,
   input: SavingsGoalInput,
 ): Promise<SavingsGoal> {
-  return inWriteTransaction(scope, async (tx, membership) => {
+  return inHouseholdWrite(scope, async (tx, membership) => {
     const [row] = await tx
       .insert(savingsGoals)
       .values({
@@ -278,7 +264,7 @@ export async function updateGoal(
   scope: GoalScope,
   input: UpdateSavingsGoalInput,
 ): Promise<SavingsGoal> {
-  return inWriteTransaction(scope, async (tx, membership) => {
+  return inHouseholdWrite(scope, async (tx, membership) => {
     const goal = await findGoalToManage(tx, scope, membership);
     if (goal.archivedAt) throw goalArchived();
     const [row] = await tx
@@ -296,7 +282,7 @@ export async function updateGoal(
  * it go, so a closed goal holds no place on anyone's page. Idempotent.
  */
 export async function archiveGoal(scope: GoalScope, now = new Date()): Promise<void> {
-  await inWriteTransaction(scope, async (tx, membership) => {
+  await inHouseholdWrite(scope, async (tx, membership) => {
     const goal = await findGoalToManage(tx, scope, membership);
     if (goal.archivedAt) return;
     await tx.update(savingsGoals).set({ archivedAt: now }).where(eq(savingsGoals.id, goal.id));
@@ -393,7 +379,7 @@ export async function addEntry(
   scope: GoalScope,
   input: SavingsEntryInput,
 ): Promise<{ entry: SavingsEntry; goal: SavingsGoal }> {
-  return inWriteTransaction(scope, async (tx) => {
+  return inHouseholdWrite(scope, async (tx) => {
     const goal = await findGoal(tx, scope, { lock: true });
     const row = await insertEntry(tx, scope, goal, input);
     const [entry] = await toEntries(tx, [row]);
@@ -484,7 +470,7 @@ export async function undoImportedEntries(
  * withdrawal in effect, so it is refused when others' withdrawals already used it.
  */
 export async function deleteEntry(scope: EntryScope): Promise<void> {
-  await inWriteTransaction(scope, async (tx) => {
+  await inHouseholdWrite(scope, async (tx) => {
     const goal = await findGoal(tx, scope, { lock: true });
     const [entry] = await tx
       .select()
@@ -511,7 +497,7 @@ export async function deleteEntry(scope: EntryScope): Promise<void> {
  * Pinning a pinned goal changes nothing.
  */
 export async function pinGoal(scope: GoalScope): Promise<void> {
-  await inWriteTransaction(scope, async (tx) => {
+  await inHouseholdWrite(scope, async (tx) => {
     const goal = await findGoal(tx, scope);
     if (goal.archivedAt) throw goalArchived();
     await tx
@@ -544,7 +530,7 @@ export async function pinGoal(scope: GoalScope): Promise<void> {
 
 /** Unpinning a goal that is not pinned changes nothing. */
 export async function unpinGoal(scope: GoalScope): Promise<void> {
-  await inWriteTransaction(scope, async (tx) => {
+  await inHouseholdWrite(scope, async (tx) => {
     const goal = await findGoal(tx, scope);
     await tx
       .delete(savingsGoalPins)

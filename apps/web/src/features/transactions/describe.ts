@@ -2,11 +2,6 @@ import type { Transaction, TransactionPerson } from '@splinance/shared';
 import { i18n } from '@/i18n';
 import { formatPercentInput } from './money';
 
-/** "You" for the viewer, the display name for everyone else. */
-export function personName(person: TransactionPerson, viewerId: string | undefined): string {
-  return person.userId === viewerId ? i18n.t('transactions:you') : person.displayName;
-}
-
 /** The second line of a row: who paid and how it is split ("Anna paid · split equally"). */
 export function describeTransaction(
   transaction: Transaction,

@@ -109,6 +109,21 @@ export async function lockHouseholdShared(tx: Db, householdId: string): Promise<
 }
 
 /**
+ * A household-scoped write: one database transaction that takes the shared household lock,
+ * then checks membership, then runs `work`. Both steps stay inside the transaction, in this
+ * order (lock order: user row, households, goals).
+ */
+export async function inHouseholdWrite<T>(
+  scope: HouseholdScope,
+  work: (tx: Db, membership: Membership) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await lockHouseholdShared(tx, scope.householdId);
+    return work(tx, await requireMembership(tx, scope));
+  });
+}
+
+/**
  * The single authorization check for household-scoped work. Non-members (including former
  * members) and archived households get 404, so ids reveal nothing. A member asking for an
  * owner-only action gets 403: they already know the household exists.
