@@ -27,7 +27,8 @@ interface Collected {
   share: number;
 }
 
-type ActivityMode = { mode: 'silent' } | { mode: 'collect'; people: Map<string, Collected> };
+type ActivityMode =
+  { mode: 'silent' } | { mode: 'collect'; people: Map<string, Collected>; listening?: Set<string> };
 
 const context = new AsyncLocalStorage<ActivityMode>();
 
@@ -162,9 +163,16 @@ export async function recordTransactionActivity(
   const people = new Set([...peopleIn(before), ...peopleIn(after)]);
   people.delete(scope.userId);
   if (people.size === 0) return;
-  const listening = await listeners(tx, scope.householdId);
-
   const store = context.getStore();
+  // While collecting (an import, its undo) the listeners are read once, not once per row.
+  let listening: Set<string>;
+  if (store?.mode === 'collect') {
+    store.listening ??= await listeners(tx, scope.householdId);
+    listening = store.listening;
+  } else {
+    listening = await listeners(tx, scope.householdId);
+  }
+
   const rows: ActivityRow[] = [];
   for (const userId of people) {
     if (!listening.has(userId)) continue;

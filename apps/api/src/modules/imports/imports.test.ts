@@ -2,6 +2,7 @@ import {
   apiErrorResponseSchema,
   categoryListResponseSchema,
   importCheckResponseSchema,
+  importInputSchema,
   importListResponseSchema,
   importResponseSchema,
   transactionListResponseSchema,
@@ -9,13 +10,21 @@ import {
 } from '@splinance/shared';
 import { and, asc, eq } from 'drizzle-orm';
 import request from 'supertest';
-import { beforeEach, describe, expect, it } from 'vitest';
+import pg from 'pg';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetDatabase } from '../../../test/db';
 import { type App, createHousehold, errorCode, join } from '../../../test/households';
 import { bearer, createTestUser, pgErrorOf, type TestUser } from '../../../test/users';
 import { createApp } from '../../app';
 import { db, pool } from '../../db/client';
-import { auditLog, importBatches, transactions } from '../../db/schema';
+import {
+  auditLog,
+  importBatches,
+  notifications,
+  transactions,
+  transactionSplits,
+} from '../../db/schema';
+import { createImport, undoImport } from './imports.service';
 
 let app: App;
 let anna: TestUser;
@@ -183,6 +192,26 @@ describe('POST /imports', () => {
     // The web says it in the UI language from the code and the row.
     expect(error.details).toEqual({ row: 2 });
     expect(await db.$count(importBatches)).toBe(0);
+    expect(await db.$count(transactions)).toBe(0);
+  });
+
+  it('names the row whose category does not fit, checked for all rows at once', async () => {
+    const res = await request(app)
+      .get(base('/categories'))
+      .set('Authorization', await bearer(anna))
+      .expect(200);
+    const all = categoryListResponseSchema.parse(res.body).categories;
+    const groceries = all.find((c) => c.name === 'Groceries');
+    const salary = all.find((c) => c.name === 'Salary');
+    const failed = await postImport(anna, [
+      row('kh:1', { categoryId: groceries?.id }),
+      row('kh:2'),
+      // An income category on an expense.
+      row('kh:3', { categoryId: salary?.id }),
+    ]);
+    expect(failed.status).toBe(400);
+    expect(errorCode(failed)).toBe('INVALID_CATEGORY');
+    expect(apiErrorResponseSchema.parse(failed.body).error.details).toEqual({ row: 3 });
     expect(await db.$count(transactions)).toBe(0);
   });
 
@@ -434,5 +463,57 @@ describe('import batch indexes', () => {
       await client.query('rollback');
       client.release();
     }
+  });
+});
+
+describe('a large import', () => {
+  /** Statements sent to Postgres while `work` runs (every pool client, including BEGIN). */
+  async function statements(work: () => Promise<unknown>): Promise<number> {
+    const spy = vi.spyOn(pg.Client.prototype, 'query');
+    try {
+      await work();
+      return spy.mock.calls.length;
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  it('writes a thousand rows in a bounded number of statements, and undoes them too', async () => {
+    const input = importInputSchema.parse({
+      source: 'kh',
+      fileName: 'export.csv',
+      rows: Array.from({ length: 1000 }, (_, i) =>
+        // Every other row shared with Ben: splits, and his share in the notification.
+        row(
+          `kh:${String(i)}`,
+          i % 2 === 0
+            ? {}
+            : {
+                visibility: 'shared',
+                paidBy: anna.id,
+                split: { method: 'equal', userIds: [anna.id, ben.id] },
+              },
+        ),
+      ),
+    });
+    const scope = { userId: anna.id, householdId };
+    let created: Awaited<ReturnType<typeof createImport>> | undefined;
+    const writing = await statements(async () => {
+      created = await createImport(scope, input);
+    });
+    expect(created?.batch.rowCount).toBe(1000);
+    expect(writing).toBeLessThan(60);
+    expect(await db.$count(transactionSplits)).toBe(1000);
+    expect(await db.$count(auditLog)).toBe(1000);
+    // One notification for Ben about the whole import, his share summed.
+    const [toBen] = await db.select().from(notifications).where(eq(notifications.userId, ben.id));
+    expect([toBen?.type, toBen?.count, toBen?.amount]).toEqual(['import_added', 500, 500 * 1153]);
+
+    const undoing = await statements(() =>
+      undoImport({ ...scope, importId: created?.batch.id ?? '' }),
+    );
+    expect(undoing).toBeLessThan(60);
+    expect((await listTransactions(anna)).length).toBe(0);
+    expect(await db.$count(auditLog)).toBe(2000);
   });
 });
