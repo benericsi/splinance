@@ -48,6 +48,14 @@ export const map: Messages<typeof en.map> = {
     more_other: 'Még {{count}} fizetés',
     moreHint: 'A Rendszeres oldalon',
   },
+  goal: {
+    saved: '{{amount}} félretéve',
+    of: '{{percent}}% · {{amount}} / {{target}}',
+    private: 'Csak te látod',
+    more_one: 'Még {{count}} cél',
+    more_other: 'Még {{count}} cél',
+    moreHint: 'A Megtakarítások oldalon',
+  },
   budget: {
     title: '{{category}} · keret',
     unknown: 'Keret',

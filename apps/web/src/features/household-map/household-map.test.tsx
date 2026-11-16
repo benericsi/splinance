@@ -261,6 +261,57 @@ describe('the overview as a map', () => {
     expect(screen.getByRole('region', { name: 'Household map', hidden: true })).toBeInTheDocument();
   });
 
+  it('shows savings goals once they arrive, each the way to its dialog', async () => {
+    restore = wideScreen();
+    fakeApi();
+    const goal = {
+      id: '01a12509-0f61-75bc-b406-000000000500',
+      name: 'Summer in Italy',
+      targetAmount: 600_000,
+      targetDate: null,
+      currency: 'HUF',
+      visibility: 'shared',
+      createdBy: { userId: testUser.id, displayName: testUser.displayName },
+      archivedAt: null,
+      balance: 150_000,
+      contributions: [],
+      pinned: false,
+      plans: [],
+      createdAt: '2026-10-01T00:00:00.000Z',
+    };
+    server.use(
+      mock.get(`/api/households/${testHousehold.id}/savings`, () =>
+        HttpResponse.json({
+          savings: {
+            currency: 'HUF',
+            goals: [
+              goal,
+              {
+                ...goal,
+                id: `${goal.id.slice(0, -1)}1`,
+                name: 'Own pot',
+                visibility: 'private',
+                targetAmount: null,
+              },
+            ],
+            setAside: 0,
+            setAsideByDay: [],
+            toSetAside: 0,
+          },
+        }),
+      ),
+    );
+    renderRoute(`${overview}?view=map`);
+
+    const map = await screen.findByRole('region', { name: 'Household map' });
+    const trip = await within(map).findByRole('link', { name: /Summer in Italy/ });
+    expect(trip).toHaveAttribute('href', `${overview}/savings/${goal.id}`);
+    expect(trip).toHaveTextContent(/25% · 150\s000\sFt of 600\s000\sFt/);
+    const pot = within(map).getByRole('link', { name: /Own pot/ });
+    expect(pot).toHaveTextContent(/150\s000\sFt saved/);
+    expect(within(pot).getByRole('img', { name: 'Only you see this' })).toBeInTheDocument();
+  });
+
   it('offers what can be added, the invite only to owners', async () => {
     restore = wideScreen();
     fakeApi();

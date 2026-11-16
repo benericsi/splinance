@@ -1,5 +1,5 @@
 import type { Currency } from '@splinance/shared';
-import { Ellipsis, Landmark, Lock, type LucideIcon, Mail, Repeat } from 'lucide-react';
+import { Ellipsis, Landmark, Lock, type LucideIcon, Mail, Repeat, Target } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HouseholdAvatar } from '@/components/household-avatar';
@@ -8,6 +8,7 @@ import { BudgetBar } from '@/features/budgets/components/budget-bar';
 import { budgetNote } from '@/features/budgets/status';
 import { expiresIn } from '@/features/invites/format';
 import { dueLabel } from '@/features/recurring/view';
+import { goalProgress, ringFraction } from '@/features/savings/view';
 import { MaskMoney } from '@/features/transactions/components/amount';
 import { formatMoney } from '@/features/transactions/money';
 import { cn } from '@/lib/utils';
@@ -154,6 +155,46 @@ export function MapNodeCard({ node, currency }: { node: MapNodeData; currency: C
           title={t('invite.title')}
           status={t('invite.expires', { when: expiresIn(node.expiresAt) })}
           icon={Mail}
+          ghost
+        />
+      );
+    case 'goal': {
+      const amount = formatMoney(node.balance, currency);
+      const { percent, reached } = goalProgress(node);
+      const fraction = ringFraction(node);
+      return (
+        <Card
+          title={node.name}
+          status={
+            node.targetAmount === null
+              ? t('goal.saved', { amount })
+              : t('goal.of', {
+                  amount,
+                  target: formatMoney(node.targetAmount, currency),
+                  percent: percent ?? 0,
+                })
+          }
+          tone={reached ? 'positive' : 'neutral'}
+          icon={node.private ? Lock : Target}
+          {...(node.private && { iconLabel: t('goal.private') })}
+        >
+          {fraction !== null && (
+            <div aria-hidden className="bg-muted mt-2 h-1.5 overflow-hidden rounded-full">
+              <div
+                className="bg-positive h-full rounded-full"
+                style={{ width: `${String(Math.round(fraction * 100))}%` }}
+              />
+            </div>
+          )}
+        </Card>
+      );
+    }
+    case 'moreGoals':
+      return (
+        <Card
+          title={t('goal.more', { count: node.count })}
+          status={t('goal.moreHint')}
+          icon={Ellipsis}
           ghost
         />
       );

@@ -78,5 +78,22 @@ export function MapNodeLink({
           {card}
         </Link>
       );
+    case 'goal':
+      return (
+        <Link
+          to="/h/$householdId/savings/$goalId"
+          params={{ householdId, goalId: node.goalId }}
+          state={OPEN_MODAL_STATE}
+          {...link}
+        >
+          {card}
+        </Link>
+      );
+    case 'moreGoals':
+      return (
+        <Link to="/h/$householdId/savings" params={params} {...link}>
+          {card}
+        </Link>
+      );
   }
 }

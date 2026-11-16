@@ -1,8 +1,9 @@
-import type { Budget, ImportBatch, Invite, RecurringSeries } from '@splinance/shared';
+import type { Budget, ImportBatch, Invite, RecurringSeries, SavingsGoal } from '@splinance/shared';
 import { describe, expect, it } from 'vitest';
 import { householdDetail, testHousehold, testUser } from '../../../test/utils';
 import {
   BUDGET_CAP,
+  GOAL_CAP,
   buildMap,
   type MapInput,
   type MapNode,
@@ -85,6 +86,7 @@ function input(overrides: Partial<MapInput> = {}): MapInput {
     recurring: { currency: 'HUF', series: [], suggestions: [], dismissed: [] },
     imports: [],
     invites: [],
+    goals: [],
     today: '2026-11-11',
     now: new Date('2026-11-11T12:00:00.000Z'),
     ...overrides,
@@ -287,6 +289,52 @@ describe('buildMap', () => {
       source: 'household',
       kind: 'pending',
     });
+  });
+
+  it('puts shared goals on the household side and private ones on yours, pins first', () => {
+    const goal = (n: number, overrides: Partial<SavingsGoal> = {}): SavingsGoal => ({
+      id: uuid(400 + n),
+      name: `Goal ${String(n)}`,
+      targetAmount: 600_000,
+      targetDate: null,
+      currency: 'HUF',
+      visibility: 'shared',
+      createdBy: anna,
+      archivedAt: null,
+      balance: 150_000,
+      contributions: [],
+      pinned: false,
+      plans: [],
+      createdAt: '2026-10-01T00:00:00.000Z',
+      ...overrides,
+    });
+    const map = buildMap(
+      input({
+        goals: [
+          goal(1),
+          goal(2),
+          goal(3, { pinned: true }),
+          goal(4, { archivedAt: '2026-11-01T00:00:00.000Z' }),
+          goal(5, { visibility: 'private', targetAmount: null }),
+        ],
+      }),
+    );
+    const goals = ofKind(map.nodes, 'goal');
+    expect(goals.map((g) => [g.name, g.private])).toEqual([
+      ['Goal 5', true],
+      ['Goal 3', false],
+      ['Goal 1', false],
+    ]);
+    // The third open shared goal folds away; the closed one is not on the map.
+    expect(ofKind(map.nodes, 'moreGoals')).toMatchObject([{ id: 'more-goals:shared', count: 1 }]);
+    expect(GOAL_CAP).toBe(2);
+    // Like the other nodes: yours point at you, the household's hang off the household.
+    const linked = (id: string) =>
+      map.edges.filter((e) => e.source === id || e.target === id).map((e) => [e.source, e.target]);
+    expect(linked(`goal:${uuid(405)}`)).toEqual([[`goal:${uuid(405)}`, `member:${anna.userId}`]]);
+    expect(linked(`goal:${uuid(403)}`)).toEqual([['household', `goal:${uuid(403)}`]]);
+    // Without goals (or before the savings query answers) there are no goal nodes.
+    expect(ofKind(buildMap(input()).nodes, 'goal')).toEqual([]);
   });
 
   it('lays columns out left to right and centers each one vertically', () => {
