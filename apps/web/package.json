@@ -28,7 +28,7 @@
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "facehash": "^0.1.0",
-    "i18next": "^26.7.2",
+    "i18next": "^27.1.1",
     "lucide-react": "^1.52.0",
     "motion": "13.4.4",
     "react": "^19.3.0",
