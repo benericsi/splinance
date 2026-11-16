@@ -206,6 +206,36 @@ describe('POST /api/auth/login', () => {
     const res = await attempt().expect(429);
     expect(errorCode(res)).toBe('RATE_LIMITED');
   });
+
+  it('also limits failed attempts per account, from however many addresses', async () => {
+    const proxied = createApp({ trustProxy: 1 });
+    await registerAnna(proxied);
+    await request(proxied)
+      .post('/api/auth/register')
+      .set('X-Forwarded-For', '192.0.2.200')
+      .send({ email: 'ben@example.com', password: 'violet tram morning', displayName: 'Ben' })
+      .expect(201);
+    const guess = (ip: string, email = ' Anna@Example.com ') =>
+      request(proxied)
+        .post('/api/auth/login')
+        .set('X-Forwarded-For', ip)
+        .send({ email, password: 'wrong password!' });
+
+    for (let i = 1; i <= 10; i++) await guess(`198.51.100.${String(i)}`).expect(401);
+    // The 11th wrong guess for Anna, from yet another address: refused.
+    expect(errorCode(await guess('203.0.113.50').expect(429))).toBe('RATE_LIMITED');
+    // The same for an email nobody has, so the answer tells nothing about who exists.
+    for (let i = 11; i <= 20; i++) {
+      await guess(`198.51.100.${String(i)}`, 'nobody@example.com').expect(401);
+    }
+    await guess('203.0.113.51', 'nobody@example.com').expect(429);
+    // Someone else signs in fine from the address that was just refused.
+    await request(proxied)
+      .post('/api/auth/login')
+      .set('X-Forwarded-For', '203.0.113.50')
+      .send({ email: 'ben@example.com', password: 'violet tram morning' })
+      .expect(200);
+  });
 });
 
 describe('GET /api/me', () => {
