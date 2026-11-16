@@ -272,6 +272,7 @@ Category rules. Also under a household; every member manages them, like categori
 
 - A rule matches when its text appears in the transaction's counterparty or description, accent and case insensitive (`matchKey`), and the kinds agree. No regular expressions: they are easy to get wrong and can be slow.
 - Applying categorizes the earlier transactions the caller can see that have no category, each as an audited update with a new version (an edit form opened before gets the usual conflict). It never changes who a transaction is for: that would move balances. Matching runs in TypeScript with the same function the web uses, so preview and result agree.
+- The preview count and applying look at the newest 5,000 uncategorized transactions of the rule's kind (`RULE_SCAN_LIMIT`), reading only the text columns without a lock; applying then locks just the matches (id order) and checks them again under the lock, so a transaction someone else is editing that the rule does not match never makes it wait. A new rule's position (last) is read and inserted under a per-household advisory lock, so rules created together get different positions.
 
 Budgets. Also under a household; every member sees and sets them. Household budgets only for now (shared spending).
 
