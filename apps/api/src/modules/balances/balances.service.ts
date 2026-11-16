@@ -1,13 +1,8 @@
 import type { Balances } from '@splinance/shared';
 import { db } from '../../db/client';
-import { requireMembership } from '../households/households.service';
+import { requireMembership, type HouseholdScope } from '../households/households.service';
 import { namesOf, personOf } from '../households/people';
 import { openDebts } from './ledger';
-
-interface HouseholdScope {
-  userId: string;
-  householdId: string;
-}
 
 /**
  * Who owes whom, per pair. Every member sees every debt: balances come only from shared

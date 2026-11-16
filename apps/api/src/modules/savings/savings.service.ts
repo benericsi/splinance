@@ -27,6 +27,7 @@ import {
   lockHouseholdShared,
   type Membership,
   requireMembership,
+  type HouseholdScope,
 } from '../households/households.service';
 import { namesOf, personOf } from '../households/people';
 
@@ -50,11 +51,6 @@ const notYourGoal = () =>
 
 const notYourEntry = () =>
   new HttpError(403, 'Only the person who recorded this can remove it', 'FORBIDDEN');
-
-export interface HouseholdScope {
-  userId: string;
-  householdId: string;
-}
 
 export interface GoalScope extends HouseholdScope {
   goalId: string;

@@ -20,7 +20,11 @@ import {
   transactions,
 } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
-import { lockHouseholdShared, requireMembership } from '../households/households.service';
+import {
+  lockHouseholdShared,
+  requireMembership,
+  type HouseholdScope,
+} from '../households/households.service';
 import { namesOf, personOf } from '../households/people';
 import {
   goalNotFound,
@@ -30,7 +34,6 @@ import {
 } from '../savings/savings.service';
 import {
   activeMemberIds,
-  type HouseholdScope,
   insertTransactions,
   softDeleteTransactions,
 } from '../transactions/transactions.service';

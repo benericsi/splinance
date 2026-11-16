@@ -1,10 +1,10 @@
 import type { Category, CreateCategoryInput, UpdateCategoryInput } from '@splinance/shared';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { isUniqueViolation } from '../../db/errors';
+import { mapUniqueViolation } from '../../db/errors';
 import { categories, type CategoryRow } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
-import { requireMembership } from '../households/households.service';
+import { requireMembership, type HouseholdScope } from '../households/households.service';
 
 export const categoryNotFound = () =>
   new HttpError(404, 'Category not found', 'CATEGORY_NOT_FOUND');
@@ -13,11 +13,6 @@ const nameTaken = () =>
   new HttpError(409, 'A category with this name already exists', 'CATEGORY_NAME_TAKEN');
 
 const NAME_UNIQUE = 'categories_household_kind_name_unique';
-
-interface HouseholdScope {
-  userId: string;
-  householdId: string;
-}
 
 interface CategoryScope extends HouseholdScope {
   categoryId: string;
@@ -35,14 +30,7 @@ function toCategory(row: CategoryRow): Category {
 }
 
 /** Turns the partial unique index violation into a 409 the form can show next to the name. */
-async function mapNameTaken<T>(write: Promise<T>): Promise<T> {
-  try {
-    return await write;
-  } catch (err) {
-    if (isUniqueViolation(err, NAME_UNIQUE)) throw nameTaken();
-    throw err;
-  }
-}
+const mapNameTaken = <T>(write: Promise<T>) => mapUniqueViolation(write, NAME_UNIQUE, nameTaken);
 
 const activeCategory = ({ householdId, categoryId }: CategoryScope) =>
   and(

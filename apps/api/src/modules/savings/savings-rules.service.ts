@@ -6,11 +6,11 @@ import {
 } from '@splinance/shared';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
-import { isUniqueViolation } from '../../db/errors';
+import { mapUniqueViolation } from '../../db/errors';
 import { savingsGoals, savingsRules, type SavingsRuleRow } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
-import { requireMembership } from '../households/households.service';
-import { goalVisibleTo, type HouseholdScope } from './savings.service';
+import { type HouseholdScope, requireMembership } from '../households/households.service';
+import { goalVisibleTo } from './savings.service';
 
 export const savingsRuleNotFound = () =>
   new HttpError(404, 'Savings rule not found', 'SAVINGS_RULE_NOT_FOUND');
@@ -31,14 +31,8 @@ function toRule(row: SavingsRuleRow): SavingsRule {
   return { id: row.id, pattern: row.pattern, goalId: row.goalId };
 }
 
-async function mapPatternTaken<T>(write: Promise<T>): Promise<T> {
-  try {
-    return await write;
-  } catch (err) {
-    if (isUniqueViolation(err, PATTERN_UNIQUE)) throw patternTaken();
-    throw err;
-  }
-}
+const mapPatternTaken = <T>(write: Promise<T>) =>
+  mapUniqueViolation(write, PATTERN_UNIQUE, patternTaken);
 
 /** A goal a rule may point at: open, in this household, and one the caller can see. */
 async function openGoal(executor: Db, scope: HouseholdScope, goalId: string): Promise<string> {

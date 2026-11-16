@@ -42,7 +42,8 @@ export interface Membership {
   role: HouseholdRole;
 }
 
-interface HouseholdScope {
+/** The caller and the household of a household-scoped request. */
+export interface HouseholdScope {
   userId: string;
   householdId: string;
 }

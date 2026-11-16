@@ -4,8 +4,7 @@ import { db } from '../../db/client';
 import { budgets, categories, transactions } from '../../db/schema';
 import { HttpError } from '../../lib/http-error';
 import { monthRange } from '../../lib/months';
-import { requireMembership } from '../households/households.service';
-import type { HouseholdScope } from '../transactions/transactions.service';
+import { requireMembership, type HouseholdScope } from '../households/households.service';
 
 const invalidCategory = () =>
   new HttpError(400, 'Choose an active expense category', 'INVALID_CATEGORY');
