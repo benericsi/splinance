@@ -1,4 +1,5 @@
 import {
+  addDays,
   assignPayments,
   type DetectedSeries,
   detectRecurring,
@@ -17,9 +18,9 @@ import {
   type RecurringSuggestion,
   type RecurringSuggestionDecision,
   seriesCovers,
-  type TransactionKind,
   type SeriesMatcher,
   seriesPayments,
+  type TransactionKind,
   type UpdateRecurringSeriesInput,
 } from '@splinance/shared';
 import { and, count, desc, eq, gte, inArray, isNull, or } from 'drizzle-orm';
@@ -77,12 +78,6 @@ const scopeOf = (row: Pick<RecurringSeriesRow, 'userId'>): RecurringScope =>
 
 const ownerFor = (scope: RecurringScope, userId: string) => (scope === 'private' ? userId : null);
 
-function minusDays(date: string, days: number): string {
-  const value = new Date(`${date}T00:00:00Z`);
-  value.setUTCDate(value.getUTCDate() - days);
-  return value.toISOString().slice(0, 10);
-}
-
 const mapPatternTaken = <T>(write: Promise<T>) =>
   mapUniqueViolation(write, PATTERN_UNIQUE, patternTaken);
 
@@ -109,7 +104,7 @@ async function visibleRows(executor: Db, scope: HouseholdScope, today: string) {
       and(
         eq(transactions.householdId, scope.householdId),
         isNull(transactions.deletedAt),
-        gte(transactions.occurredOn, minusDays(today, SCAN_DAYS)),
+        gte(transactions.occurredOn, addDays(today, -SCAN_DAYS)),
         visibleTo(scope.userId),
       ),
     )

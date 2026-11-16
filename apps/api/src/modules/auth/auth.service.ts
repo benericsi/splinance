@@ -1,3 +1,4 @@
+import { DAY_MS } from '@splinance/shared';
 import type { LoginInput, RegisterInput, User } from '@splinance/shared';
 import { and, eq, isNull, or } from 'drizzle-orm';
 import { env } from '../../config/env';
@@ -9,8 +10,6 @@ import { generateToken, hashToken } from '../../lib/random-token';
 import { logger } from '../../lib/logger';
 import { hashPassword, verifyDummyPassword, verifyPassword } from './passwords';
 import { signAccessToken } from './tokens';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * A previous refresh token is still accepted for this long after rotation.

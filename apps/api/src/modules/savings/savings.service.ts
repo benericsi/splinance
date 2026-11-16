@@ -30,6 +30,7 @@ import {
   type HouseholdScope,
 } from '../households/households.service';
 import { namesOf, personOf } from '../households/people';
+import { monthRange } from '../../lib/months';
 
 export const goalNotFound = () =>
   new HttpError(404, 'Savings goal not found', 'SAVINGS_GOAL_NOT_FOUND');
@@ -154,15 +155,6 @@ async function toEntries(executor: Db, rows: SavingsEntryRow[]): Promise<Savings
   }));
 }
 
-/** The first day of the month and of the one after it. */
-function monthRange(month: string): { start: string; end: string } {
-  const year = Number(month.slice(0, 4));
-  const next = Number(month.slice(5)) + 1;
-  const end =
-    next > 12 ? `${String(year + 1)}-01-01` : `${String(year)}-${String(next).padStart(2, '0')}-01`;
-  return { start: `${month}-01`, end };
-}
-
 /**
  * The goals the viewer can see, active first, and (with a month) what they set aside in
  * it, in all and per day. Their own entries are always in goals they can see, so the sums
@@ -180,7 +172,7 @@ export async function getSavings(scope: HouseholdScope, query: SavingsQuery): Pr
   let setAside: number | null = null;
   let setAsideByDay: DaySetAside[] | null = null;
   if (query.month) {
-    const { start, end } = monthRange(query.month);
+    const [start, end] = monthRange(query.month);
     const days = await db
       .select({ date: savingsEntries.entryOn, amount: entrySum })
       .from(savingsEntries)

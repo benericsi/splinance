@@ -1,6 +1,6 @@
 import type { ParseOptions, StatementSource } from '../imports';
+import { addDays } from '../dates';
 import {
-  addDays,
   DEMO_PEOPLE,
   type DemoBankMove,
   type DemoBankRow,
