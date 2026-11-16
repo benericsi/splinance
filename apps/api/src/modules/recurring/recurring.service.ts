@@ -27,7 +27,6 @@ import { and, count, desc, eq, gte, inArray, isNull, or } from 'drizzle-orm';
 import { db, type Db } from '../../db/client';
 import { mapUniqueViolation } from '../../db/errors';
 import {
-  categories,
   notifications,
   recurringSeries,
   type RecurringSeriesRow,
@@ -38,6 +37,7 @@ import { HttpError } from '../../lib/http-error';
 import { budapestToday } from '../../lib/today';
 import { requireMembership, type HouseholdScope } from '../households/households.service';
 import { visibleTo } from '../transactions/transactions.service';
+import { usableCategory } from '../categories/categories.service';
 
 export const seriesNotFound = () =>
   new HttpError(404, 'Recurring payment not found', 'SERIES_NOT_FOUND');
@@ -47,9 +47,6 @@ const suggestionNotFound = () =>
 
 const patternTaken = () =>
   new HttpError(409, 'A recurring payment matches this text already', 'SERIES_PATTERN_TAKEN');
-
-const invalidCategory = (kind: TransactionKind) =>
-  new HttpError(400, `Choose an active ${kind} category`, 'INVALID_CATEGORY');
 
 const PATTERN_UNIQUE = 'recurring_series_pattern_unique';
 
@@ -348,18 +345,7 @@ async function checkCategory(
   categoryId: string | null,
 ) {
   if (categoryId === null) return;
-  const [row] = await executor
-    .select({ id: categories.id })
-    .from(categories)
-    .where(
-      and(
-        eq(categories.id, categoryId),
-        eq(categories.householdId, householdId),
-        eq(categories.kind, kind),
-        isNull(categories.archivedAt),
-      ),
-    );
-  if (!row) throw invalidCategory(kind);
+  await usableCategory(executor, householdId, categoryId, kind);
 }
 
 async function checkRoom(executor: Db, householdId: string) {
